@@ -12,4 +12,26 @@ rules:
   before_build: check needed_by + check imports internal availability
   after_build: update exports + update imports with status
 
+progress:
+  current_phase: 1
+  current_task: database models
+  phases:
+    1:
+      name: database
+      status: in-progress
+      done: []
+      next: [define entities, create django models, setup postgresql connection]
+    2:
+      name: backend API
+      status: pending
+    3:
+      name: frontend
+      status: pending
+    4:
+      name: payment integration
+      status: pending
+    5:
+      name: deploy
+      status: pending
+
 files: {}
