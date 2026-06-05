@@ -14,13 +14,13 @@ rules:
 
 progress:
   current_phase: 1
-  current_task: database models
+  current_task: complete
   phases:
     1:
       name: database
-      status: in-progress
-      done: [define entities, create django models]
-      next: [setup postgresql connection, django settings, migrations]
+      status: done
+      done: [define entities, create django models, split into apps, django project setup, migrations verified]
+      next: []
     2:
       name: backend API
       status: pending
@@ -39,28 +39,69 @@ files:
   "backend/core/models.py":
     status: done
     imports:
-      external:
-        - {from: uuid, items: [uuid4]}
-        - {from: django.db.models, items: [Model, UUIDField, CharField, EmailField, TextField, BooleanField, DateField, DateTimeField, DecimalField, IntegerField, ImageField, JSONField, GenericIPAddressField, ForeignKey, ManyToManyField, TextChoices, Index]}
-        - {from: django.contrib.contenttypes.fields, items: [GenericForeignKey]}
-        - {from: django.contrib.contenttypes.models, items: [ContentType]}
-        - {from: django.core.validators, items: [MinValueValidator, MaxValueValidator]}
-        - {from: django.core.exceptions, items: [ValidationError]}
+      external: [{from: uuid, items: [uuid4]}, {from: django.db.models, items: [Model, UUIDField, CharField, DateTimeField]}]
       internal: []
     exports:
-      - {name: Permission,    kind: class, type: Django Model, fields: [id(UUID), codename(str,unique), label(str), description(str,opt), created_at]}
-      - {name: AccessGroup,   kind: class, type: Django Model, fields: [id(UUID), name(str,unique), description(str,opt), permissions(M2M→Permission), created_at, updated_at]}
-      - {name: Member,        kind: class, type: Django Model, fields: [id(UUID), full_name(str), display_name(str,opt), group(FK→AccessGroup), phone(str,opt), email(email,opt), password(str,hashed), is_active(bool), created_at, updated_at], validation: "clean(): phone OR email required"}
-      - {name: Contribution,  kind: class, type: Django Model, fields: [id(UUID), contributor(FK→Member,null=guest), guest_name(str,opt), amount(decimal), currency(str,3,GBP), payment_method(choices:stripe|paypal|google_pay|manual|other), status(choices:pending|completed|failed), notes(text,opt), created_at, updated_at]}
-      - {name: Expense,       kind: class, type: Django Model, fields: [id(UUID), withdrawn_by(FK→Member), amount(decimal), short_reason(str), description(text,opt), receipt_image(img,opt), expense_date(date), created_at, updated_at]}
-      - {name: Post,          kind: class, type: Django Model, fields: [id(UUID), author(FK→Member), title(str), body(text), created_at, updated_at]}
-      - {name: PostImage,     kind: class, type: Django Model, fields: [id(UUID), post(FK→Post,CASCADE), image(img), uploaded_at]}
-      - {name: Comment,       kind: class, type: Django Model, fields: [id(UUID), author(FK→Member,null=guest), guest_name(str,opt), content_type(FK→ContentType), object_id(UUID), content_object(GenericFK), text(text), rating(int,1-10,opt), is_approved(bool,False), created_at, updated_at]}
-      - {name: ActivityLog,   kind: class, type: Django Model, immutable: true, fields: [id(UUID), actor(FK→Member,null=anon), actor_display(str,snapshot), action(str), target_type(FK→ContentType,null), target_id(UUID,null), target_display(str,snapshot), ip_address, extra_data(json), created_at]}
-      - {name: SystemLog,     kind: class, type: Django Model, immutable: true, superuser_only: true, fields: [id(UUID), level(choices:debug|info|warning|error|critical), source(str), message(text), extra_data(json), related_member(FK→Member,null), ip_address, created_at]}
+      - {name: Permission, kind: class, type: Django Model, fields: [id(UUID), codename(str,unique,50), label(str,100), description(str,opt,350), created_at]}
     needed_by:
-      - {file: "backend/core/serializers.py",  items: [Permission, AccessGroup, Member, Contribution, Expense, Post, PostImage, Comment, ActivityLog, SystemLog], status: pending}
-      - {file: "backend/core/views.py",         items: [Permission, AccessGroup, Member, Contribution, Expense, Post, Comment, ActivityLog, SystemLog], status: pending}
-      - {file: "backend/core/admin.py",         items: [Permission, AccessGroup, Member, Contribution, Expense, Post, PostImage, Comment, ActivityLog, SystemLog], status: pending}
-      - {file: "backend/payments/service.py",   items: [Contribution, Member], status: pending}
-      - {file: "backend/core/auth_backend.py",  items: [Member], status: pending}
+      - {file: "backend/accounts/models.py", items: [Permission], status: available}
+      - {file: "backend/accounts/serializers.py", items: [Permission], status: pending}
+      - {file: "backend/accounts/views.py", items: [Permission], status: pending}
+
+  "backend/accounts/models.py":
+    status: done
+    imports:
+      external: [{from: uuid, items: [uuid4]}, {from: django.db.models, items: [...]}, {from: django.core.exceptions, items: [ValidationError]}]
+      internal:
+        - {from: "backend/core/models.py", items: [{name: Permission, status: available}]}
+    exports:
+      - {name: AccessGroup, kind: class, type: Django Model, fields: [id(UUID), name(str,unique,20), description(str,opt,350), permissions(M2M→core.Permission), created_at, updated_at]}
+      - {name: Member,      kind: class, type: Django Model, fields: [id(UUID), full_name(str,35), display_name(str,opt,20), group(FK→AccessGroup), phone(str,opt,20), email(email,opt), password(str,128,hashed), is_active(bool,True), created_at, updated_at], validation: "clean(): phone OR email required"}
+    needed_by:
+      - {file: "backend/fund/models.py",    items: [Member], status: available}
+      - {file: "backend/posts/models.py",   items: [Member], status: available}
+      - {file: "backend/logs/models.py",    items: [Member], status: available}
+      - {file: "backend/accounts/serializers.py", items: [AccessGroup, Member], status: pending}
+      - {file: "backend/accounts/views.py",       items: [AccessGroup, Member], status: pending}
+      - {file: "backend/accounts/auth_backend.py", items: [Member], status: pending}
+
+  "backend/fund/models.py":
+    status: done
+    imports:
+      external: [{from: uuid, items: [uuid4]}, {from: django.db.models, items: [...]}]
+      internal:
+        - {from: "backend/accounts/models.py", items: [{name: Member, status: available}]}
+    exports:
+      - {name: Contribution, kind: class, type: Django Model, fields: [id(UUID), contributor(FK→accounts.Member,null=guest), guest_name(str,opt,50), amount(decimal,10.2), currency(str,3,GBP), payment_method(choices:stripe|paypal|google_pay|manual|other), status(choices:pending|completed|failed), notes(text,opt), created_at, updated_at]}
+      - {name: Expense,      kind: class, type: Django Model, fields: [id(UUID), withdrawn_by(FK→accounts.Member), amount(decimal,10.2), short_reason(str,100), description(text,opt), receipt_image(img,opt), expense_date(date), created_at, updated_at]}
+    needed_by:
+      - {file: "backend/fund/serializers.py", items: [Contribution, Expense], status: pending}
+      - {file: "backend/fund/views.py",       items: [Contribution, Expense], status: pending}
+      - {file: "backend/payments/service.py", items: [Contribution], status: pending}
+
+  "backend/posts/models.py":
+    status: done
+    imports:
+      external: [{from: uuid, items: [uuid4]}, {from: django.contrib.contenttypes.fields, items: [GenericForeignKey]}, {from: django.contrib.contenttypes.models, items: [ContentType]}, {from: django.core.validators, items: [MinValueValidator, MaxValueValidator]}]
+      internal:
+        - {from: "backend/accounts/models.py", items: [{name: Member, status: available}]}
+    exports:
+      - {name: Post,      kind: class, type: Django Model, fields: [id(UUID), author(FK→accounts.Member), title(str,150), body(text), created_at, updated_at]}
+      - {name: PostImage, kind: class, type: Django Model, fields: [id(UUID), post(FK→Post,CASCADE), image(img,upload:posts/), uploaded_at]}
+      - {name: Comment,   kind: class, type: Django Model, fields: [id(UUID), author(FK→accounts.Member,null=guest), guest_name(str,opt,50), content_type(FK→ContentType), object_id(UUID), content_object(GenericFK), text(text), rating(int,1-10,opt), is_approved(bool,False), created_at, updated_at]}
+    needed_by:
+      - {file: "backend/posts/serializers.py", items: [Post, PostImage, Comment], status: pending}
+      - {file: "backend/posts/views.py",       items: [Post, PostImage, Comment], status: pending}
+
+  "backend/logs/models.py":
+    status: done
+    imports:
+      external: [{from: uuid, items: [uuid4]}, {from: django.contrib.contenttypes.models, items: [ContentType]}]
+      internal:
+        - {from: "backend/accounts/models.py", items: [{name: Member, status: available}]}
+    exports:
+      - {name: ActivityLog, kind: class, type: Django Model, immutable: true, fields: [id(UUID), actor(FK→accounts.Member,null=anon), actor_display(str,100,snapshot), action(str,100), target_type(FK→ContentType,null), target_id(UUID,null), target_display(str,255,snapshot), ip_address, extra_data(json), created_at]}
+      - {name: SystemLog,   kind: class, type: Django Model, immutable: true, superuser_only: true, fields: [id(UUID), level(choices:debug|info|warning|error|critical), source(str,100), message(text), extra_data(json), related_member(FK→accounts.Member,null), ip_address, created_at]}
+    needed_by:
+      - {file: "backend/logs/serializers.py", items: [ActivityLog, SystemLog], status: pending}
+      - {file: "backend/logs/views.py",       items: [ActivityLog, SystemLog], status: pending}
