@@ -1,5 +1,5 @@
 meta:
-  project: iran-charity-fund
+  project: groupfund
   backend: django/python
   frontend: react/javascript
   db: postgresql
@@ -19,11 +19,11 @@ progress:
     1:
       name: database
       status: done
-      done: [define entities, create django models, split into apps, django project setup, migrations verified]
-      next: []
+      done: [entities defined, models created, split into 5 apps, project setup, migrations verified]
     2:
       name: backend API
       status: pending
+      next: [serializers, views, urls, auth_backend, payments/service]
     3:
       name: frontend
       status: pending
@@ -36,72 +36,476 @@ progress:
 
 files:
 
+  # ─── PROJECT CONFIG ────────────────────────────────────────────────────────
+
+  "backend/groupfund/settings.py":
+    status: done
+    kind: config
+    key_settings:
+      installed_apps: [django.contrib.contenttypes, django.contrib.staticfiles, rest_framework, corsheaders, core, accounts, fund, posts, logs]
+      db_engine: postgresql (override: DB_ENGINE env for local sqlite testing)
+      db_env_vars: [DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT]
+      media: MEDIA_ROOT=backend/media, MEDIA_URL=/media/
+      static: STATIC_ROOT=backend/staticfiles, STATIC_URL=/static/
+      cors: CORS_ALLOWED_ORIGINS from env
+      auth_env_vars: [SECRET_KEY, DEBUG, ALLOWED_HOSTS]
+    imports:
+      external: [{from: os, items: [environ]}, {from: pathlib, items: [Path]}]
+      internal: []
+    exports: []
+    needed_by: []
+
+  "backend/groupfund/urls.py":
+    status: in-progress
+    imports:
+      external: [{from: django.urls, items: [path, include]}]
+      internal:
+        - {file: "backend/core/urls.py",     items: [urlpatterns], status: pending}
+        - {file: "backend/accounts/urls.py", items: [urlpatterns], status: pending}
+        - {file: "backend/fund/urls.py",     items: [urlpatterns], status: pending}
+        - {file: "backend/posts/urls.py",    items: [urlpatterns], status: pending}
+        - {file: "backend/logs/urls.py",     items: [urlpatterns], status: pending}
+    exports: []
+    needed_by: []
+
+  # ─── CORE APP ──────────────────────────────────────────────────────────────
+
   "backend/core/models.py":
     status: done
     imports:
-      external: [{from: uuid, items: [uuid4]}, {from: django.db.models, items: [Model, UUIDField, CharField, DateTimeField]}]
+      external: [{from: uuid, items: [uuid4]}, {from: django.db, items: [models]}]
       internal: []
     exports:
-      - {name: Permission, kind: class, type: Django Model, fields: [id(UUID), codename(str,unique,50), label(str,100), description(str,opt,350), created_at]}
+      - name: Permission
+        kind: class
+        type: Django Model
+        fields:
+          id: UUID, pk, auto
+          codename: str(50), unique
+          label: str(100)
+          description: str(350), blank
+          created_at: datetime, auto
+        meta: {ordering: [codename]}
     needed_by:
-      - {file: "backend/accounts/models.py", items: [Permission], status: available}
-      - {file: "backend/accounts/serializers.py", items: [Permission], status: pending}
-      - {file: "backend/accounts/views.py", items: [Permission], status: pending}
+      - {file: "backend/accounts/models.py",  items: [Permission], status: available}
+      - {file: "backend/core/serializers.py", items: [Permission], status: pending}
+      - {file: "backend/core/views.py",       items: [Permission], status: pending}
+
+  "backend/core/serializers.py":
+    status: pending
+    imports:
+      external: [{from: rest_framework, items: [serializers]}]
+      internal:
+        - {from: "backend/core/models.py", items: [{name: Permission, status: available}]}
+    exports:
+      - {name: PermissionSerializer, kind: class, type: DRF ModelSerializer, fields: [id, codename, label, description]}
+    needed_by:
+      - {file: "backend/core/views.py",           items: [PermissionSerializer], status: pending}
+      - {file: "backend/accounts/serializers.py", items: [PermissionSerializer], status: pending}
+
+  "backend/core/views.py":
+    status: pending
+    imports:
+      external: [{from: rest_framework.viewsets, items: [ReadOnlyModelViewSet]}]
+      internal:
+        - {from: "backend/core/models.py",      items: [{name: Permission, status: available}]}
+        - {from: "backend/core/serializers.py", items: [{name: PermissionSerializer, status: pending}]}
+    exports:
+      - {name: PermissionViewSet, kind: class, type: DRF ReadOnlyModelViewSet}
+    needed_by:
+      - {file: "backend/core/urls.py", items: [PermissionViewSet], status: pending}
+
+  "backend/core/urls.py":
+    status: pending
+    imports:
+      external: [{from: rest_framework.routers, items: [DefaultRouter]}]
+      internal:
+        - {from: "backend/core/views.py", items: [{name: PermissionViewSet, status: pending}]}
+    exports:
+      - {name: urlpatterns, kind: constant, type: list}
+    needed_by:
+      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: in-progress}
+
+  # ─── ACCOUNTS APP ──────────────────────────────────────────────────────────
 
   "backend/accounts/models.py":
     status: done
     imports:
-      external: [{from: uuid, items: [uuid4]}, {from: django.db.models, items: [...]}, {from: django.core.exceptions, items: [ValidationError]}]
+      external:
+        - {from: uuid, items: [uuid4]}
+        - {from: django.db, items: [models]}
+        - {from: django.core.exceptions, items: [ValidationError]}
       internal:
         - {from: "backend/core/models.py", items: [{name: Permission, status: available}]}
     exports:
-      - {name: AccessGroup, kind: class, type: Django Model, fields: [id(UUID), name(str,unique,20), description(str,opt,350), permissions(M2M→core.Permission), created_at, updated_at]}
-      - {name: Member,      kind: class, type: Django Model, fields: [id(UUID), full_name(str,35), display_name(str,opt,20), group(FK→AccessGroup), phone(str,opt,20), email(email,opt), password(str,128,hashed), is_active(bool,True), created_at, updated_at], validation: "clean(): phone OR email required"}
+      - name: AccessGroup
+        kind: class
+        type: Django Model
+        fields:
+          id: UUID, pk, auto
+          name: str(20), unique
+          description: str(350), blank
+          permissions: M2M → core.Permission
+          created_at: datetime, auto
+          updated_at: datetime, auto
+        meta: {ordering: [name]}
+      - name: Member
+        kind: class
+        type: Django Model
+        fields:
+          id: UUID, pk, auto
+          full_name: str(35)
+          display_name: str(20), blank
+          group: FK → AccessGroup, PROTECT
+          phone: str(20), blank
+          email: EmailField, blank
+          password: str(128), hashed via make_password()
+          is_active: bool, default True
+          created_at: datetime, auto
+          updated_at: datetime, auto
+        validation: "clean() → phone OR email required"
+        meta: {ordering: [full_name]}
     needed_by:
-      - {file: "backend/fund/models.py",    items: [Member], status: available}
-      - {file: "backend/posts/models.py",   items: [Member], status: available}
-      - {file: "backend/logs/models.py",    items: [Member], status: available}
-      - {file: "backend/accounts/serializers.py", items: [AccessGroup, Member], status: pending}
-      - {file: "backend/accounts/views.py",       items: [AccessGroup, Member], status: pending}
+      - {file: "backend/fund/models.py",           items: [Member], status: available}
+      - {file: "backend/posts/models.py",          items: [Member], status: available}
+      - {file: "backend/logs/models.py",           items: [Member], status: available}
+      - {file: "backend/accounts/serializers.py",  items: [AccessGroup, Member], status: pending}
+      - {file: "backend/accounts/views.py",        items: [AccessGroup, Member], status: pending}
       - {file: "backend/accounts/auth_backend.py", items: [Member], status: pending}
+
+  "backend/accounts/auth_backend.py":
+    status: pending
+    imports:
+      external:
+        - {from: django.contrib.auth.hashers, items: [check_password]}
+        - {from: django.db.models, items: [Q]}
+      internal:
+        - {from: "backend/accounts/models.py", items: [{name: Member, status: available}]}
+    exports:
+      - name: MemberAuthBackend
+        kind: class
+        methods:
+          - {signature: "authenticate(request, identifier: str, password: str) -> Member | None", note: "identifier = phone or email, checks both fields"}
+          - {signature: "get_user(user_id: UUID) -> Member | None"}
+    needed_by:
+      - {file: "backend/accounts/views.py", items: [MemberAuthBackend], status: pending}
+
+  "backend/accounts/serializers.py":
+    status: pending
+    imports:
+      external: [{from: rest_framework, items: [serializers]}, {from: django.contrib.auth.hashers, items: [make_password]}]
+      internal:
+        - {from: "backend/accounts/models.py",  items: [{name: AccessGroup, status: available}, {name: Member, status: available}]}
+        - {from: "backend/core/serializers.py", items: [{name: PermissionSerializer, status: pending}]}
+    exports:
+      - {name: AccessGroupSerializer,  kind: class, type: DRF ModelSerializer, fields: [id, name, description, permissions(nested PermissionSerializer)]}
+      - {name: MemberSerializer,       kind: class, type: DRF ModelSerializer, fields: [id, full_name, display_name, group, phone, email, is_active, created_at]}
+      - {name: MemberCreateSerializer, kind: class, type: DRF ModelSerializer, fields: [full_name, display_name, group, phone, email, password], note: "hashes password via make_password() on save"}
+      - {name: LoginSerializer,        kind: class, type: DRF Serializer,      fields: [identifier(str), password(str)]}
+    needed_by:
+      - {file: "backend/accounts/views.py", items: [AccessGroupSerializer, MemberSerializer, MemberCreateSerializer, LoginSerializer], status: pending}
+
+  "backend/accounts/views.py":
+    status: pending
+    imports:
+      external:
+        - {from: rest_framework.viewsets, items: [ModelViewSet]}
+        - {from: rest_framework.views, items: [APIView]}
+        - {from: rest_framework.response, items: [Response]}
+      internal:
+        - {from: "backend/accounts/models.py",      items: [{name: AccessGroup, status: available}, {name: Member, status: available}]}
+        - {from: "backend/accounts/serializers.py", items: [{name: AccessGroupSerializer, status: pending}, {name: MemberSerializer, status: pending}, {name: MemberCreateSerializer, status: pending}, {name: LoginSerializer, status: pending}]}
+        - {from: "backend/accounts/auth_backend.py",items: [{name: MemberAuthBackend, status: pending}]}
+    exports:
+      - {name: AccessGroupViewSet, kind: class, type: DRF ModelViewSet}
+      - {name: MemberViewSet,      kind: class, type: DRF ModelViewSet}
+      - {name: LoginView,          kind: class, type: DRF APIView, description: "authenticates via MemberAuthBackend, returns JWT tokens"}
+    needed_by:
+      - {file: "backend/accounts/urls.py", items: [AccessGroupViewSet, MemberViewSet, LoginView], status: pending}
+
+  "backend/accounts/urls.py":
+    status: pending
+    imports:
+      external: [{from: rest_framework.routers, items: [DefaultRouter]}, {from: django.urls, items: [path]}]
+      internal:
+        - {from: "backend/accounts/views.py", items: [{name: AccessGroupViewSet, status: pending}, {name: MemberViewSet, status: pending}, {name: LoginView, status: pending}]}
+    exports:
+      - {name: urlpatterns, kind: constant, type: list}
+    needed_by:
+      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: in-progress}
+
+  # ─── FUND APP ──────────────────────────────────────────────────────────────
 
   "backend/fund/models.py":
     status: done
     imports:
-      external: [{from: uuid, items: [uuid4]}, {from: django.db.models, items: [...]}]
+      external: [{from: uuid, items: [uuid4]}, {from: django.db, items: [models]}]
       internal:
         - {from: "backend/accounts/models.py", items: [{name: Member, status: available}]}
     exports:
-      - {name: Contribution, kind: class, type: Django Model, fields: [id(UUID), contributor(FK→accounts.Member,null=guest), guest_name(str,opt,50), amount(decimal,10.2), currency(str,3,GBP), payment_method(choices:stripe|paypal|google_pay|manual|other), status(choices:pending|completed|failed), notes(text,opt), created_at, updated_at]}
-      - {name: Expense,      kind: class, type: Django Model, fields: [id(UUID), withdrawn_by(FK→accounts.Member), amount(decimal,10.2), short_reason(str,100), description(text,opt), receipt_image(img,opt), expense_date(date), created_at, updated_at]}
+      - name: Contribution
+        kind: class
+        type: Django Model
+        fields:
+          id: UUID, pk, auto
+          contributor: FK → accounts.Member, SET_NULL, null (null = guest)
+          guest_name: str(50), blank
+          amount: decimal(10,2)
+          currency: str(3), default GBP
+          payment_method: choices [stripe, paypal, google_pay, manual, other]
+          status: choices [pending, completed, failed], default pending
+          notes: text, blank
+          created_at: datetime, auto
+          updated_at: datetime, auto
+        meta: {ordering: [-created_at]}
+      - name: Expense
+        kind: class
+        type: Django Model
+        fields:
+          id: UUID, pk, auto
+          withdrawn_by: FK → accounts.Member, PROTECT
+          amount: decimal(10,2)
+          short_reason: str(100)
+          description: text, blank
+          receipt_image: ImageField, upload_to receipts/, blank
+          expense_date: date
+          created_at: datetime, auto
+          updated_at: datetime, auto
+        meta: {ordering: [-expense_date]}
     needed_by:
       - {file: "backend/fund/serializers.py", items: [Contribution, Expense], status: pending}
       - {file: "backend/fund/views.py",       items: [Contribution, Expense], status: pending}
       - {file: "backend/payments/service.py", items: [Contribution], status: pending}
 
+  "backend/fund/serializers.py":
+    status: pending
+    imports:
+      external: [{from: rest_framework, items: [serializers]}]
+      internal:
+        - {from: "backend/fund/models.py", items: [{name: Contribution, status: available}, {name: Expense, status: available}]}
+    exports:
+      - {name: ContributionSerializer, kind: class, type: DRF ModelSerializer, fields: [id, contributor, guest_name, amount, currency, payment_method, status, notes, created_at]}
+      - {name: ExpenseSerializer,      kind: class, type: DRF ModelSerializer, fields: [id, withdrawn_by, amount, short_reason, description, receipt_image, expense_date, created_at]}
+      - {name: FundSummarySerializer,  kind: class, type: DRF Serializer,      fields: [total_contributions(decimal), total_expenses(decimal), balance(decimal), is_balance_visible(bool)]}
+    needed_by:
+      - {file: "backend/fund/views.py", items: [ContributionSerializer, ExpenseSerializer, FundSummarySerializer], status: pending}
+
+  "backend/fund/views.py":
+    status: pending
+    imports:
+      external:
+        - {from: rest_framework.viewsets, items: [ModelViewSet]}
+        - {from: rest_framework.views, items: [APIView]}
+        - {from: rest_framework.response, items: [Response]}
+      internal:
+        - {from: "backend/fund/models.py",      items: [{name: Contribution, status: available}, {name: Expense, status: available}]}
+        - {from: "backend/fund/serializers.py", items: [{name: ContributionSerializer, status: pending}, {name: ExpenseSerializer, status: pending}, {name: FundSummarySerializer, status: pending}]}
+        - {from: "backend/payments/service.py", items: [{name: create_payment_intent, status: pending}, {name: handle_webhook, status: pending}]}
+    exports:
+      - {name: ContributionViewSet, kind: class, type: DRF ModelViewSet}
+      - {name: ExpenseViewSet,      kind: class, type: DRF ModelViewSet}
+      - {name: FundSummaryView,     kind: class, type: DRF APIView, description: "returns totals/balance — respects admin visibility toggle"}
+      - {name: StripeWebhookView,   kind: class, type: DRF APIView, description: "receives Stripe webhook, calls handle_webhook()"}
+    needed_by:
+      - {file: "backend/fund/urls.py", items: [ContributionViewSet, ExpenseViewSet, FundSummaryView, StripeWebhookView], status: pending}
+
+  "backend/fund/urls.py":
+    status: pending
+    imports:
+      external: [{from: rest_framework.routers, items: [DefaultRouter]}, {from: django.urls, items: [path]}]
+      internal:
+        - {from: "backend/fund/views.py", items: [{name: ContributionViewSet, status: pending}, {name: ExpenseViewSet, status: pending}, {name: FundSummaryView, status: pending}, {name: StripeWebhookView, status: pending}]}
+    exports:
+      - {name: urlpatterns, kind: constant, type: list}
+    needed_by:
+      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: in-progress}
+
+  # ─── POSTS APP ─────────────────────────────────────────────────────────────
+
   "backend/posts/models.py":
     status: done
     imports:
-      external: [{from: uuid, items: [uuid4]}, {from: django.contrib.contenttypes.fields, items: [GenericForeignKey]}, {from: django.contrib.contenttypes.models, items: [ContentType]}, {from: django.core.validators, items: [MinValueValidator, MaxValueValidator]}]
+      external:
+        - {from: uuid, items: [uuid4]}
+        - {from: django.db, items: [models]}
+        - {from: django.contrib.contenttypes.fields, items: [GenericForeignKey]}
+        - {from: django.contrib.contenttypes.models, items: [ContentType]}
+        - {from: django.core.validators, items: [MinValueValidator, MaxValueValidator]}
       internal:
         - {from: "backend/accounts/models.py", items: [{name: Member, status: available}]}
     exports:
-      - {name: Post,      kind: class, type: Django Model, fields: [id(UUID), author(FK→accounts.Member), title(str,150), body(text), created_at, updated_at]}
-      - {name: PostImage, kind: class, type: Django Model, fields: [id(UUID), post(FK→Post,CASCADE), image(img,upload:posts/), uploaded_at]}
-      - {name: Comment,   kind: class, type: Django Model, fields: [id(UUID), author(FK→accounts.Member,null=guest), guest_name(str,opt,50), content_type(FK→ContentType), object_id(UUID), content_object(GenericFK), text(text), rating(int,1-10,opt), is_approved(bool,False), created_at, updated_at]}
+      - name: Post
+        kind: class
+        type: Django Model
+        fields:
+          id: UUID, pk, auto
+          author: FK → accounts.Member, PROTECT
+          title: str(150)
+          body: text
+          created_at: datetime, auto
+          updated_at: datetime, auto
+        meta: {ordering: [-created_at]}
+      - name: PostImage
+        kind: class
+        type: Django Model
+        fields:
+          id: UUID, pk, auto
+          post: FK → Post, CASCADE
+          image: ImageField, upload_to posts/
+          uploaded_at: datetime, auto
+      - name: Comment
+        kind: class
+        type: Django Model
+        fields:
+          id: UUID, pk, auto
+          author: FK → accounts.Member, SET_NULL, null (null = guest)
+          guest_name: str(50), blank
+          content_type: FK → ContentType
+          object_id: UUID
+          content_object: GenericFK (targets Post or Expense)
+          text: text
+          rating: int(1-10), null
+          is_approved: bool, default False
+          created_at: datetime, auto
+          updated_at: datetime, auto
+        meta: {ordering: [-created_at], indexes: [[content_type, object_id]]}
     needed_by:
       - {file: "backend/posts/serializers.py", items: [Post, PostImage, Comment], status: pending}
       - {file: "backend/posts/views.py",       items: [Post, PostImage, Comment], status: pending}
 
+  "backend/posts/serializers.py":
+    status: pending
+    imports:
+      external: [{from: rest_framework, items: [serializers]}]
+      internal:
+        - {from: "backend/posts/models.py", items: [{name: Post, status: available}, {name: PostImage, status: available}, {name: Comment, status: available}]}
+    exports:
+      - {name: PostImageSerializer, kind: class, type: DRF ModelSerializer, fields: [id, image, uploaded_at]}
+      - {name: PostSerializer,      kind: class, type: DRF ModelSerializer, fields: [id, author, title, body, images(nested PostImageSerializer), created_at, updated_at]}
+      - {name: CommentSerializer,   kind: class, type: DRF ModelSerializer, fields: [id, author, guest_name, text, rating, is_approved, created_at]}
+    needed_by:
+      - {file: "backend/posts/views.py", items: [PostSerializer, PostImageSerializer, CommentSerializer], status: pending}
+
+  "backend/posts/views.py":
+    status: pending
+    imports:
+      external: [{from: rest_framework.viewsets, items: [ModelViewSet]}]
+      internal:
+        - {from: "backend/posts/models.py",      items: [{name: Post, status: available}, {name: Comment, status: available}]}
+        - {from: "backend/posts/serializers.py", items: [{name: PostSerializer, status: pending}, {name: PostImageSerializer, status: pending}, {name: CommentSerializer, status: pending}]}
+    exports:
+      - {name: PostViewSet,    kind: class, type: DRF ModelViewSet}
+      - {name: CommentViewSet, kind: class, type: DRF ModelViewSet, description: "handles approval workflow — is_approved toggle for admins"}
+    needed_by:
+      - {file: "backend/posts/urls.py", items: [PostViewSet, CommentViewSet], status: pending}
+
+  "backend/posts/urls.py":
+    status: pending
+    imports:
+      external: [{from: rest_framework.routers, items: [DefaultRouter]}]
+      internal:
+        - {from: "backend/posts/views.py", items: [{name: PostViewSet, status: pending}, {name: CommentViewSet, status: pending}]}
+    exports:
+      - {name: urlpatterns, kind: constant, type: list}
+    needed_by:
+      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: in-progress}
+
+  # ─── LOGS APP ──────────────────────────────────────────────────────────────
+
   "backend/logs/models.py":
     status: done
     imports:
-      external: [{from: uuid, items: [uuid4]}, {from: django.contrib.contenttypes.models, items: [ContentType]}]
+      external:
+        - {from: uuid, items: [uuid4]}
+        - {from: django.db, items: [models]}
+        - {from: django.contrib.contenttypes.models, items: [ContentType]}
       internal:
         - {from: "backend/accounts/models.py", items: [{name: Member, status: available}]}
     exports:
-      - {name: ActivityLog, kind: class, type: Django Model, immutable: true, fields: [id(UUID), actor(FK→accounts.Member,null=anon), actor_display(str,100,snapshot), action(str,100), target_type(FK→ContentType,null), target_id(UUID,null), target_display(str,255,snapshot), ip_address, extra_data(json), created_at]}
-      - {name: SystemLog,   kind: class, type: Django Model, immutable: true, superuser_only: true, fields: [id(UUID), level(choices:debug|info|warning|error|critical), source(str,100), message(text), extra_data(json), related_member(FK→accounts.Member,null), ip_address, created_at]}
+      - name: ActivityLog
+        kind: class
+        type: Django Model
+        immutable: true
+        fields:
+          id: UUID, pk, auto
+          actor: FK → accounts.Member, SET_NULL, null (null = anonymous)
+          actor_display: str(100), snapshot at action time
+          action: str(100) [created_post, deleted_comment, changed_permission, login, logout, failed_login, contributed, added_expense, approved_comment, edited_post, deleted_post, changed_group, created_member, deactivated_member]
+          target_type: FK → ContentType, null
+          target_id: UUID, null
+          target_display: str(255), snapshot at action time
+          ip_address: GenericIPAddressField, null
+          extra_data: JSON, null (before/after values for edits)
+          created_at: datetime, auto
+        meta: {ordering: [-created_at], indexes: [[actor, action], [target_type, target_id]]}
+      - name: SystemLog
+        kind: class
+        type: Django Model
+        immutable: true
+        superuser_only: true
+        fields:
+          id: UUID, pk, auto
+          level: choices [debug, info, warning, error, critical]
+          source: str(100) e.g. payment.stripe / auth.login / api.contribution
+          message: text
+          extra_data: JSON, null (stack traces, request/response data)
+          related_member: FK → accounts.Member, SET_NULL, null
+          ip_address: GenericIPAddressField, null
+          created_at: datetime, auto
+        meta: {ordering: [-created_at]}
     needed_by:
       - {file: "backend/logs/serializers.py", items: [ActivityLog, SystemLog], status: pending}
       - {file: "backend/logs/views.py",       items: [ActivityLog, SystemLog], status: pending}
+
+  "backend/logs/serializers.py":
+    status: pending
+    imports:
+      external: [{from: rest_framework, items: [serializers]}]
+      internal:
+        - {from: "backend/logs/models.py", items: [{name: ActivityLog, status: available}, {name: SystemLog, status: available}]}
+    exports:
+      - {name: ActivityLogSerializer, kind: class, type: DRF ModelSerializer, fields: [id, actor_display, action, target_display, ip_address, extra_data, created_at]}
+      - {name: SystemLogSerializer,   kind: class, type: DRF ModelSerializer, fields: [id, level, source, message, extra_data, related_member, ip_address, created_at]}
+    needed_by:
+      - {file: "backend/logs/views.py", items: [ActivityLogSerializer, SystemLogSerializer], status: pending}
+
+  "backend/logs/views.py":
+    status: pending
+    imports:
+      external: [{from: rest_framework.viewsets, items: [ReadOnlyModelViewSet]}]
+      internal:
+        - {from: "backend/logs/models.py",      items: [{name: ActivityLog, status: available}, {name: SystemLog, status: available}]}
+        - {from: "backend/logs/serializers.py", items: [{name: ActivityLogSerializer, status: pending}, {name: SystemLogSerializer, status: pending}]}
+    exports:
+      - {name: ActivityLogViewSet, kind: class, type: DRF ReadOnlyModelViewSet, description: "superuser sees all; group admins see scoped by member"}
+      - {name: SystemLogViewSet,   kind: class, type: DRF ReadOnlyModelViewSet, description: "superuser ONLY"}
+    needed_by:
+      - {file: "backend/logs/urls.py", items: [ActivityLogViewSet, SystemLogViewSet], status: pending}
+
+  "backend/logs/urls.py":
+    status: pending
+    imports:
+      external: [{from: rest_framework.routers, items: [DefaultRouter]}]
+      internal:
+        - {from: "backend/logs/views.py", items: [{name: ActivityLogViewSet, status: pending}, {name: SystemLogViewSet, status: pending}]}
+    exports:
+      - {name: urlpatterns, kind: constant, type: list}
+    needed_by:
+      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: in-progress}
+
+  # ─── PAYMENTS ──────────────────────────────────────────────────────────────
+
+  "backend/payments/service.py":
+    status: pending
+    imports:
+      external:
+        - {from: stripe, items: [PaymentIntent, Webhook]}
+      internal:
+        - {from: "backend/fund/models.py",     items: [{name: Contribution, status: available}]}
+        - {from: "backend/accounts/models.py", items: [{name: Member, status: available}]}
+    exports:
+      - {name: create_payment_intent, kind: function, signature: "(amount: int, currency: str = 'gbp', member_id: UUID = None) -> dict", description: "amount in pence (500 = £5.00). returns {client_secret, payment_intent_id}"}
+      - {name: confirm_contribution,  kind: function, signature: "(payment_intent_id: str) -> Contribution",                              description: "marks matching Contribution as completed"}
+      - {name: handle_webhook,        kind: function, signature: "(payload: bytes, sig_header: str) -> None",                             description: "processes Stripe webhook events (payment_intent.succeeded etc.)"}
+    needed_by:
+      - {file: "backend/fund/views.py", items: [create_payment_intent, handle_webhook], status: pending}
