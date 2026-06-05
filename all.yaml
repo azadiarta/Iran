@@ -19,8 +19,8 @@ progress:
     1:
       name: database
       status: in-progress
-      done: []
-      next: [define entities, create django models, setup postgresql connection]
+      done: [define entities, create django models]
+      next: [setup postgresql connection, django settings, migrations]
     2:
       name: backend API
       status: pending
@@ -34,4 +34,33 @@ progress:
       name: deploy
       status: pending
 
-files: {}
+files:
+
+  "backend/core/models.py":
+    status: done
+    imports:
+      external:
+        - {from: uuid, items: [uuid4]}
+        - {from: django.db.models, items: [Model, UUIDField, CharField, EmailField, TextField, BooleanField, DateField, DateTimeField, DecimalField, IntegerField, ImageField, JSONField, GenericIPAddressField, ForeignKey, ManyToManyField, TextChoices, Index]}
+        - {from: django.contrib.contenttypes.fields, items: [GenericForeignKey]}
+        - {from: django.contrib.contenttypes.models, items: [ContentType]}
+        - {from: django.core.validators, items: [MinValueValidator, MaxValueValidator]}
+        - {from: django.core.exceptions, items: [ValidationError]}
+      internal: []
+    exports:
+      - {name: Permission,    kind: class, type: Django Model, fields: [id(UUID), codename(str,unique), label(str), description(str,opt), created_at]}
+      - {name: AccessGroup,   kind: class, type: Django Model, fields: [id(UUID), name(str,unique), description(str,opt), permissions(M2M→Permission), created_at, updated_at]}
+      - {name: Member,        kind: class, type: Django Model, fields: [id(UUID), full_name(str), display_name(str,opt), group(FK→AccessGroup), phone(str,opt), email(email,opt), password(str,hashed), is_active(bool), created_at, updated_at], validation: "clean(): phone OR email required"}
+      - {name: Contribution,  kind: class, type: Django Model, fields: [id(UUID), contributor(FK→Member,null=guest), guest_name(str,opt), amount(decimal), currency(str,3,GBP), payment_method(choices:stripe|paypal|google_pay|manual|other), status(choices:pending|completed|failed), notes(text,opt), created_at, updated_at]}
+      - {name: Expense,       kind: class, type: Django Model, fields: [id(UUID), withdrawn_by(FK→Member), amount(decimal), short_reason(str), description(text,opt), receipt_image(img,opt), expense_date(date), created_at, updated_at]}
+      - {name: Post,          kind: class, type: Django Model, fields: [id(UUID), author(FK→Member), title(str), body(text), created_at, updated_at]}
+      - {name: PostImage,     kind: class, type: Django Model, fields: [id(UUID), post(FK→Post,CASCADE), image(img), uploaded_at]}
+      - {name: Comment,       kind: class, type: Django Model, fields: [id(UUID), author(FK→Member,null=guest), guest_name(str,opt), content_type(FK→ContentType), object_id(UUID), content_object(GenericFK), text(text), rating(int,1-10,opt), is_approved(bool,False), created_at, updated_at]}
+      - {name: ActivityLog,   kind: class, type: Django Model, immutable: true, fields: [id(UUID), actor(FK→Member,null=anon), actor_display(str,snapshot), action(str), target_type(FK→ContentType,null), target_id(UUID,null), target_display(str,snapshot), ip_address, extra_data(json), created_at]}
+      - {name: SystemLog,     kind: class, type: Django Model, immutable: true, superuser_only: true, fields: [id(UUID), level(choices:debug|info|warning|error|critical), source(str), message(text), extra_data(json), related_member(FK→Member,null), ip_address, created_at]}
+    needed_by:
+      - {file: "backend/core/serializers.py",  items: [Permission, AccessGroup, Member, Contribution, Expense, Post, PostImage, Comment, ActivityLog, SystemLog], status: pending}
+      - {file: "backend/core/views.py",         items: [Permission, AccessGroup, Member, Contribution, Expense, Post, Comment, ActivityLog, SystemLog], status: pending}
+      - {file: "backend/core/admin.py",         items: [Permission, AccessGroup, Member, Contribution, Expense, Post, PostImage, Comment, ActivityLog, SystemLog], status: pending}
+      - {file: "backend/payments/service.py",   items: [Contribution, Member], status: pending}
+      - {file: "backend/core/auth_backend.py",  items: [Member], status: pending}
