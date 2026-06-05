@@ -1,0 +1,15 @@
+meta:
+  project: iran-charity-fund
+  backend: django/python
+  frontend: react/javascript
+  db: postgresql
+  deploy: railway
+  payment: stripe (gbp primary, expandable: paypal, google_pay, multi-currency)
+
+rules:
+  status: [done, in-progress, pending]
+  kind: [class, function, constant, type]
+  before_build: check needed_by + check imports internal availability
+  after_build: update exports + update imports with status
+
+files: {}
