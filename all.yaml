@@ -51,7 +51,7 @@ progress:
     9:
       name: frontend
       status: done
-      done: [lib/api.ts (axios + interceptors + unwrap), authStore, langStore, i18n, messages en/fa, middleware, layouts, Navbar, Footer, animations (IranianSymbols, PageTransition, SplashScreen), pages (landing, login, register, posts, posts/[id], expenses, contribute, profile, contact, forbidden, unavailable, not-found)]
+      done: [lib/api.ts (axios + interceptors + unwrap), authStore, langStore, i18n, messages en/fa, middleware, layouts, Navbar, Footer, animations (IranianSymbols, PageTransition, SplashScreen), pages (landing, login, register, posts, posts/[id], expenses, contribute, profile, contact, forbidden, unavailable, not-found), "ADMIN PANEL (7B): admin design system (styles/admin.css), AdminLayout/AdminTopBar/AdminSidebar + route protection, reusable admin components (AdminTable/AdminModal/AdminConfirmDialog/AdminStatCard/AdminBadge/admin form fields), toast system, 12 admin pages (dashboard/members/members-detail/groups/contributions/expenses/posts/comments/payments/settings/logs-activity/logs-system) — see Phase 7B section below for full file list + 2 flagged backend gaps (no global comments endpoint, no permissions-list endpoint)"]
     10:
       name: payment integration (Stripe / Google Pay)
       status: pending
@@ -1032,17 +1032,22 @@ files:
   "frontend/lib/api.ts":
     status: done
     kind: module
-    note: "axios instance + interceptors: attaches JWT, unwraps {success,message,data} → data (leaves raw paginated/auth payloads untouched), 401 refresh-queue, 403→/forbidden, 404→/not-found, 503→/unavailable"
+    note: "axios instance + interceptors: attaches JWT, unwraps {success,message,data} → data (leaves raw paginated/auth payloads untouched), 401 refresh-queue, 403→/forbidden, 404→/not-found, 503→/unavailable. EXTENDED in Phase 7B with admin-only methods/types (additions only — no Phase 7A method signatures changed, except Comment.id corrected number→string/UUID)"
     exports:
       - {name: authAPI, kind: object, methods: [register, login, logout, getProfile, refreshToken]}
-      - {name: postsAPI, kind: object, methods: [getList, getDetail, getComments, createComment]}
-      - {name: fundAPI, kind: object, methods: [getBalance, getContributions, getExpenses]}
+      - {name: postsAPI, kind: object, methods: [getList, getDetail, getComments, createComment, "(7B) create(multipart)", "(7B) update", "(7B) delete", "(7B) uploadImages(multipart)", "(7B) deleteImage"]}
+      - {name: commentsAPI, kind: object, "phase": 7B, methods: [approve, delete], note: "target-agnostic moderation actions only — no global list endpoint exists in backend"}
+      - {name: fundAPI, kind: object, methods: [getBalance, getContributions, getExpenses, "(7B) updateContributionStatus(completed|failed)", "(7B) deleteContribution(superuser)", "(7B) createExpense(multipart)", "(7B) deleteExpense"]}
       - {name: paymentsAPI, kind: object, methods: [getMethods, initiate, uploadReceipt(field=receipt_image), getStatus]}
-      - {name: membersAPI, kind: object, methods: [getProfile, updateProfile, changePassword]}
-      - {name: settingsAPI, kind: object, methods: [getPublicSettings], note: "raw axios.get bypassing shared interceptor — avoids 403→/forbidden redirect for guests on public /contact page"}
-      - {name: types, kind: type, items: [ApiResponse, PostAuthor, PostImage, PostSummary, PostDetail, Comment, Paginated<T>, FundBalance]}
+      - {name: membersAPI, kind: object, methods: [getProfile, updateProfile, changePassword, "(7B) getList(paginated+filters)", "(7B) changeGroup", "(7B) toggleActive", "(7B) delete"]}
+      - {name: groupsAPI, kind: object, "phase": 7B, methods: [getList, create, update, setDefault(superuser), delete(superuser)]}
+      - {name: dashboardAPI, kind: object, "phase": 7B, methods: [getStats]}
+      - {name: logsAPI, kind: object, "phase": 7B, methods: [getActivity, getActivityDetail, getSystem(superuser), getSystemDetail(superuser)]}
+      - {name: settingsAPI, kind: object, methods: [getPublicSettings, "(7B) getAll(superuser)", "(7B) update(key,value)(superuser)"], note: "raw axios.get bypassing shared interceptor — avoids 403→/forbidden redirect for guests on public /contact page"}
+      - {name: types, kind: type, items: [ApiResponse, PostAuthor, PostImage, PostSummary, PostDetail, Comment, Paginated<T>, FundBalance, "(7B) MemberMinimal, Contribution, Expense, MemberListItem, MemberDetail, GroupPermission, AccessGroup, DashboardData, ActivityLogEntry, SystemLogEntry, DefaultSettingItem"]}
     needed_by:
       - {file: "frontend/app/[locale]/**/page.tsx", items: [authAPI, postsAPI, fundAPI, paymentsAPI, membersAPI, settingsAPI], status: available}
+      - {file: "frontend/app/[locale]/admin/**/page.tsx", items: [commentsAPI, groupsAPI, dashboardAPI, logsAPI, "extended fundAPI/membersAPI/postsAPI/settingsAPI"], status: available}
 
   "frontend/store/authStore.ts":
     status: done
@@ -1095,7 +1100,7 @@ files:
   "frontend/app/[locale]/ClientLayout.tsx":
     status: done
     kind: component
-    note: "renders SplashScreen → Navbar → main → Footer"
+    note: "renders SplashScreen → Navbar → main → Footer. MODIFIED in Phase 7B (small addition, not a rewrite): detects /admin routes via usePathname() and skips the public Navbar/Footer there, since AdminLayout renders its own AdminTopBar/AdminSidebar shell — prevents double navigation chrome on admin pages. Public routes render exactly as before."
 
   "frontend/components/layout/Navbar.tsx":
     status: done
@@ -1190,3 +1195,181 @@ files:
     kind: page
     route: "/{locale}/not-found"
     note: "target of axios interceptor 404 redirect; errors.not_found_* translation keys"
+
+  # ─── FRONTEND (Phase 7B) — React Admin Panel (app/[locale]/admin/) ─────────
+  # Reuses Phase 7A primitives (LionAndSun, PageTransition, authStore, langStore,
+  # lib/api.ts, IranianSymbols) — no Phase 7A component was recreated.
+  # Bilingual strings (en/fa) are inline via `isRTL ? '...' : '...'` ternaries —
+  # matching the pattern already used for dynamic copy in Phase 7A pages —
+  # rather than a new `admin` messages namespace (avoids an enormous JSON tree
+  # for ~12 detail-heavy pages while keeping full bilingual + RTL support).
+
+  "frontend/styles/admin.css":
+    status: done
+    kind: style
+    note: "darker admin theme: --admin-bg #05050a, --admin-surface #0d0d14/#13131e, --admin-sidebar-width 260px/64px collapsed, neon vars (cyan/violet/gold), .admin-glass-card, .admin-shell, .admin-nav-item.active (RTL-aware), .admin-skeleton pulse animation. Imported by app/[locale]/admin/layout.tsx only — does not affect public pages"
+
+  "frontend/store/toastStore.ts":
+    status: done
+    kind: module
+    note: "zustand store backing the custom toast notification system (no 3rd-party toast lib in the project); show(type, message) auto-dismisses after 4s, dismiss(id)"
+
+  "frontend/components/admin/AdminToastContainer.tsx":
+    status: done
+    kind: component
+    note: "fixed top-end toast stack consuming toastStore; color-coded by type (success=green/error=red/warning=amber/info=cyan) with framer-motion enter/exit"
+
+  "frontend/components/admin/AdminBadge.tsx":
+    status: done
+    kind: component
+    note: "status→color badge (pending/pending_review→amber, completed/approved/active→green, failed/rejected/inactive→red, fallback cyan); optional `label` override"
+
+  "frontend/components/admin/AdminModal.tsx":
+    status: done
+    kind: component
+    note: "centered overlay glass-card modal; backdrop click + X to close; framer-motion fade+scale; configurable maxWidth"
+
+  "frontend/components/admin/AdminConfirmDialog.tsx":
+    status: done
+    kind: component
+    note: "destructive-action confirmation — AlertTriangle icon, red confirm + neutral cancel, loading state"
+
+  "frontend/components/admin/AdminStatCard.tsx":
+    status: done
+    kind: component
+    note: "dashboard stat card with animated count-up (useMotionValue+animate), trend indicator (up/down/neutral), prefix/suffix/decimals"
+
+  "frontend/components/admin/AdminTable.tsx":
+    status: done
+    kind: component
+    exports: [default, AdminTableColumn<T>, PaginationState]
+    note: "generic admin data table — skeleton-row loading state, dimmed-LionAndSun empty state, prev/next pagination footer matching public posts page styling"
+
+  "frontend/components/admin/fields/AdminInput.tsx":
+    status: done
+    kind: component
+  "frontend/components/admin/fields/AdminSelect.tsx":
+    status: done
+    kind: component
+  "frontend/components/admin/fields/AdminTextarea.tsx":
+    status: done
+    kind: component
+  "frontend/components/admin/fields/AdminToggle.tsx":
+    status: done
+    kind: component
+  "frontend/components/admin/fields/AdminFileUpload.tsx":
+    status: done
+    kind: component
+    note: "drag-and-drop zone, image previews via URL.createObjectURL, file chips, Clear button"
+  "frontend/components/admin/fields/AdminPermissionCheckbox.tsx":
+    status: done
+    kind: component
+    exports: [default, PermissionOption]
+    note: "permission grid with locked always-on entries (can_contribute/can_comment, force-included by backend regardless)"
+
+  "frontend/components/layout/AdminSidebar.tsx":
+    status: done
+    kind: component
+    note: "260px/64px collapsible (framer-motion width transition) + mobile drawer w/ overlay; nav items Dashboard/Members/Groups/Contributions/Expenses/Posts/Comments(badge)/Payments/Settings/divider/Activity Log/System Log(superuser-only); visibility via authStore.hasPermission() + is_superuser bypass; active state via .admin-nav-item.active"
+
+  "frontend/components/layout/AdminTopBar.tsx":
+    status: done
+    kind: component
+    note: "fixed 56px bar — hamburger, LionAndSun+'Admin Panel', language switcher (mirrors Navbar handleLanguageSwitch), notification bell→pending-comment badge, profile dropdown (View Profile/Back to Site/Logout, mirrors Navbar handleLogout/getInitials)"
+
+  "frontend/components/layout/AdminLayout.tsx":
+    status: done
+    kind: component
+    note: "composes AdminTopBar + AdminSidebar + scrollable main + AdminToastContainer; owns collapsed/mobileOpen state, fetches dashboardAPI.getStats() once for the pending-comments badge count"
+
+  "frontend/app/[locale]/admin/layout.tsx":
+    status: done
+    kind: component
+    note: "ROUTE PROTECTION — redirects to /login if unauthenticated, /forbidden if member lacks all of [can_manage_permissions, can_post, can_expense, can_approve_comments, can_view_dashboard] (is_superuser bypasses); shows LionAndSun spinner while checking; imports styles/admin.css; wraps children in AdminLayout"
+
+  "frontend/app/[locale]/admin/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/admin"
+    note: "Dashboard — dashboardAPI.getStats(): 4 AdminStatCards (balance/contributions/expenses/members), recharts BarChart (contributions vs expenses this month), 4 RecentCard grids (contributions/expenses/posts/pending_comments). Gated on can_view_dashboard"
+
+  "frontend/app/[locale]/admin/members/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/admin/members"
+    note: "membersAPI.getList(page,{search,group,is_active}) + groupsAPI.getList() for filter options; AdminTable w/ search+group+status filters, links to detail page. Gated on can_manage_permissions"
+
+  "frontend/app/[locale]/admin/members/[id]/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/admin/members/{id}"
+    note: "membersAPI.getProfile/updateProfile/changeGroup/changePassword/toggleActive/delete — profile edit form, group-change form, password-change form (gated can_change_any_password), danger zone (deactivate via AdminConfirmDialog, delete gated can_delete_member)"
+
+  "frontend/app/[locale]/admin/groups/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/admin/groups"
+    note: "groupsAPI CRUD — card grid (name/description/member_count/permission chips/is_default star), create/edit AdminModal w/ AdminPermissionCheckbox, set-default + delete (superuser-only, AdminConfirmDialog). KNOWN LIMITATION: permission grid options are derived as the union of permissions already attached to existing groups (workaround — see note at bottom of file)"
+
+  "frontend/app/[locale]/admin/contributions/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/admin/contributions"
+    note: "fundAPI.getContributions(page,{status,payment_method}) — AdminTable w/ status/method filters, approve→status=completed / reject→status=failed (no 'rejected' status exists on backend) via AdminConfirmDialog, superuser-only delete. Gated on can_view_balance"
+
+  "frontend/app/[locale]/admin/expenses/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/admin/expenses"
+    note: "fundAPI.getExpenses/createExpense(multipart receipt_image)/deleteExpense — AdminTable + 'Add Expense' AdminModal (AdminFileUpload for receipt). Create gated can_expense, delete gated can_manage_permissions, view gated can_view_balance"
+
+  "frontend/app/[locale]/admin/posts/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/admin/posts"
+    note: "postsAPI CRUD incl. multipart create/uploadImages/deleteImage — AdminTable + create/edit AdminModal (AdminFileUpload multi-image, existing-image removal grid). Gated on can_post"
+
+  "frontend/app/[locale]/admin/comments/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/admin/comments"
+    note: "DEGRADED — see 'BACKEND GAPS' below. Sources data from dashboardAPI.getStats().pending_comments (max 5, no pagination/filtering); approve/delete wired to real commentsAPI.approve/delete. Visible AlertTriangle banner explains the limitation to admins (en+fa). Gated on can_approve_comments (delete additionally gated can_manage_permissions)"
+
+  "frontend/app/[locale]/admin/payments/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/admin/payments"
+    note: "settingsAPI.getAll/update — manual bank transfer + PayPal sections (AdminToggle for *_enabled, per-field save buttons incl. AdminFileUpload-free text fields + instructions textarea). Superuser-only"
+
+  "frontend/app/[locale]/admin/settings/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/admin/settings"
+    note: "settingsAPI.getAll/update — generic key/value editor for all non-payment DefaultSetting rows (default_group, default_currency, require_comment_approval, max_receipt_image_size_mb, *_visibility, etc.), per-field save. Superuser-only"
+
+  "frontend/app/[locale]/admin/logs/activity/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/admin/logs/activity"
+    note: "logsAPI.getActivity(page,{actor,action,date_from,date_to}) — read-only AdminTable w/ filter form + detail AdminModal (pretty-printed extra_data JSON). Gated on can_manage_permissions"
+
+  "frontend/app/[locale]/admin/logs/system/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/admin/logs/system"
+    note: "logsAPI.getSystem(page,{level,source,date_from,date_to}) — read-only AdminTable (level→AdminBadge color) w/ filter form + detail AdminModal. Superuser-only"
+
+  # ─── PHASE 7B — KNOWN BACKEND GAPS (frontend cannot fully resolve; flagged for future API work) ──
+  # 1. NO global `/api/comments/` list endpoint exists — only per-target lists (approved-only)
+  #    and target-agnostic approve/delete actions. The spec's full "Comments" admin page
+  #    (filters: pending/all/approved/rejected, paginated table) is NOT buildable as specified.
+  #    Workaround used: dashboardAPI.getStats().pending_comments (last 5 pending only, no
+  #    pagination/filters) + real commentsAPI.approve/delete actions. A future backend task
+  #    should add a `CommentListView`-style global endpoint (e.g. GET /api/posts/comments/)
+  #    with is_approved/target_type filters and standard `_paginate()` response.
+  # 2. NO endpoint to list all available Permission objects — core/views.py PermissionViewSet
+  #    and core/urls.py remain `status: pending` and are not wired into groupfund/urls.py.
+  #    Workaround used in Groups create/edit modal: union of `permissions[]` already attached
+  #    to existing AccessGroups via groupsAPI.getList() — permissions not yet assigned to ANY
+  #    group will not appear in the checkbox grid. A future backend task should wire up
+  #    GET /api/permissions/ returning all seeded Permission rows.

@@ -242,7 +242,7 @@ export interface PostDetail extends PostSummary {
 }
 
 export interface Comment {
-  id: number;
+  id: string;
   author_label?: string;
   guest_name?: string | null;
   text: string;
@@ -278,6 +278,44 @@ export const postsAPI = {
     id: string,
     data: { text: string; rating?: number; guest_name?: string }
   ) => api.post<ApiResponse>(`/api/posts/${id}/comments/create/`, data),
+
+  // ── Admin ──────────────────────────────────────────────────────────────
+  create: (data: { title: string; body: string; images?: File[] }) => {
+    const formData = new FormData();
+    formData.append('title', data.title);
+    formData.append('body', data.body);
+    (data.images || []).forEach((file) => formData.append('images', file));
+    return api.post<ApiResponse>('/api/posts/create/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
+  update: (id: string, data: { title?: string; body?: string }) =>
+    api.patch<ApiResponse>(`/api/posts/${id}/update/`, data),
+
+  delete: (id: string) => api.delete<ApiResponse>(`/api/posts/${id}/delete/`),
+
+  uploadImages: (id: string, images: File[]) => {
+    const formData = new FormData();
+    images.forEach((file) => formData.append('images', file));
+    return api.post<ApiResponse>(`/api/posts/${id}/images/`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
+  deleteImage: (id: string, imageId: number) =>
+    api.delete<ApiResponse>(`/api/posts/${id}/images/${imageId}/delete/`),
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Comments API (admin moderation — target-agnostic actions)
+// ═══════════════════════════════════════════════════════════════════════════════
+export const commentsAPI = {
+  approve: (id: string) =>
+    api.patch<ApiResponse>(`/api/posts/comments/${id}/approve/`),
+
+  delete: (id: string) =>
+    api.delete<ApiResponse>(`/api/posts/comments/${id}/delete/`),
 };
 
 // ─── Fund types ───────────────────────────────────────────────────────────────
@@ -288,17 +326,92 @@ export interface FundBalance {
   currency: string;
 }
 
+export interface MemberMinimal {
+  id: string;
+  display_name: string;
+  full_name: string;
+}
+
+export interface Contribution {
+  id: string;
+  contributor: MemberMinimal | null;
+  guest_name: string;
+  amount: number;
+  currency: string;
+  payment_method: string;
+  status: 'pending' | 'pending_review' | 'completed' | 'failed';
+  notes: string;
+  created_at: string;
+}
+
+export interface Expense {
+  id: string;
+  withdrawn_by: MemberMinimal | null;
+  amount: number;
+  short_reason: string;
+  description: string;
+  receipt_image: string | null;
+  expense_date: string;
+  created_at: string;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Fund API
 // ═══════════════════════════════════════════════════════════════════════════════
 export const fundAPI = {
   getBalance: () => api.get<ApiResponse>('/api/fund/balance/'),
 
-  getContributions: (page = 1) =>
-    api.get<ApiResponse>(`/api/fund/contributions/?page=${page}`),
+  getContributions: (
+    page = 1,
+    filters: { status?: string; payment_method?: string; date_from?: string; date_to?: string } = {}
+  ) => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    if (filters.status) params.set('status', filters.status);
+    if (filters.payment_method) params.set('payment_method', filters.payment_method);
+    if (filters.date_from) params.set('date_from', filters.date_from);
+    if (filters.date_to) params.set('date_to', filters.date_to);
+    return api.get<ApiResponse>(`/api/fund/contributions/?${params.toString()}`);
+  },
 
-  getExpenses: (page = 1) =>
-    api.get<ApiResponse>(`/api/fund/expenses/?page=${page}`),
+  updateContributionStatus: (id: string, status: 'completed' | 'failed') =>
+    api.patch<ApiResponse>(`/api/fund/contributions/${id}/status/`, { status }),
+
+  deleteContribution: (id: string) =>
+    api.delete<ApiResponse>(`/api/fund/contributions/${id}/delete/`),
+
+  getExpenses: (
+    page = 1,
+    filters: { date_from?: string; date_to?: string; withdrawn_by?: string } = {}
+  ) => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    if (filters.date_from) params.set('date_from', filters.date_from);
+    if (filters.date_to) params.set('date_to', filters.date_to);
+    if (filters.withdrawn_by) params.set('withdrawn_by', filters.withdrawn_by);
+    return api.get<ApiResponse>(`/api/fund/expenses/?${params.toString()}`);
+  },
+
+  createExpense: (data: {
+    amount: number;
+    short_reason: string;
+    description?: string;
+    receipt_image?: File;
+    expense_date: string;
+  }) => {
+    const formData = new FormData();
+    formData.append('amount', String(data.amount));
+    formData.append('short_reason', data.short_reason);
+    if (data.description) formData.append('description', data.description);
+    if (data.receipt_image) formData.append('receipt_image', data.receipt_image);
+    formData.append('expense_date', data.expense_date);
+    return api.post<ApiResponse>('/api/fund/expenses/create/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
+  deleteExpense: (id: string) =>
+    api.delete<ApiResponse>(`/api/fund/expenses/${id}/delete/`),
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -331,6 +444,21 @@ export const paymentsAPI = {
 // ═══════════════════════════════════════════════════════════════════════════════
 // Members API
 // ═══════════════════════════════════════════════════════════════════════════════
+export interface MemberListItem {
+  id: string;
+  full_name: string;
+  display_name: string;
+  group_name: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface MemberDetail extends MemberListItem {
+  email: string | null;
+  phone: string | null;
+  group_permissions: string[];
+}
+
 export const membersAPI = {
   getProfile: (id: string) => api.get<ApiResponse>(`/api/members/${id}/`),
 
@@ -352,11 +480,156 @@ export const membersAPI = {
       confirm_new_password: string;
     }
   ) => api.post<ApiResponse>(`/api/members/${id}/change-password/`, data),
+
+  // ── Admin ──────────────────────────────────────────────────────────────
+  getList: (
+    page = 1,
+    filters: { search?: string; group?: string; is_active?: boolean } = {}
+  ) => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    if (filters.search) params.set('search', filters.search);
+    if (filters.group) params.set('group', filters.group);
+    if (filters.is_active !== undefined) params.set('is_active', String(filters.is_active));
+    return api.get<ApiResponse>(`/api/members/?${params.toString()}`);
+  },
+
+  changeGroup: (id: string, groupId: string) =>
+    api.patch<ApiResponse>(`/api/members/${id}/group/`, { group_id: groupId }),
+
+  toggleActive: (id: string) =>
+    api.patch<ApiResponse>(`/api/members/${id}/toggle-active/`),
+
+  delete: (id: string) => api.delete<ApiResponse>(`/api/members/${id}/delete/`),
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Groups API
+// ═══════════════════════════════════════════════════════════════════════════════
+export interface GroupPermission {
+  codename: string;
+  label: string;
+}
+
+export interface AccessGroup {
+  id: string;
+  name: string;
+  description: string;
+  is_default: boolean;
+  permissions: GroupPermission[];
+  member_count: number;
+  created_at: string;
+}
+
+export const groupsAPI = {
+  getList: () => api.get<ApiResponse>('/api/groups/'),
+
+  create: (data: { name: string; description?: string; permission_ids?: string[] }) =>
+    api.post<ApiResponse>('/api/groups/create/', data),
+
+  update: (
+    id: string,
+    data: { name?: string; description?: string; permission_ids?: string[] }
+  ) => api.patch<ApiResponse>(`/api/groups/${id}/update/`, data),
+
+  setDefault: (id: string) =>
+    api.patch<ApiResponse>(`/api/groups/${id}/set-default/`),
+
+  delete: (id: string) => api.delete<ApiResponse>(`/api/groups/${id}/delete/`),
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Dashboard API
+// ═══════════════════════════════════════════════════════════════════════════════
+export interface DashboardData {
+  fund: {
+    balance: number;
+    total_contributions: number;
+    total_expenses: number;
+    currency: string;
+    contributions_this_month: number;
+    expenses_this_month: number;
+  };
+  members: { total: number; active: number; inactive: number };
+  recent_contributions: Contribution[];
+  recent_expenses: Expense[];
+  recent_posts: PostSummary[];
+  pending_comments?: Comment[];
+}
+
+export const dashboardAPI = {
+  getStats: () => api.get<ApiResponse>('/api/dashboard/'),
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Logs API
+// ═══════════════════════════════════════════════════════════════════════════════
+export interface ActivityLogEntry {
+  id: string;
+  actor_display: string;
+  action: string;
+  target_display: string;
+  ip_address: string | null;
+  extra_data: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface SystemLogEntry {
+  id: string;
+  level: string;
+  source: string;
+  message: string;
+  extra_data: Record<string, unknown> | null;
+  related_member_name: string | null;
+  ip_address: string | null;
+  created_at: string;
+}
+
+export const logsAPI = {
+  getActivity: (
+    page = 1,
+    filters: { actor?: string; action?: string; date_from?: string; date_to?: string; ip_address?: string } = {}
+  ) => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    if (filters.actor) params.set('actor', filters.actor);
+    if (filters.action) params.set('action', filters.action);
+    if (filters.date_from) params.set('date_from', filters.date_from);
+    if (filters.date_to) params.set('date_to', filters.date_to);
+    if (filters.ip_address) params.set('ip_address', filters.ip_address);
+    return api.get<ApiResponse>(`/api/logs/activity/?${params.toString()}`);
+  },
+
+  getActivityDetail: (id: string) => api.get<ApiResponse>(`/api/logs/activity/${id}/`),
+
+  getSystem: (
+    page = 1,
+    filters: { level?: string; source?: string; date_from?: string; date_to?: string } = {}
+  ) => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    if (filters.level) params.set('level', filters.level);
+    if (filters.source) params.set('source', filters.source);
+    if (filters.date_from) params.set('date_from', filters.date_from);
+    if (filters.date_to) params.set('date_to', filters.date_to);
+    return api.get<ApiResponse>(`/api/logs/system/?${params.toString()}`);
+  },
+
+  getSystemDetail: (id: string) => api.get<ApiResponse>(`/api/logs/system/${id}/`),
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Settings API
 // ═══════════════════════════════════════════════════════════════════════════════
+export interface DefaultSettingItem {
+  id: string;
+  key: string;
+  value: string;
+  description: string;
+  updated_by_name: string | null;
+  updated_at: string;
+}
+
 export const settingsAPI = {
   // Bypasses the shared `api` instance — its interceptor force-redirects on
   // 403, but regular visitors hitting this superuser-only endpoint must be
@@ -372,6 +645,12 @@ export const settingsAPI = {
       return null;
     }
   },
+
+  // ── Admin (superuser) ──────────────────────────────────────────────────
+  getAll: () => api.get<ApiResponse>('/api/settings/'),
+
+  update: (key: string, value: string) =>
+    api.patch<ApiResponse>(`/api/settings/${key}/`, { value }),
 };
 
 export default api;

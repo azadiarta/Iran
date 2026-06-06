@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import SplashScreen from '@/components/animations/SplashScreen';
@@ -13,10 +14,26 @@ interface ClientLayoutProps {
 export default function ClientLayout({ children, locale }: ClientLayoutProps) {
   const [splashDone, setSplashDone] = useState(false);
   const { setLocale } = useLangStore();
+  const pathname = usePathname();
 
   useEffect(() => {
     setLocale(locale);
   }, [locale, setLocale]);
+
+  // Admin routes render their own AdminTopBar/AdminSidebar shell, so the
+  // public Navbar/Footer must be skipped to avoid a double navigation chrome.
+  const isAdminRoute = pathname?.startsWith(`/${locale}/admin`);
+
+  if (isAdminRoute) {
+    return (
+      <>
+        {!splashDone && (
+          <SplashScreen locale={locale} onComplete={() => setSplashDone(true)} />
+        )}
+        <main className="flex-1">{children}</main>
+      </>
+    );
+  }
 
   return (
     <>

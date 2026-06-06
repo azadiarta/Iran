@@ -1,0 +1,159 @@
+'use client';
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { Search, Eye } from 'lucide-react';
+import AdminTable, { AdminTableColumn } from '@/components/admin/AdminTable';
+import AdminBadge from '@/components/admin/AdminBadge';
+import AdminInput from '@/components/admin/fields/AdminInput';
+import AdminSelect from '@/components/admin/fields/AdminSelect';
+import useAuthStore from '@/store/authStore';
+import useToastStore from '@/store/toastStore';
+import { membersAPI, groupsAPI, MemberListItem, AccessGroup, Paginated } from '@/lib/api';
+
+export default function AdminMembersPage() {
+  const params = useParams();
+  const router = useRouter();
+  const locale = (params?.locale as 'en' | 'fa') || 'en';
+  const isRTL = locale === 'fa';
+  const { hasPermission, member: currentMember } = useAuthStore();
+  const showToast = useToastStore((s) => s.show);
+
+  const canManage = !!currentMember?.is_superuser || hasPermission('can_manage_permissions');
+
+  const [members, setMembers] = useState<MemberListItem[]>([]);
+  const [groups, setGroups] = useState<AccessGroup[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [hasNext, setHasNext] = useState(false);
+  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [groupFilter, setGroupFilter] = useState('');
+  const [activeFilter, setActiveFilter] = useState('');
+
+  useEffect(() => {
+    groupsAPI
+      .getList()
+      .then((res) => setGroups(res.data as unknown as AccessGroup[]))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!canManage) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const filters: { search?: string; group?: string; is_active?: boolean } = {};
+    if (search) filters.search = search;
+    if (groupFilter) filters.group = groupFilter;
+    if (activeFilter) filters.is_active = activeFilter === 'active';
+
+    membersAPI
+      .getList(page, filters)
+      .then((res) => {
+        const data = res.data as unknown as Paginated<MemberListItem>;
+        setMembers(data.results);
+        setHasNext(!!data.next);
+      })
+      .catch(() => showToast('error', isRTL ? 'بارگذاری اعضا ناموفق بود' : 'Failed to load members'))
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canManage, page, search, groupFilter, activeFilter]);
+
+  function submitSearch(e: React.FormEvent) {
+    e.preventDefault();
+    setPage(1);
+    setSearch(searchInput.trim());
+  }
+
+  if (!canManage) {
+    return (
+      <div className="admin-glass-card p-8 text-center text-white/50 text-sm">
+        {isRTL ? 'شما دسترسی مدیریت اعضا را ندارید.' : 'You do not have permission to manage members.'}
+      </div>
+    );
+  }
+
+  const columns: AdminTableColumn<MemberListItem>[] = [
+    { key: 'full_name', header: isRTL ? 'نام کامل' : 'Full Name', render: (m) => <span className="text-white/80">{m.full_name}</span> },
+    { key: 'display_name', header: isRTL ? 'نام نمایشی' : 'Display Name', render: (m) => <span className="text-white/60">{m.display_name}</span> },
+    { key: 'group', header: isRTL ? 'گروه' : 'Group', render: (m) => <span className="text-white/60">{m.group_name || '—'}</span> },
+    { key: 'status', header: isRTL ? 'وضعیت' : 'Status', render: (m) => <AdminBadge status={m.is_active ? 'active' : 'inactive'} /> },
+    {
+      key: 'created_at',
+      header: isRTL ? 'تاریخ عضویت' : 'Joined',
+      render: (m) => <span className="text-white/40 text-xs">{new Date(m.created_at).toLocaleDateString(locale === 'fa' ? 'fa-IR' : 'en-US')}</span>,
+    },
+    {
+      key: 'actions',
+      header: '',
+      render: (m) => (
+        <button
+          onClick={() => router.push(`/${locale}/admin/members/${m.id}`)}
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all"
+          style={{ border: '1px solid rgba(0,255,255,0.3)', color: '#00ffff', backgroundColor: 'rgba(0,255,255,0.05)' }}
+        >
+          <Eye className="w-3.5 h-3.5" />
+          {isRTL ? 'مشاهده' : 'View'}
+        </button>
+      ),
+    },
+  ];
+
+  return (
+    <div className="flex flex-col gap-6" dir={isRTL ? 'rtl' : 'ltr'}>
+      <div>
+        <h1 className="text-2xl font-bold text-white">{isRTL ? 'اعضا' : 'Members'}</h1>
+        <p className="text-sm text-white/40 mt-1">{isRTL ? 'مدیریت اعضای سامانه' : 'Manage system members'}</p>
+      </div>
+
+      <div className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <form onSubmit={submitSearch} className="lg:col-span-2 flex gap-2">
+          <div className="flex-1">
+            <AdminInput
+              placeholder={isRTL ? 'جستجو بر اساس نام...' : 'Search by name...'}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </div>
+          <button
+            type="submit"
+            className="flex items-center justify-center rounded-xl px-4 transition-all"
+            style={{ border: '1px solid rgba(0,255,255,0.3)', color: '#00ffff', backgroundColor: 'rgba(0,255,255,0.05)' }}
+          >
+            <Search className="w-4 h-4" />
+          </button>
+        </form>
+        <AdminSelect
+          value={groupFilter}
+          onChange={(e) => { setGroupFilter(e.target.value); setPage(1); }}
+          placeholder={isRTL ? 'همه گروه‌ها' : 'All groups'}
+          options={groups.map((g) => ({ value: g.id, label: g.name }))}
+        />
+        <AdminSelect
+          value={activeFilter}
+          onChange={(e) => { setActiveFilter(e.target.value); setPage(1); }}
+          placeholder={isRTL ? 'همه وضعیت‌ها' : 'All statuses'}
+          options={[
+            { value: 'active', label: isRTL ? 'فعال' : 'Active' },
+            { value: 'inactive', label: isRTL ? 'غیرفعال' : 'Inactive' },
+          ]}
+        />
+      </div>
+
+      <AdminTable
+        columns={columns}
+        data={members}
+        loading={loading}
+        rowKey={(m) => m.id}
+        emptyMessage={isRTL ? 'عضوی یافت نشد' : 'No members found'}
+        pagination={{
+          page,
+          hasNext,
+          hasPrev: page > 1,
+          onPageChange: setPage,
+        }}
+      />
+    </div>
+  );
+}
