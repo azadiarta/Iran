@@ -13,7 +13,7 @@ rules:
   after_build: update exports + update imports with status
 
 progress:
-  current_phase: 4
+  current_phase: 5
   current_task: complete
   phases:
     1:
@@ -34,8 +34,8 @@ progress:
       done: [DefaultSetting model, AccessGroup.is_default + save(), get_default_group_id(), Member.group SET_DEFAULT, Expense.withdrawn_by SET_NULL, Post.author SET_NULL, core/signals.py, core/utils.py, core/apps.py ready(), migrations verified]
     5:
       name: backend API (fund, posts, logs, core)
-      status: pending
-      next: [serializers, views, urls for fund/posts/logs/core, payments/service]
+      status: done
+      done: [fund/serializers, fund/views, fund/urls, posts/serializers, posts/views, posts/urls, groupfund/urls updated]
     6:
       name: frontend
       status: pending
@@ -79,8 +79,8 @@ files:
       internal:
         - {file: "backend/accounts/urls.py", items: [urlpatterns], status: available}
         - {file: "backend/core/urls.py",     items: [urlpatterns], status: pending}
-        - {file: "backend/fund/urls.py",     items: [urlpatterns], status: pending}
-        - {file: "backend/posts/urls.py",    items: [urlpatterns], status: pending}
+        - {file: "backend/fund/urls.py",     items: [urlpatterns], status: available}
+        - {file: "backend/posts/urls.py",    items: [urlpatterns], status: available}
         - {file: "backend/logs/urls.py",     items: [urlpatterns], status: pending}
     exports: []
     needed_by: []
@@ -394,47 +394,61 @@ files:
       - {file: "backend/payments/service.py", items: [Contribution], status: pending}
 
   "backend/fund/serializers.py":
-    status: pending
+    status: done
     imports:
       external: [{from: rest_framework, items: [serializers]}]
       internal:
-        - {from: "backend/fund/models.py", items: [{name: Contribution, status: available}, {name: Expense, status: available}]}
+        - {from: "backend/fund/models.py",  items: [{name: Contribution, status: available}, {name: Expense, status: available}]}
+        - {from: "backend/core/models.py",  items: [{name: DefaultSetting, status: available}]}
     exports:
-      - {name: ContributionSerializer, kind: class, type: DRF ModelSerializer, fields: [id, contributor, guest_name, amount, currency, payment_method, status, notes, created_at]}
-      - {name: ExpenseSerializer,      kind: class, type: DRF ModelSerializer, fields: [id, withdrawn_by, amount, short_reason, description, receipt_image, expense_date, created_at]}
-      - {name: FundSummarySerializer,  kind: class, type: DRF Serializer,      fields: [total_contributions(decimal), total_expenses(decimal), balance(decimal), is_balance_visible(bool)]}
+      - {name: ContributionSerializer,       kind: class, type: DRF ModelSerializer, fields: [id, contributor(nested), guest_name, amount, currency, payment_method, status, notes, created_at]}
+      - {name: ContributionCreateSerializer, kind: class, type: DRF ModelSerializer, note: "auto-sets contributor, validates amount>0, reads default_currency from DefaultSetting"}
+      - {name: ContributionStatusSerializer, kind: class, type: DRF ModelSerializer, fields: [status], note: "only completed or failed allowed"}
+      - {name: ExpenseSerializer,            kind: class, type: DRF ModelSerializer, fields: [id, withdrawn_by(nested), amount, short_reason, description, receipt_image, expense_date, created_at]}
+      - {name: ExpenseCreateSerializer,      kind: class, type: DRF ModelSerializer, note: "auto-sets withdrawn_by, validates amount>0, checks max_receipt_image_size_mb from DefaultSetting"}
+      - {name: FundBalanceSerializer,        kind: class, type: DRF Serializer, fields: [total_contributions, total_expenses, balance, currency]}
     needed_by:
-      - {file: "backend/fund/views.py", items: [ContributionSerializer, ExpenseSerializer, FundSummarySerializer], status: pending}
+      - {file: "backend/fund/views.py", items: [ContributionSerializer, ContributionCreateSerializer, ContributionStatusSerializer, ExpenseSerializer, ExpenseCreateSerializer, FundBalanceSerializer], status: available}
 
   "backend/fund/views.py":
-    status: pending
+    status: done
     imports:
       external:
-        - {from: rest_framework.viewsets, items: [ModelViewSet]}
+        - {from: decimal, items: [Decimal]}
+        - {from: django.contrib.contenttypes.models, items: [ContentType]}
+        - {from: django.db.models, items: [Sum]}
+        - {from: rest_framework.permissions, items: [AllowAny, IsAuthenticated]}
         - {from: rest_framework.views, items: [APIView]}
-        - {from: rest_framework.response, items: [Response]}
       internal:
-        - {from: "backend/fund/models.py",      items: [{name: Contribution, status: available}, {name: Expense, status: available}]}
-        - {from: "backend/fund/serializers.py", items: [{name: ContributionSerializer, status: pending}, {name: ExpenseSerializer, status: pending}, {name: FundSummarySerializer, status: pending}]}
-        - {from: "backend/payments/service.py", items: [{name: create_payment_intent, status: pending}, {name: handle_webhook, status: pending}]}
+        - {from: "backend/accounts/permissions.py", items: [{name: HasGroupPermission, status: available}, {name: IsSuperuser, status: available}]}
+        - {from: "backend/core/models.py",           items: [{name: DefaultSetting, status: available}]}
+        - {from: "backend/core/utils.py",            items: [{name: api_success, status: available}, {name: api_error, status: available}]}
+        - {from: "backend/fund/models.py",           items: [{name: Contribution, status: available}, {name: Expense, status: available}]}
+        - {from: "backend/fund/serializers.py",      items: [{name: ContributionSerializer, status: available}, {name: ContributionCreateSerializer, status: available}, {name: ContributionStatusSerializer, status: available}, {name: ExpenseSerializer, status: available}, {name: ExpenseCreateSerializer, status: available}, {name: FundBalanceSerializer, status: available}]}
+        - {from: "backend/logs/models.py",           items: [{name: ActivityLog, status: available}]}
     exports:
-      - {name: ContributionViewSet, kind: class, type: DRF ModelViewSet}
-      - {name: ExpenseViewSet,      kind: class, type: DRF ModelViewSet}
-      - {name: FundSummaryView,     kind: class, type: DRF APIView, description: "returns totals/balance — respects admin visibility toggle"}
-      - {name: StripeWebhookView,   kind: class, type: DRF APIView, description: "receives Stripe webhook, calls handle_webhook()"}
+      - {name: ContributionListView,         kind: class, type: DRF APIView, endpoint: "GET  /api/fund/contributions/",              auth: required}
+      - {name: ContributionCreateView,       kind: class, type: DRF APIView, endpoint: "POST /api/fund/contributions/create/",       auth: optional(guests allowed)}
+      - {name: ContributionStatusUpdateView, kind: class, type: DRF APIView, endpoint: "PATCH /api/fund/contributions/{id}/status/", auth: can_manage_permissions}
+      - {name: ContributionDeleteView,       kind: class, type: DRF APIView, endpoint: "DELETE /api/fund/contributions/{id}/delete/", auth: superuser}
+      - {name: ExpenseListView,              kind: class, type: DRF APIView, endpoint: "GET  /api/fund/expenses/",                   auth: dynamic(expense_list_visibility setting)}
+      - {name: ExpenseCreateView,            kind: class, type: DRF APIView, endpoint: "POST /api/fund/expenses/create/",            auth: can_expense}
+      - {name: ExpenseDeleteView,            kind: class, type: DRF APIView, endpoint: "DELETE /api/fund/expenses/{id}/delete/",     auth: can_manage_permissions}
+      - {name: FundBalanceView,              kind: class, type: DRF APIView, endpoint: "GET  /api/fund/balance/",                   auth: required, note: "always recalculates from DB"}
     needed_by:
-      - {file: "backend/fund/urls.py", items: [ContributionViewSet, ExpenseViewSet, FundSummaryView, StripeWebhookView], status: pending}
+      - {file: "backend/fund/urls.py", items: [ContributionListView, ContributionCreateView, ContributionStatusUpdateView, ContributionDeleteView, ExpenseListView, ExpenseCreateView, ExpenseDeleteView, FundBalanceView], status: available}
 
   "backend/fund/urls.py":
-    status: pending
+    status: done
     imports:
-      external: [{from: rest_framework.routers, items: [DefaultRouter]}, {from: django.urls, items: [path]}]
+      external: [{from: django.urls, items: [path]}]
       internal:
-        - {from: "backend/fund/views.py", items: [{name: ContributionViewSet, status: pending}, {name: ExpenseViewSet, status: pending}, {name: FundSummaryView, status: pending}, {name: StripeWebhookView, status: pending}]}
+        - {from: "backend/fund/views.py",  items: [{name: ContributionListView, status: available}, {name: ContributionCreateView, status: available}, {name: ContributionStatusUpdateView, status: available}, {name: ContributionDeleteView, status: available}, {name: ExpenseListView, status: available}, {name: ExpenseCreateView, status: available}, {name: ExpenseDeleteView, status: available}, {name: FundBalanceView, status: available}]}
+        - {from: "backend/posts/views.py", items: [{name: CommentListView, status: available}, {name: CommentCreateView, status: available}]}
     exports:
-      - {name: urlpatterns, kind: constant, type: list}
+      - {name: urlpatterns, kind: constant, type: list, routes: [contributions/, contributions/create/, contributions/{id}/status/, contributions/{id}/delete/, expenses/, expenses/create/, expenses/{id}/delete/, expenses/{id}/comments/, expenses/{id}/comments/create/, balance/]}
     needed_by:
-      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: in-progress}
+      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: available}
 
   # ─── POSTS APP ─────────────────────────────────────────────────────────────
 
@@ -490,41 +504,64 @@ files:
       - {file: "backend/posts/views.py",       items: [Post, PostImage, Comment], status: pending}
 
   "backend/posts/serializers.py":
-    status: pending
+    status: done
     imports:
       external: [{from: rest_framework, items: [serializers]}]
       internal:
         - {from: "backend/posts/models.py", items: [{name: Post, status: available}, {name: PostImage, status: available}, {name: Comment, status: available}]}
     exports:
-      - {name: PostImageSerializer, kind: class, type: DRF ModelSerializer, fields: [id, image, uploaded_at]}
-      - {name: PostSerializer,      kind: class, type: DRF ModelSerializer, fields: [id, author, title, body, images(nested PostImageSerializer), created_at, updated_at]}
-      - {name: CommentSerializer,   kind: class, type: DRF ModelSerializer, fields: [id, author, guest_name, text, rating, is_approved, created_at]}
+      - {name: PostImageSerializer,    kind: class, type: DRF ModelSerializer, fields: [id, image, uploaded_at]}
+      - {name: PostSerializer,         kind: class, type: DRF ModelSerializer, fields: [id, author(nested), title, body, images(nested), created_at, updated_at]}
+      - {name: PostCreateSerializer,   kind: class, type: DRF ModelSerializer, note: "auto-sets author from request.user"}
+      - {name: PostUpdateSerializer,   kind: class, type: DRF ModelSerializer, fields: [title, body], note: "all fields optional"}
+      - {name: CommentSerializer,      kind: class, type: DRF ModelSerializer, fields: [id, author(nested), author_label, guest_name, text, rating, is_approved, created_at]}
+      - {name: CommentCreateSerializer,kind: class, type: DRF ModelSerializer, note: "auto-sets author, always sets is_approved=False, requires content_type+object_id in context"}
     needed_by:
-      - {file: "backend/posts/views.py", items: [PostSerializer, PostImageSerializer, CommentSerializer], status: pending}
+      - {file: "backend/posts/views.py", items: [PostSerializer, PostImageSerializer, PostCreateSerializer, PostUpdateSerializer, CommentSerializer, CommentCreateSerializer], status: available}
+      - {file: "backend/fund/urls.py",   items: [CommentListView, CommentCreateView], note: "views imported from posts/views.py", status: available}
 
   "backend/posts/views.py":
-    status: pending
+    status: done
     imports:
-      external: [{from: rest_framework.viewsets, items: [ModelViewSet]}]
+      external:
+        - {from: django.contrib.contenttypes.models, items: [ContentType]}
+        - {from: rest_framework.parsers, items: [JSONParser, MultiPartParser]}
+        - {from: rest_framework.permissions, items: [AllowAny, IsAuthenticated]}
+        - {from: rest_framework.views, items: [APIView]}
       internal:
-        - {from: "backend/posts/models.py",      items: [{name: Post, status: available}, {name: Comment, status: available}]}
-        - {from: "backend/posts/serializers.py", items: [{name: PostSerializer, status: pending}, {name: PostImageSerializer, status: pending}, {name: CommentSerializer, status: pending}]}
+        - {from: "backend/accounts/permissions.py", items: [{name: HasGroupPermission, status: available}]}
+        - {from: "backend/core/models.py",           items: [{name: DefaultSetting, status: available}]}
+        - {from: "backend/core/utils.py",            items: [{name: api_success, status: available}, {name: api_error, status: available}]}
+        - {from: "backend/fund/models.py",           items: [{name: Expense, status: available}]}
+        - {from: "backend/logs/models.py",           items: [{name: ActivityLog, status: available}]}
+        - {from: "backend/posts/models.py",          items: [{name: Post, status: available}, {name: PostImage, status: available}, {name: Comment, status: available}]}
+        - {from: "backend/posts/serializers.py",     items: [{name: PostSerializer, status: available}, {name: PostCreateSerializer, status: available}, {name: PostUpdateSerializer, status: available}, {name: PostImageSerializer, status: available}, {name: CommentSerializer, status: available}, {name: CommentCreateSerializer, status: available}]}
     exports:
-      - {name: PostViewSet,    kind: class, type: DRF ModelViewSet}
-      - {name: CommentViewSet, kind: class, type: DRF ModelViewSet, description: "handles approval workflow — is_approved toggle for admins"}
+      - {name: PostListView,          kind: class, type: DRF APIView, endpoint: "GET    /api/posts/",                          auth: dynamic(post_list_visibility)}
+      - {name: PostDetailView,        kind: class, type: DRF APIView, endpoint: "GET    /api/posts/{id}/",                     auth: dynamic, note: "returns post + approved comments"}
+      - {name: PostCreateView,        kind: class, type: DRF APIView, endpoint: "POST   /api/posts/create/",                   auth: can_post}
+      - {name: PostUpdateView,        kind: class, type: DRF APIView, endpoint: "PATCH  /api/posts/{id}/update/",              auth: author or can_manage_permissions}
+      - {name: PostDeleteView,        kind: class, type: DRF APIView, endpoint: "DELETE /api/posts/{id}/delete/",              auth: author or can_manage_permissions}
+      - {name: PostImageUploadView,   kind: class, type: DRF APIView, endpoint: "POST   /api/posts/{id}/images/",             auth: author or can_manage_permissions}
+      - {name: PostImageDeleteView,   kind: class, type: DRF APIView, endpoint: "DELETE /api/posts/{id}/images/{img_id}/delete/", auth: author or can_manage_permissions}
+      - {name: CommentListView,       kind: class, type: DRF APIView, endpoint: "GET    /api/posts/{id}/comments/ or /api/fund/expenses/{id}/comments/", auth: public}
+      - {name: CommentCreateView,     kind: class, type: DRF APIView, endpoint: "POST   /api/posts/{id}/comments/create/ or /api/fund/expenses/{id}/comments/create/", auth: optional(guests allowed), note: "always is_approved=False"}
+      - {name: CommentApproveView,    kind: class, type: DRF APIView, endpoint: "PATCH  /api/posts/comments/{id}/approve/",   auth: can_approve_comments}
+      - {name: CommentDeleteView,     kind: class, type: DRF APIView, endpoint: "DELETE /api/posts/comments/{id}/delete/",    auth: can_manage_permissions}
     needed_by:
-      - {file: "backend/posts/urls.py", items: [PostViewSet, CommentViewSet], status: pending}
+      - {file: "backend/posts/urls.py", items: [PostListView, PostDetailView, PostCreateView, PostUpdateView, PostDeleteView, PostImageUploadView, PostImageDeleteView, CommentListView, CommentCreateView, CommentApproveView, CommentDeleteView], status: available}
+      - {file: "backend/fund/urls.py",  items: [CommentListView, CommentCreateView], status: available}
 
   "backend/posts/urls.py":
-    status: pending
+    status: done
     imports:
-      external: [{from: rest_framework.routers, items: [DefaultRouter]}]
+      external: [{from: django.urls, items: [path]}]
       internal:
-        - {from: "backend/posts/views.py", items: [{name: PostViewSet, status: pending}, {name: CommentViewSet, status: pending}]}
+        - {from: "backend/posts/views.py", items: [{name: PostListView, status: available}, {name: PostDetailView, status: available}, {name: PostCreateView, status: available}, {name: PostUpdateView, status: available}, {name: PostDeleteView, status: available}, {name: PostImageUploadView, status: available}, {name: PostImageDeleteView, status: available}, {name: CommentListView, status: available}, {name: CommentCreateView, status: available}, {name: CommentApproveView, status: available}, {name: CommentDeleteView, status: available}]}
     exports:
-      - {name: urlpatterns, kind: constant, type: list}
+      - {name: urlpatterns, kind: constant, type: list, routes: ["GET /", "POST create/", "GET {id}/", "PATCH {id}/update/", "DELETE {id}/delete/", "POST {id}/images/", "DELETE {id}/images/{img_id}/delete/", "GET {id}/comments/", "POST {id}/comments/create/", "PATCH comments/{id}/approve/", "DELETE comments/{id}/delete/"]}
     needed_by:
-      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: in-progress}
+      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: available}
 
   # ─── LOGS APP ──────────────────────────────────────────────────────────────
 
