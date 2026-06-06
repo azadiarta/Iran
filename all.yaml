@@ -13,7 +13,7 @@ rules:
   after_build: update exports + update imports with status
 
 progress:
-  current_phase: 6
+  current_phase: 7
   current_task: complete
   phases:
     1:
@@ -41,12 +41,16 @@ progress:
       status: done
       done: [accounts/member_views, accounts/member_urls, accounts/group_views, accounts/group_urls, core/serializers, core/settings_views, core/settings_urls, core/dashboard_views, core/dashboard_urls, logs/serializers, logs/views, logs/urls, accounts/serializers extended, groupfund/urls updated]
     7:
+      name: payment system (manual bank transfer + PayPal)
+      status: done
+      done: [fund/models updated (pending_review status + receipt_image), payments app created, BasePaymentProvider, ManualPaymentProvider, PayPalPaymentProvider, PaymentFactory, payments/serializers, payments/views, payments/urls, migrations 0003 applied, groupfund/urls updated]
+    8:
       name: frontend
       status: pending
-    8:
-      name: payment integration
-      status: pending
     9:
+      name: payment integration (Stripe / Google Pay)
+      status: pending
+    10:
       name: deploy
       status: pending
 
@@ -58,7 +62,7 @@ files:
     status: done
     kind: config
     key_settings:
-      installed_apps: [django.contrib.admin, django.contrib.auth, django.contrib.contenttypes, django.contrib.sessions, django.contrib.messages, django.contrib.staticfiles, rest_framework, rest_framework_simplejwt.token_blacklist, corsheaders, core, accounts, fund, posts, logs]
+      installed_apps: [django.contrib.admin, django.contrib.auth, django.contrib.contenttypes, django.contrib.sessions, django.contrib.messages, django.contrib.staticfiles, rest_framework, rest_framework_simplejwt.token_blacklist, corsheaders, core, accounts, fund, posts, logs, payments]
       auth_user_model: accounts.Member
       authentication_backends: [accounts.backends.MemberAuthBackend]
       db_engine: postgresql (override: DB_ENGINE env for local sqlite testing)
@@ -89,6 +93,7 @@ files:
         - {file: "backend/logs/urls.py",            items: [urlpatterns], status: available}
         - {file: "backend/core/settings_urls.py",   items: [urlpatterns], status: available}
         - {file: "backend/core/dashboard_urls.py",  items: [urlpatterns], status: available}
+        - {file: "backend/payments/urls.py",         items: [urlpatterns], status: available}
     exports: []
     needed_by: []
 
@@ -505,8 +510,9 @@ files:
           amount: decimal(10,2)
           currency: str(3), default GBP
           payment_method: choices [stripe, paypal, google_pay, manual, other]
-          status: choices [pending, completed, failed], default pending
+          status: choices [pending, pending_review, completed, failed], default pending
           notes: text, blank
+          receipt_image: ImageField, upload_to contribution_receipts/, blank
           created_at: datetime, auto
           updated_at: datetime, auto
         meta: {ordering: [-created_at]}
@@ -525,9 +531,9 @@ files:
           updated_at: datetime, auto
         meta: {ordering: [-expense_date]}
     needed_by:
-      - {file: "backend/fund/serializers.py", items: [Contribution, Expense], status: pending}
-      - {file: "backend/fund/views.py",       items: [Contribution, Expense], status: pending}
-      - {file: "backend/payments/service.py", items: [Contribution], status: pending}
+      - {file: "backend/fund/serializers.py",    items: [Contribution, Expense], status: available}
+      - {file: "backend/fund/views.py",         items: [Contribution, Expense], status: available}
+      - {file: "backend/payments/views.py",     items: [Contribution], status: available}
 
   "backend/fund/serializers.py":
     status: done
@@ -789,19 +795,133 @@ files:
     needed_by:
       - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: available}
 
-  # ─── PAYMENTS ──────────────────────────────────────────────────────────────
+  # ─── PAYMENTS APP ─────────────────────────────────────────────────────────
 
-  "backend/payments/service.py":
-    status: pending
+  "backend/payments/__init__.py":
+    status: done
+    imports: {}
+    exports: []
+    needed_by: []
+
+  "backend/payments/base.py":
+    status: done
+    imports:
+      external: [{from: abc, items: [ABC, abstractmethod]}]
+      internal: []
+    exports:
+      - name: BasePaymentProvider
+        kind: class
+        type: ABC
+        abstract_methods: [is_configured, get_instructions, initiate_payment, verify_payment]
+        concrete_methods: [get_unavailable_message]
+    needed_by:
+      - {file: "backend/payments/manual.py",  items: [BasePaymentProvider], status: available}
+      - {file: "backend/payments/paypal.py",  items: [BasePaymentProvider], status: available}
+
+  "backend/payments/manual.py":
+    status: done
+    imports:
+      external: []
+      internal:
+        - {from: "backend/core/models.py",    items: [{name: DefaultSetting, status: available}]}
+        - {from: "backend/fund/models.py",    items: [{name: Contribution, status: available}]}
+        - {from: "backend/payments/base.py",  items: [{name: BasePaymentProvider, status: available}]}
+    exports:
+      - name: ManualPaymentProvider
+        kind: class
+        type: BasePaymentProvider
+        is_configured: "payment_manual_enabled=true AND all 5 bank detail keys present"
+        initiate_payment: "status=PENDING, prepends Reference:{ref} to notes, saves"
+        get_instructions: "returns bank_name, account_name, account_number, sort_code, reference, amount, currency, instructions"
+    needed_by:
+      - {file: "backend/payments/factory.py", items: [ManualPaymentProvider], status: available}
+
+  "backend/payments/paypal.py":
+    status: done
+    imports:
+      external: []
+      internal:
+        - {from: "backend/core/models.py",    items: [{name: DefaultSetting, status: available}]}
+        - {from: "backend/fund/models.py",    items: [{name: Contribution, status: available}]}
+        - {from: "backend/payments/base.py",  items: [{name: BasePaymentProvider, status: available}]}
+    exports:
+      - name: PayPalPaymentProvider
+        kind: class
+        type: BasePaymentProvider
+        note: "NOT a PayPal API integration — manual send via PayPal app, admin confirms"
+        is_configured: "payment_paypal_enabled=true AND paypal_email AND paypal_me_link present"
+        initiate_payment: "status=PENDING, saves"
+        get_instructions: "returns paypal_email, paypal_me_link, reference, amount, currency, instructions"
+    needed_by:
+      - {file: "backend/payments/factory.py", items: [PayPalPaymentProvider], status: available}
+
+  "backend/payments/factory.py":
+    status: done
+    imports:
+      external: []
+      internal:
+        - {from: "backend/payments/manual.py", items: [{name: ManualPaymentProvider, status: available}]}
+        - {from: "backend/payments/paypal.py", items: [{name: PayPalPaymentProvider, status: available}]}
+    exports:
+      - name: PaymentFactory
+        kind: class
+        methods:
+          - {name: get_provider, signature: "(cls, payment_method: str) -> BasePaymentProvider | None", note: "returns None for unknown/unimplemented methods"}
+          - {name: all_methods,  signature: "(cls) -> list[dict]", note: "returns {method, label, is_available, unavailable_message} for each registered method"}
+        registry: {manual: ManualPaymentProvider, paypal: PayPalPaymentProvider, stripe: None(future), google_pay: None(future)}
+    needed_by:
+      - {file: "backend/payments/views.py", items: [PaymentFactory], status: available}
+
+  "backend/payments/serializers.py":
+    status: done
+    imports:
+      external: [{from: rest_framework, items: [serializers]}]
+      internal:
+        - {from: "backend/core/models.py", items: [{name: DefaultSetting, status: available}]}
+        - {from: "backend/fund/models.py", items: [{name: Contribution, status: available}]}
+    exports:
+      - {name: PaymentInitiateSerializer, kind: class, type: DRF Serializer, fields: [amount(positive decimal), payment_method(choices), guest_name(optional), notes(optional)], note: "guest_name required if unauthenticated"}
+      - {name: ReceiptUploadSerializer,   kind: class, type: DRF Serializer, fields: [receipt_image(ImageField)], note: "validates ext (jpg/jpeg/png/pdf) + size from max_receipt_image_size_mb DefaultSetting"}
+    needed_by:
+      - {file: "backend/payments/views.py", items: [PaymentInitiateSerializer, ReceiptUploadSerializer], status: available}
+
+  "backend/payments/views.py":
+    status: done
     imports:
       external:
-        - {from: stripe, items: [PaymentIntent, Webhook]}
+        - {from: django.contrib.contenttypes.models, items: [ContentType]}
+        - {from: rest_framework.parsers, items: [FormParser, MultiPartParser]}
+        - {from: rest_framework.permissions, items: [AllowAny]}
+        - {from: rest_framework.views, items: [APIView]}
       internal:
-        - {from: "backend/fund/models.py",     items: [{name: Contribution, status: available}]}
-        - {from: "backend/accounts/models.py", items: [{name: Member, status: available}]}
+        - {from: "backend/core/models.py",             items: [{name: DefaultSetting, status: available}]}
+        - {from: "backend/core/utils.py",              items: [{name: api_success, status: available}, {name: api_error, status: available}]}
+        - {from: "backend/fund/models.py",             items: [{name: Contribution, status: available}]}
+        - {from: "backend/logs/models.py",             items: [{name: ActivityLog, status: available}]}
+        - {from: "backend/payments/factory.py",        items: [{name: PaymentFactory, status: available}]}
+        - {from: "backend/payments/serializers.py",    items: [{name: PaymentInitiateSerializer, status: available}, {name: ReceiptUploadSerializer, status: available}]}
     exports:
-      - {name: create_payment_intent, kind: function, signature: "(amount: int, currency: str = 'gbp', member_id: UUID = None) -> dict", description: "amount in pence (500 = £5.00). returns {client_secret, payment_intent_id}"}
-      - {name: confirm_contribution,  kind: function, signature: "(payment_intent_id: str) -> Contribution",                              description: "marks matching Contribution as completed"}
-      - {name: handle_webhook,        kind: function, signature: "(payload: bytes, sig_header: str) -> None",                             description: "processes Stripe webhook events (payment_intent.succeeded etc.)"}
+      - {name: PaymentMethodsView, kind: class, type: DRF APIView, endpoint: "GET  /api/payments/methods/",          auth: AllowAny, note: "never crashes; wraps PaymentFactory.all_methods()"}
+      - {name: PaymentInitiateView,kind: class, type: DRF APIView, endpoint: "POST /api/payments/initiate/",         auth: AllowAny, note: "creates Contribution, calls initiate_payment(); returns is_available=False if unconfigured"}
+      - {name: ReceiptUploadView,  kind: class, type: DRF APIView, endpoint: "POST /api/payments/{id}/receipt/",     auth: AllowAny, parsers: [MultiPartParser, FormParser], note: "validates file, sets status=PENDING_REVIEW"}
+      - {name: PaymentStatusView,  kind: class, type: DRF APIView, endpoint: "GET  /api/payments/{id}/status/",      auth: AllowAny}
     needed_by:
-      - {file: "backend/fund/views.py", items: [create_payment_intent, handle_webhook], status: pending}
+      - {file: "backend/payments/urls.py", items: [PaymentMethodsView, PaymentInitiateView, ReceiptUploadView, PaymentStatusView], status: available}
+
+  "backend/payments/urls.py":
+    status: done
+    imports:
+      external: [{from: django.urls, items: [path]}]
+      internal:
+        - {from: "backend/payments/views.py", items: [{name: PaymentMethodsView, status: available}, {name: PaymentInitiateView, status: available}, {name: ReceiptUploadView, status: available}, {name: PaymentStatusView, status: available}]}
+    exports:
+      - {name: urlpatterns, kind: constant, type: list, routes: ["GET methods/", "POST initiate/", "POST {uuid}/receipt/", "GET {uuid}/status/"]}
+    needed_by:
+      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: available}
+
+  # ─── FUTURE: Stripe / Google Pay ───────────────────────────────────────────
+  # To add: create payments/stripe.py extending BasePaymentProvider
+  #         register in payments/factory.py._REGISTRY. Nothing else changes.
+  # DefaultSetting keys reserved: payment_stripe_enabled, payment_stripe_public_key,
+  #   payment_stripe_secret_key, payment_stripe_webhook_secret,
+  #   payment_google_pay_enabled

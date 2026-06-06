@@ -11,9 +11,10 @@ class Contribution(models.Model):
         OTHER      = 'other',      'Other'
 
     class Status(models.TextChoices):
-        PENDING   = 'pending',   'Pending'
-        COMPLETED = 'completed', 'Completed'
-        FAILED    = 'failed',    'Failed'
+        PENDING        = 'pending',        'Pending'
+        PENDING_REVIEW = 'pending_review', 'Pending Review'
+        COMPLETED      = 'completed',      'Completed'
+        FAILED         = 'failed',         'Failed'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     contributor = models.ForeignKey(
@@ -26,6 +27,7 @@ class Contribution(models.Model):
     payment_method = models.CharField(max_length=20, choices=PaymentMethod.choices)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     notes = models.TextField(blank=True)
+    receipt_image = models.ImageField(upload_to='contribution_receipts/', blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

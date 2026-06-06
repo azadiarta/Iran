@@ -24,6 +24,31 @@ class Permission(models.Model):
 #   default_currency = GBP
 #   require_comment_approval = true
 #   max_receipt_image_size_mb = 5
+#   expense_list_visibility = members_only
+#   post_list_visibility = members_only
+#   member_profile_visibility = members_only
+#
+# Payment: Manual Bank Transfer
+#   payment_manual_enabled = false
+#   payment_manual_bank_name =
+#   payment_manual_account_name =
+#   payment_manual_account_number =
+#   payment_manual_sort_code =
+#   payment_manual_reference_prefix = FUND-
+#   payment_manual_instructions =
+#
+# Payment: PayPal (Personal / Sole Trader — no API, manual send)
+#   payment_paypal_enabled = false
+#   payment_paypal_email =
+#   payment_paypal_me_link =
+#   payment_paypal_instructions =
+#
+# Future (keys reserved — do not use yet):
+#   payment_stripe_enabled = false
+#   payment_stripe_public_key =
+#   payment_stripe_secret_key =
+#   payment_stripe_webhook_secret =
+#   payment_google_pay_enabled = false
 
 class DefaultSetting(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

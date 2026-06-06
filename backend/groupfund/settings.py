@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     'fund',
     'posts',
     'logs',
+    'payments',
 ]
 
 MIDDLEWARE = [
