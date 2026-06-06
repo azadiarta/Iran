@@ -1,0 +1,9 @@
+{% extends "admin/change_list.html" %}
+{% block content %}
+{% if fund_balance %}
+<div style="margin-bottom:1rem;padding:0.75rem 1.25rem;background:#1a2b38;color:#4dd0e1;border:1px solid #4dd0e1;border-radius:4px;font-weight:bold;">
+  Current Balance: {{ fund_balance }}
+</div>
+{% endif %}
+{{ block.super }}
+{% endblock %}

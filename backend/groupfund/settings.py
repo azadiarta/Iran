@@ -9,6 +9,7 @@ DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 INSTALLED_APPS = [
+    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -97,6 +98,82 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.JSONParser',
         'rest_framework.parsers.MultiPartParser',
     ],
+}
+
+# ─── i18n ─────────────────────────────────────────────────────────────────────
+# Run: django-admin makemessages -l fa
+LANGUAGE_CODE = 'en-us'
+USE_I18N = True
+LANGUAGES = [
+    ('en', 'English'),
+    ('fa', 'Persian'),
+]
+LOCALE_PATHS = [BASE_DIR / 'locale']
+
+# ─── Jazzmin ──────────────────────────────────────────────────────────────────
+JAZZMIN_SETTINGS = {
+    'site_title': 'Group Fund Admin',
+    'site_header': 'Group Fund',
+    'site_brand': 'Group Fund',
+    'welcome_sign': 'Welcome to Group Fund Admin Panel',
+    'copyright': 'Group Fund',
+    'show_themes': True,
+    'theme': 'darkly',
+    'dark_mode_theme': 'darkly',
+    'language_chooser': True,
+    'icons': {
+        'auth': 'fas fa-users-cog',
+        'accounts.member': 'fas fa-user',
+        'accounts.accessgroup': 'fas fa-shield-alt',
+        'core.permission': 'fas fa-key',
+        'core.defaultsetting': 'fas fa-cog',
+        'fund.contribution': 'fas fa-arrow-circle-up',
+        'fund.expense': 'fas fa-arrow-circle-down',
+        'posts.post': 'fas fa-newspaper',
+        'posts.postimage': 'fas fa-image',
+        'posts.comment': 'fas fa-comments',
+        'logs.activitylog': 'fas fa-history',
+        'logs.systemlog': 'fas fa-server',
+    },
+    'order_with_respect_to': ['core', 'accounts', 'fund', 'posts', 'logs'],
+    'hide_apps': [],
+    'hide_models': [],
+    'topmenu_links': [
+        {'name': 'Home', 'url': 'admin:index', 'permissions': ['auth.view_user']},
+        {'name': 'API', 'url': '/api/', 'new_window': True},
+    ],
+}
+
+JAZZMIN_UI_TWEAKS = {
+    'navbar_small_text': False,
+    'footer_small_text': False,
+    'body_small_text': False,
+    'brand_small_text': False,
+    'brand_colour': 'navbar-dark',
+    'accent': 'accent-teal',
+    'navbar': 'navbar-dark',
+    'no_navbar_border': True,
+    'navbar_fixed': True,
+    'layout_boxed': False,
+    'footer_fixed': False,
+    'sidebar_fixed': True,
+    'sidebar': 'sidebar-dark-teal',
+    'sidebar_nav_small_text': False,
+    'sidebar_disable_expand': False,
+    'sidebar_nav_child_indent': True,
+    'sidebar_nav_compact_style': False,
+    'sidebar_nav_legacy_style': False,
+    'sidebar_nav_flat_style': False,
+    'theme': 'darkly',
+    'dark_mode_theme': 'darkly',
+    'button_classes': {
+        'primary': 'btn-primary',
+        'secondary': 'btn-secondary',
+        'info': 'btn-info',
+        'warning': 'btn-warning',
+        'danger': 'btn-danger',
+        'success': 'btn-success',
+    },
 }
 
 SIMPLE_JWT = {

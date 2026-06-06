@@ -13,7 +13,7 @@ rules:
   after_build: update exports + update imports with status
 
 progress:
-  current_phase: 7
+  current_phase: 8
   current_task: complete
   phases:
     1:
@@ -45,12 +45,16 @@ progress:
       status: done
       done: [fund/models updated (pending_review status + receipt_image), payments app created, BasePaymentProvider, ManualPaymentProvider, PayPalPaymentProvider, PaymentFactory, payments/serializers, payments/views, payments/urls, migrations 0003 applied, groupfund/urls updated]
     8:
+      name: Django admin panel (jazzmin)
+      status: done
+      done: [django-jazzmin added, JAZZMIN_SETTINGS + JAZZMIN_UI_TWEAKS, i18n setup, core/admin.py, accounts/admin.py, fund/admin.py + balance templates, posts/admin.py, logs/admin.py, payments/admin.py, can_view_balance permission seed, FundBalanceView gated on can_view_balance]
+    9:
       name: frontend
       status: pending
-    9:
+    10:
       name: payment integration (Stripe / Google Pay)
       status: pending
-    10:
+    11:
       name: deploy
       status: pending
 
@@ -62,7 +66,7 @@ files:
     status: done
     kind: config
     key_settings:
-      installed_apps: [django.contrib.admin, django.contrib.auth, django.contrib.contenttypes, django.contrib.sessions, django.contrib.messages, django.contrib.staticfiles, rest_framework, rest_framework_simplejwt.token_blacklist, corsheaders, core, accounts, fund, posts, logs, payments]
+      installed_apps: [jazzmin, django.contrib.admin, django.contrib.auth, django.contrib.contenttypes, django.contrib.sessions, django.contrib.messages, django.contrib.staticfiles, rest_framework, rest_framework_simplejwt.token_blacklist, corsheaders, core, accounts, fund, posts, logs, payments]
       auth_user_model: accounts.Member
       authentication_backends: [accounts.backends.MemberAuthBackend]
       db_engine: postgresql (override: DB_ENGINE env for local sqlite testing)
@@ -97,6 +101,101 @@ files:
     exports: []
     needed_by: []
 
+  # ─── ADMIN ────────────────────────────────────────────────────────────────
+
+  "backend/core/admin.py":
+    status: done
+    imports:
+      external:
+        - {from: json, items: [json]}
+        - {from: django.contrib, items: [admin]}
+        - {from: django.contrib.contenttypes.models, items: [ContentType]}
+        - {from: django.db.models, items: [Q]}
+        - {from: django.utils.html, items: [mark_safe]}
+      internal:
+        - {from: "backend/core/models.py",  items: [{name: DefaultSetting, status: available}, {name: Permission, status: available}]}
+        - {from: "backend/logs/models.py",  items: [{name: ActivityLog, status: available}]}
+    exports:
+      - {name: PermissionAdmin,      kind: class, type: Django ModelAdmin, note: "list_display codename/label/desc; read-only in admin"}
+      - {name: DefaultSettingAdmin,  kind: class, type: Django ModelAdmin, note: "auto-sets updated_by; logs setting_updated_via_admin; SettingCategoryFilter; key readonly on edit"}
+      - {name: SettingCategoryFilter,kind: class, type: SimpleListFilter,  note: "filters by key prefix: general/visibility/payment_manual/paypal/stripe/google"}
+    needed_by: []
+
+  "backend/accounts/admin.py":
+    status: done
+    imports:
+      external:
+        - {from: django.contrib, items: [admin]}
+        - {from: django.contrib.auth.admin, items: [UserAdmin]}
+        - {from: django.contrib.contenttypes.models, items: [ContentType]}
+      internal:
+        - {from: "backend/accounts/models.py", items: [{name: AccessGroup, status: available}, {name: Member, status: available}]}
+        - {from: "backend/core/models.py",     items: [{name: DefaultSetting, status: available}]}
+        - {from: "backend/fund/models.py",     items: [{name: Contribution, status: available}, {name: Expense, status: available}]}
+        - {from: "backend/logs/models.py",     items: [{name: ActivityLog, status: available}]}
+    exports:
+      - {name: MemberAdmin,      kind: class, type: Django UserAdmin, note: "inlines: last-5 contributions + last-5 expenses; actions: activate/deactivate (never superuser); logs on save"}
+      - {name: AccessGroupAdmin, kind: class, type: Django ModelAdmin, note: "filter_horizontal permissions; member_count column; set_as_default action syncs DefaultSetting+ActivityLog"}
+    needed_by: []
+
+  "backend/fund/admin.py":
+    status: done
+    imports:
+      external:
+        - {from: decimal, items: [Decimal]}
+        - {from: django.contrib, items: [admin]}
+        - {from: django.contrib.contenttypes.models, items: [ContentType]}
+        - {from: django.db.models, items: [Sum]}
+        - {from: django.utils.html, items: [mark_safe]}
+      internal:
+        - {from: "backend/core/models.py", items: [{name: DefaultSetting, status: available}]}
+        - {from: "backend/fund/models.py", items: [{name: Contribution, status: available}, {name: Expense, status: available}]}
+        - {from: "backend/logs/models.py", items: [{name: ActivityLog, status: available}]}
+    exports:
+      - {name: ContributionAdmin, kind: class, type: Django ModelAdmin, note: "contributor_display column; receipt_preview; approve/reject actions; changelist shows live fund balance"}
+      - {name: ExpenseAdmin,      kind: class, type: Django ModelAdmin, note: "receipt_preview; changelist shows live fund balance"}
+    templates:
+      - "backend/fund/templates/admin/fund/contribution/change_list.html"
+      - "backend/fund/templates/admin/fund/expense/change_list.html"
+    needed_by: []
+
+  "backend/posts/admin.py":
+    status: done
+    imports:
+      external:
+        - {from: django.contrib, items: [admin]}
+        - {from: django.contrib.contenttypes.admin, items: [GenericTabularInline]}
+        - {from: django.contrib.contenttypes.models, items: [ContentType]}
+        - {from: django.utils.html, items: [mark_safe]}
+      internal:
+        - {from: "backend/logs/models.py",  items: [{name: ActivityLog, status: available}]}
+        - {from: "backend/posts/models.py", items: [{name: Comment, status: available}, {name: Post, status: available}, {name: PostImage, status: available}]}
+    exports:
+      - {name: PostAdmin,      kind: class, type: Django ModelAdmin, note: "inlines: PostImageInline (thumbnails, add/delete) + PostCommentInline (GenericTabularInline, readonly approved only); comment_count column"}
+      - {name: PostImageAdmin, kind: class, type: Django ModelAdmin, note: "image_preview column"}
+      - {name: CommentAdmin,   kind: class, type: Django ModelAdmin, note: "approve/reject actions; author_display + text_preview + target columns; logs to ActivityLog"}
+    needed_by: []
+
+  "backend/logs/admin.py":
+    status: done
+    imports:
+      external:
+        - {from: json, items: [json]}
+        - {from: django.contrib, items: [admin]}
+        - {from: django.utils.html, items: [mark_safe]}
+      internal:
+        - {from: "backend/logs/models.py", items: [{name: ActivityLog, status: available}, {name: SystemLog, status: available}]}
+    exports:
+      - {name: ActivityLogAdmin, kind: class, type: Django ModelAdmin, note: "fully immutable (no add/change/delete); pretty_extra_data JSON; date_hierarchy"}
+      - {name: SystemLogAdmin,   kind: class, type: Django ModelAdmin, note: "fully immutable; message_preview column; pretty_extra_data JSON"}
+    needed_by: []
+
+  "backend/payments/admin.py":
+    status: done
+    note: "No Django models in payments app — Contribution is registered in fund/admin.py"
+    exports: []
+    needed_by: []
+
   # ─── CORE APP ──────────────────────────────────────────────────────────────
 
   "backend/core/models.py":
@@ -127,6 +226,7 @@ files:
           created_at: datetime, auto
           updated_at: datetime, auto
         seeds: [default_group=<UUID>, default_currency=GBP, require_comment_approval=true, max_receipt_image_size_mb=5]
+        permission_seeds: [can_contribute(ON), can_comment(ON), can_post, can_expense, can_manage_permissions, can_approve_comments, can_view_balance]
     needed_by:
       - {file: "backend/accounts/models.py",  items: [Permission], status: available}
       - {file: "backend/core/serializers.py", items: [Permission, DefaultSetting], status: pending}
@@ -576,7 +676,7 @@ files:
       - {name: ExpenseListView,              kind: class, type: DRF APIView, endpoint: "GET  /api/fund/expenses/",                   auth: dynamic(expense_list_visibility setting)}
       - {name: ExpenseCreateView,            kind: class, type: DRF APIView, endpoint: "POST /api/fund/expenses/create/",            auth: can_expense}
       - {name: ExpenseDeleteView,            kind: class, type: DRF APIView, endpoint: "DELETE /api/fund/expenses/{id}/delete/",     auth: can_manage_permissions}
-      - {name: FundBalanceView,              kind: class, type: DRF APIView, endpoint: "GET  /api/fund/balance/",                   auth: required, note: "always recalculates from DB"}
+      - {name: FundBalanceView,              kind: class, type: DRF APIView, endpoint: "GET  /api/fund/balance/",                   auth: can_view_balance, note: "always recalculates from DB"}
     needed_by:
       - {file: "backend/fund/urls.py", items: [ContributionListView, ContributionCreateView, ContributionStatusUpdateView, ContributionDeleteView, ExpenseListView, ExpenseCreateView, ExpenseDeleteView, FundBalanceView], status: available}
 

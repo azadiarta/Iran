@@ -3,7 +3,8 @@ from django.db import models
 
 
 # Default seed codenames: can_contribute (ON), can_comment (ON), can_post,
-# can_expense, can_manage_permissions, can_approve_comments
+# can_expense, can_manage_permissions, can_approve_comments,
+# can_view_balance (label: 'Can view fund balance')
 
 class Permission(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

@@ -199,7 +199,7 @@ class ExpenseDeleteView(APIView):
 # ─── Fund Balance ──────────────────────────────────────────────────────────────
 
 class FundBalanceView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasGroupPermission('can_view_balance')]
 
     def get(self, request):
         total_contributions = (
