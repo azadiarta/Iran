@@ -84,3 +84,143 @@ class MemberProfileSerializer(serializers.ModelSerializer):
         if not obj.group:
             return []
         return list(obj.group.permissions.values_list('codename', flat=True))
+
+
+# ─── Member management serializers ────────────────────────────────────────────
+
+class MemberListSerializer(serializers.ModelSerializer):
+    group_name = serializers.CharField(source='group.name', read_only=True, default=None)
+
+    class Meta:
+        model = Member
+        fields = ['id', 'full_name', 'display_name', 'group_name', 'is_active', 'created_at']
+        read_only_fields = fields
+
+
+class MemberDetailSerializer(serializers.ModelSerializer):
+    group_name = serializers.CharField(source='group.name', read_only=True, default=None)
+    group_permissions = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Member
+        fields = ['id', 'full_name', 'display_name', 'email', 'phone',
+                  'group_name', 'group_permissions', 'is_active', 'created_at']
+        read_only_fields = fields
+
+    def get_group_permissions(self, obj):
+        if not obj.group:
+            return []
+        return list(obj.group.permissions.values_list('codename', flat=True))
+
+
+class MemberUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Member
+        fields = ['full_name', 'display_name', 'email', 'phone']
+        extra_kwargs = {
+            'full_name':     {'required': False},
+            'display_name':  {'required': False},
+            'email':         {'required': False, 'allow_null': True},
+            'phone':         {'required': False, 'allow_null': True},
+        }
+
+    def validate_email(self, value):
+        return value or None
+
+    def validate_phone(self, value):
+        return value or None
+
+    def validate(self, data):
+        instance = self.instance
+        phone = data.get('phone', instance.phone)
+        email = data.get('email', instance.email)
+        if not phone and not email:
+            raise serializers.ValidationError('At least one of phone or email must remain.')
+        if data.get('email'):
+            if Member.objects.filter(email=data['email']).exclude(pk=instance.pk).exists():
+                raise serializers.ValidationError({'email': 'Email already in use.'})
+        if data.get('phone'):
+            if Member.objects.filter(phone=data['phone']).exclude(pk=instance.pk).exists():
+                raise serializers.ValidationError({'phone': 'Phone already in use.'})
+        return data
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(write_only=True, required=False, allow_blank=True, default='')
+    new_password = serializers.CharField(write_only=True, min_length=8)
+    confirm_new_password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        if data['new_password'] != data['confirm_new_password']:
+            raise serializers.ValidationError({'new_password': 'Passwords do not match.'})
+        return data
+
+
+# ─── AccessGroup management serializers ───────────────────────────────────────
+
+class _PermissionMinimalSerializer(serializers.Serializer):
+    codename = serializers.CharField(read_only=True)
+    label = serializers.CharField(read_only=True)
+
+
+class AccessGroupSerializer(serializers.ModelSerializer):
+    permissions = _PermissionMinimalSerializer(many=True, read_only=True)
+    member_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AccessGroup
+        fields = ['id', 'name', 'description', 'is_default', 'permissions', 'member_count', 'created_at']
+        read_only_fields = ['id', 'is_default', 'created_at']
+
+    def get_member_count(self, obj):
+        return obj.members.count()
+
+
+class AccessGroupCreateSerializer(serializers.ModelSerializer):
+    permission_ids = serializers.ListField(
+        child=serializers.UUIDField(), write_only=True, required=False, default=list,
+    )
+
+    class Meta:
+        model = AccessGroup
+        fields = ['name', 'description', 'permission_ids']
+
+    def create(self, validated_data):
+        from core.models import Permission
+        permission_ids = validated_data.pop('permission_ids', [])
+        group = AccessGroup.objects.create(**validated_data)
+        required = Permission.objects.filter(codename__in=['can_contribute', 'can_comment'])
+        group.permissions.set(required)
+        if permission_ids:
+            extra = Permission.objects.filter(id__in=permission_ids)
+            group.permissions.add(*extra)
+        return group
+
+
+class AccessGroupUpdateSerializer(serializers.ModelSerializer):
+    permission_ids = serializers.ListField(
+        child=serializers.UUIDField(), write_only=True, required=False,
+    )
+
+    class Meta:
+        model = AccessGroup
+        fields = ['name', 'description', 'permission_ids']
+        extra_kwargs = {
+            'name':        {'required': False},
+            'description': {'required': False},
+        }
+
+    def update(self, instance, validated_data):
+        from core.models import Permission
+        permission_ids = validated_data.pop('permission_ids', None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        if permission_ids is not None:
+            required = set(
+                Permission.objects.filter(codename__in=['can_contribute', 'can_comment'])
+                .values_list('id', flat=True)
+            )
+            new_ids = set(permission_ids) | required
+            instance.permissions.set(Permission.objects.filter(id__in=new_ids))
+        return instance

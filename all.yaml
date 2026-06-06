@@ -13,7 +13,7 @@ rules:
   after_build: update exports + update imports with status
 
 progress:
-  current_phase: 5
+  current_phase: 6
   current_task: complete
   phases:
     1:
@@ -33,16 +33,20 @@ progress:
       status: done
       done: [DefaultSetting model, AccessGroup.is_default + save(), get_default_group_id(), Member.group SET_DEFAULT, Expense.withdrawn_by SET_NULL, Post.author SET_NULL, core/signals.py, core/utils.py, core/apps.py ready(), migrations verified]
     5:
-      name: backend API (fund, posts, logs, core)
+      name: backend API (fund, posts, comments)
       status: done
       done: [fund/serializers, fund/views, fund/urls, posts/serializers, posts/views, posts/urls, groupfund/urls updated]
     6:
+      name: backend API (members, groups, settings, dashboard, logs)
+      status: done
+      done: [accounts/member_views, accounts/member_urls, accounts/group_views, accounts/group_urls, core/serializers, core/settings_views, core/settings_urls, core/dashboard_views, core/dashboard_urls, logs/serializers, logs/views, logs/urls, accounts/serializers extended, groupfund/urls updated]
+    7:
       name: frontend
       status: pending
-    7:
+    8:
       name: payment integration
       status: pending
-    8:
+    9:
       name: deploy
       status: pending
 
@@ -77,11 +81,14 @@ files:
     imports:
       external: [{from: django.contrib, items: [admin]}, {from: django.urls, items: [path, include]}]
       internal:
-        - {file: "backend/accounts/urls.py", items: [urlpatterns], status: available}
-        - {file: "backend/core/urls.py",     items: [urlpatterns], status: pending}
-        - {file: "backend/fund/urls.py",     items: [urlpatterns], status: available}
-        - {file: "backend/posts/urls.py",    items: [urlpatterns], status: available}
-        - {file: "backend/logs/urls.py",     items: [urlpatterns], status: pending}
+        - {file: "backend/accounts/urls.py",        items: [urlpatterns], status: available}
+        - {file: "backend/accounts/member_urls.py", items: [urlpatterns], status: available}
+        - {file: "backend/accounts/group_urls.py",  items: [urlpatterns], status: available}
+        - {file: "backend/fund/urls.py",            items: [urlpatterns], status: available}
+        - {file: "backend/posts/urls.py",           items: [urlpatterns], status: available}
+        - {file: "backend/logs/urls.py",            items: [urlpatterns], status: available}
+        - {file: "backend/core/settings_urls.py",   items: [urlpatterns], status: available}
+        - {file: "backend/core/dashboard_urls.py",  items: [urlpatterns], status: available}
     exports: []
     needed_by: []
 
@@ -160,24 +167,87 @@ files:
       - {file: "backend/logs/views.py",     items: [api_success, api_error], status: pending}
 
   "backend/core/serializers.py":
-    status: pending
+    status: done
     imports:
       external: [{from: rest_framework, items: [serializers]}]
       internal:
-        - {from: "backend/core/models.py", items: [{name: Permission, status: available}]}
+        - {from: "backend/core/models.py", items: [{name: Permission, status: available}, {name: DefaultSetting, status: available}]}
     exports:
-      - {name: PermissionSerializer, kind: class, type: DRF ModelSerializer, fields: [id, codename, label, description]}
+      - {name: PermissionSerializer,      kind: class, type: DRF ModelSerializer, fields: [id, codename, label, description]}
+      - {name: DefaultSettingSerializer,  kind: class, type: DRF ModelSerializer, fields: [id, key, value, description, updated_by_name, updated_at]}
     needed_by:
-      - {file: "backend/core/views.py",           items: [PermissionSerializer], status: pending}
-      - {file: "backend/accounts/serializers.py", items: [PermissionSerializer], status: pending}
+      - {file: "backend/core/settings_views.py",  items: [DefaultSettingSerializer], status: available}
+
+  "backend/core/settings_views.py":
+    status: done
+    imports:
+      external: [{from: rest_framework.permissions, items: [IsAuthenticated]}, {from: rest_framework.views, items: [APIView]}]
+      internal:
+        - {from: "backend/accounts/models.py",     items: [{name: AccessGroup, status: available}]}
+        - {from: "backend/accounts/permissions.py",items: [{name: IsSuperuser, status: available}]}
+        - {from: "backend/core/models.py",         items: [{name: DefaultSetting, status: available}]}
+        - {from: "backend/core/serializers.py",    items: [{name: DefaultSettingSerializer, status: available}]}
+        - {from: "backend/core/utils.py",          items: [{name: api_success, status: available}, {name: api_error, status: available}]}
+        - {from: "backend/logs/models.py",         items: [{name: ActivityLog, status: available}]}
+    exports:
+      - {name: DefaultSettingListView,   kind: class, type: DRF APIView, endpoint: "GET   /api/settings/",       auth: superuser}
+      - {name: DefaultSettingUpdateView, kind: class, type: DRF APIView, endpoint: "PATCH /api/settings/{key}/", auth: superuser, note: "validates value per key, logs to ActivityLog"}
+    needed_by:
+      - {file: "backend/core/settings_urls.py", items: [DefaultSettingListView, DefaultSettingUpdateView], status: available}
+
+  "backend/core/settings_urls.py":
+    status: done
+    imports:
+      external: [{from: django.urls, items: [path]}]
+      internal:
+        - {from: "backend/core/settings_views.py", items: [{name: DefaultSettingListView, status: available}, {name: DefaultSettingUpdateView, status: available}]}
+    exports:
+      - {name: urlpatterns, kind: constant, type: list, routes: ["GET /", "PATCH {key}/"]}
+    needed_by:
+      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: available}
+
+  "backend/core/dashboard_views.py":
+    status: done
+    imports:
+      external:
+        - {from: decimal, items: [Decimal]}
+        - {from: django.db.models, items: [Sum]}
+        - {from: django.utils, items: [timezone]}
+        - {from: rest_framework.permissions, items: [IsAuthenticated]}
+        - {from: rest_framework.views, items: [APIView]}
+      internal:
+        - {from: "backend/accounts/models.py",   items: [{name: Member, status: available}]}
+        - {from: "backend/accounts/permissions.py", items: [{name: HasGroupPermission, status: available}]}
+        - {from: "backend/core/models.py",       items: [{name: DefaultSetting, status: available}]}
+        - {from: "backend/core/utils.py",        items: [{name: api_success, status: available}]}
+        - {from: "backend/fund/models.py",       items: [{name: Contribution, status: available}, {name: Expense, status: available}]}
+        - {from: "backend/fund/serializers.py",  items: [{name: ContributionSerializer, status: available}, {name: ExpenseSerializer, status: available}]}
+        - {from: "backend/posts/models.py",      items: [{name: Post, status: available}, {name: Comment, status: available}]}
+        - {from: "backend/posts/serializers.py", items: [{name: PostSerializer, status: available}, {name: CommentSerializer, status: available}]}
+    exports:
+      - {name: DashboardView, kind: class, type: DRF APIView, endpoint: "GET /api/dashboard/", auth: can_view_dashboard, note: "all numbers real-time; pending_comments only if can_approve_comments"}
+    needed_by:
+      - {file: "backend/core/dashboard_urls.py", items: [DashboardView], status: available}
+
+  "backend/core/dashboard_urls.py":
+    status: done
+    imports:
+      external: [{from: django.urls, items: [path]}]
+      internal:
+        - {from: "backend/core/dashboard_views.py", items: [{name: DashboardView, status: available}]}
+    exports:
+      - {name: urlpatterns, kind: constant, type: list, routes: ["GET /"]}
+    needed_by:
+      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: available}
 
   "backend/core/views.py":
     status: pending
+    note: "PermissionViewSet for listing permissions — deferred to later phase"
     imports:
       external: [{from: rest_framework.viewsets, items: [ReadOnlyModelViewSet]}]
       internal:
         - {from: "backend/core/models.py",      items: [{name: Permission, status: available}]}
-        - {from: "backend/core/serializers.py", items: [{name: PermissionSerializer, status: pending}]}
+        - {from: "backend/core/serializers.py", items: [{name: PermissionSerializer, status: available}]}
     exports:
       - {name: PermissionViewSet, kind: class, type: DRF ReadOnlyModelViewSet}
     needed_by:
@@ -191,8 +261,7 @@ files:
         - {from: "backend/core/views.py", items: [{name: PermissionViewSet, status: pending}]}
     exports:
       - {name: urlpatterns, kind: constant, type: list}
-    needed_by:
-      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: in-progress}
+    needed_by: []
 
   # ─── ACCOUNTS APP ──────────────────────────────────────────────────────────
 
@@ -285,23 +354,20 @@ files:
         - {from: "backend/accounts/models.py", items: [{name: AccessGroup, status: available}, {name: Member, status: available}]}
         - {from: "backend/core/models.py",     items: [{name: Permission, status: available}]}
     exports:
-      - name: RegisterSerializer
-        kind: class
-        type: DRF ModelSerializer
-        fields: [full_name, display_name, phone, email, password(write_only), password_confirm(write_only)]
-        validation: [phone OR email required, passwords match, phone/email unique]
-        on_save: [set_password(), assign default AccessGroup]
-      - name: LoginSerializer
-        kind: class
-        type: DRF Serializer
-        fields: [credential(str — phone or email), password(write_only)]
-      - name: MemberProfileSerializer
-        kind: class
-        type: DRF ModelSerializer
-        fields: [id, full_name, display_name, email, phone, group_name, group_permissions(list), is_active, created_at]
-        note: "group_permissions returns ['*'] for superuser"
+      - {name: RegisterSerializer,         kind: class, type: DRF ModelSerializer, fields: [full_name, display_name, phone, email, password(write_only), password_confirm(write_only)]}
+      - {name: LoginSerializer,            kind: class, type: DRF Serializer,      fields: [credential, password(write_only)]}
+      - {name: MemberProfileSerializer,    kind: class, type: DRF ModelSerializer, fields: [id, full_name, display_name, email, phone, group_name, group_permissions, is_active, created_at], note: "group_permissions=['*'] for superuser"}
+      - {name: MemberListSerializer,       kind: class, type: DRF ModelSerializer, fields: [id, full_name, display_name, group_name, is_active, created_at]}
+      - {name: MemberDetailSerializer,     kind: class, type: DRF ModelSerializer, fields: [id, full_name, display_name, email, phone, group_name, group_permissions, is_active, created_at]}
+      - {name: MemberUpdateSerializer,     kind: class, type: DRF ModelSerializer, fields: [full_name, display_name, email, phone], note: "all optional; validates at least one of phone/email remains"}
+      - {name: ChangePasswordSerializer,   kind: class, type: DRF Serializer,      fields: [old_password(optional), new_password, confirm_new_password]}
+      - {name: AccessGroupSerializer,      kind: class, type: DRF ModelSerializer, fields: [id, name, description, is_default, permissions(codename+label), member_count, created_at]}
+      - {name: AccessGroupCreateSerializer,kind: class, type: DRF ModelSerializer, fields: [name, description, permission_ids], note: "auto-adds can_contribute + can_comment"}
+      - {name: AccessGroupUpdateSerializer,kind: class, type: DRF ModelSerializer, fields: [name, description, permission_ids], note: "cannot remove can_contribute or can_comment"}
     needed_by:
-      - {file: "backend/accounts/views.py", items: [RegisterSerializer, LoginSerializer, MemberProfileSerializer], status: available}
+      - {file: "backend/accounts/views.py",        items: [RegisterSerializer, LoginSerializer, MemberProfileSerializer], status: available}
+      - {file: "backend/accounts/member_views.py",  items: [MemberListSerializer, MemberDetailSerializer, MemberUpdateSerializer, ChangePasswordSerializer], status: available}
+      - {file: "backend/accounts/group_views.py",   items: [AccessGroupSerializer, AccessGroupCreateSerializer, AccessGroupUpdateSerializer], status: available}
 
   "backend/accounts/permissions.py":
     status: done
@@ -347,6 +413,76 @@ files:
         - {from: "backend/accounts/views.py", items: [{name: RegisterView, status: available}, {name: LoginView, status: available}, {name: LogoutView, status: available}, {name: ProfileView, status: available}]}
     exports:
       - {name: urlpatterns, kind: constant, type: list, routes: ["POST register/", "POST login/", "POST logout/", "GET profile/", "POST token/refresh/"]}
+    needed_by:
+      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: available}
+
+  "backend/accounts/member_views.py":
+    status: done
+    imports:
+      external:
+        - {from: django.contrib.contenttypes.models, items: [ContentType]}
+        - {from: rest_framework.permissions, items: [IsAuthenticated]}
+        - {from: rest_framework.views, items: [APIView]}
+      internal:
+        - {from: "backend/accounts/models.py",      items: [{name: Member, status: available}]}
+        - {from: "backend/accounts/permissions.py", items: [{name: HasGroupPermission, status: available}]}
+        - {from: "backend/accounts/serializers.py", items: [{name: MemberListSerializer, status: available}, {name: MemberDetailSerializer, status: available}, {name: MemberUpdateSerializer, status: available}, {name: ChangePasswordSerializer, status: available}]}
+        - {from: "backend/core/models.py",          items: [{name: DefaultSetting, status: available}]}
+        - {from: "backend/core/utils.py",           items: [{name: api_success, status: available}, {name: api_error, status: available}]}
+        - {from: "backend/logs/models.py",          items: [{name: ActivityLog, status: available}]}
+    exports:
+      - {name: MemberListView,         kind: class, type: DRF APIView, endpoint: "GET    /api/members/",                       auth: can_manage_permissions, note: "filterable by group/is_active/search"}
+      - {name: MemberDetailView,       kind: class, type: DRF APIView, endpoint: "GET    /api/members/{id}/",                  auth: dynamic(member_profile_visibility), note: "full detail to owner or admin only"}
+      - {name: MemberUpdateView,       kind: class, type: DRF APIView, endpoint: "PATCH  /api/members/{id}/update/",           auth: owner or can_manage_permissions}
+      - {name: MemberChangeGroupView,  kind: class, type: DRF APIView, endpoint: "PATCH  /api/members/{id}/group/",            auth: can_manage_permissions, note: "cannot change superuser group"}
+      - {name: MemberToggleActiveView, kind: class, type: DRF APIView, endpoint: "PATCH  /api/members/{id}/toggle-active/",    auth: can_manage_permissions, note: "cannot deactivate superuser"}
+      - {name: MemberDeleteView,       kind: class, type: DRF APIView, endpoint: "DELETE /api/members/{id}/delete/",           auth: can_delete_member, note: "cannot delete superuser"}
+      - {name: ChangePasswordView,     kind: class, type: DRF APIView, endpoint: "POST   /api/members/{id}/change-password/",  auth: owner(needs old_pw) or can_change_any_password, note: "cannot change superuser password"}
+    needed_by:
+      - {file: "backend/accounts/member_urls.py", items: [MemberListView, MemberDetailView, MemberUpdateView, MemberChangeGroupView, MemberToggleActiveView, MemberDeleteView, ChangePasswordView], status: available}
+
+  "backend/accounts/member_urls.py":
+    status: done
+    imports:
+      external: [{from: django.urls, items: [path]}]
+      internal:
+        - {from: "backend/accounts/member_views.py", items: [{name: MemberListView, status: available}, {name: MemberDetailView, status: available}, {name: MemberUpdateView, status: available}, {name: MemberChangeGroupView, status: available}, {name: MemberToggleActiveView, status: available}, {name: MemberDeleteView, status: available}, {name: ChangePasswordView, status: available}]}
+    exports:
+      - {name: urlpatterns, kind: constant, type: list}
+    needed_by:
+      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: available}
+
+  "backend/accounts/group_views.py":
+    status: done
+    imports:
+      external:
+        - {from: django.contrib.contenttypes.models, items: [ContentType]}
+        - {from: rest_framework.permissions, items: [IsAuthenticated]}
+        - {from: rest_framework.views, items: [APIView]}
+      internal:
+        - {from: "backend/accounts/models.py",      items: [{name: AccessGroup, status: available}]}
+        - {from: "backend/accounts/permissions.py", items: [{name: HasGroupPermission, status: available}, {name: IsSuperuser, status: available}]}
+        - {from: "backend/accounts/serializers.py", items: [{name: AccessGroupSerializer, status: available}, {name: AccessGroupCreateSerializer, status: available}, {name: AccessGroupUpdateSerializer, status: available}]}
+        - {from: "backend/core/models.py",          items: [{name: DefaultSetting, status: available}]}
+        - {from: "backend/core/utils.py",           items: [{name: api_success, status: available}, {name: api_error, status: available}]}
+        - {from: "backend/logs/models.py",          items: [{name: ActivityLog, status: available}]}
+    exports:
+      - {name: AccessGroupListView,       kind: class, type: DRF APIView, endpoint: "GET    /api/groups/",                    auth: can_manage_permissions}
+      - {name: AccessGroupCreateView,     kind: class, type: DRF APIView, endpoint: "POST   /api/groups/create/",             auth: can_manage_permissions, note: "auto-adds can_contribute+can_comment"}
+      - {name: AccessGroupUpdateView,     kind: class, type: DRF APIView, endpoint: "PATCH  /api/groups/{id}/update/",        auth: can_manage_permissions, note: "cannot remove can_contribute or can_comment"}
+      - {name: AccessGroupSetDefaultView, kind: class, type: DRF APIView, endpoint: "PATCH  /api/groups/{id}/set-default/",   auth: superuser, note: "syncs DefaultSetting key=default_group"}
+      - {name: AccessGroupDeleteView,     kind: class, type: DRF APIView, endpoint: "DELETE /api/groups/{id}/delete/",        auth: superuser, note: "cannot delete default group; signal moves members"}
+    needed_by:
+      - {file: "backend/accounts/group_urls.py", items: [AccessGroupListView, AccessGroupCreateView, AccessGroupUpdateView, AccessGroupSetDefaultView, AccessGroupDeleteView], status: available}
+
+  "backend/accounts/group_urls.py":
+    status: done
+    imports:
+      external: [{from: django.urls, items: [path]}]
+      internal:
+        - {from: "backend/accounts/group_views.py", items: [{name: AccessGroupListView, status: available}, {name: AccessGroupCreateView, status: available}, {name: AccessGroupUpdateView, status: available}, {name: AccessGroupSetDefaultView, status: available}, {name: AccessGroupDeleteView, status: available}]}
+    exports:
+      - {name: urlpatterns, kind: constant, type: list}
     needed_by:
       - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: available}
 
@@ -611,40 +747,47 @@ files:
       - {file: "backend/logs/views.py",       items: [ActivityLog, SystemLog], status: pending}
 
   "backend/logs/serializers.py":
-    status: pending
+    status: done
     imports:
       external: [{from: rest_framework, items: [serializers]}]
       internal:
         - {from: "backend/logs/models.py", items: [{name: ActivityLog, status: available}, {name: SystemLog, status: available}]}
     exports:
       - {name: ActivityLogSerializer, kind: class, type: DRF ModelSerializer, fields: [id, actor_display, action, target_display, ip_address, extra_data, created_at]}
-      - {name: SystemLogSerializer,   kind: class, type: DRF ModelSerializer, fields: [id, level, source, message, extra_data, related_member, ip_address, created_at]}
+      - {name: SystemLogSerializer,   kind: class, type: DRF ModelSerializer, fields: [id, level, source, message, extra_data, related_member_name, ip_address, created_at]}
     needed_by:
-      - {file: "backend/logs/views.py", items: [ActivityLogSerializer, SystemLogSerializer], status: pending}
+      - {file: "backend/logs/views.py", items: [ActivityLogSerializer, SystemLogSerializer], status: available}
 
   "backend/logs/views.py":
-    status: pending
+    status: done
     imports:
-      external: [{from: rest_framework.viewsets, items: [ReadOnlyModelViewSet]}]
+      external:
+        - {from: rest_framework.pagination, items: [PageNumberPagination]}
+        - {from: rest_framework.permissions, items: [IsAuthenticated]}
+        - {from: rest_framework.views, items: [APIView]}
       internal:
-        - {from: "backend/logs/models.py",      items: [{name: ActivityLog, status: available}, {name: SystemLog, status: available}]}
-        - {from: "backend/logs/serializers.py", items: [{name: ActivityLogSerializer, status: pending}, {name: SystemLogSerializer, status: pending}]}
+        - {from: "backend/accounts/permissions.py", items: [{name: HasGroupPermission, status: available}, {name: IsSuperuser, status: available}]}
+        - {from: "backend/core/utils.py",           items: [{name: api_success, status: available}, {name: api_error, status: available}]}
+        - {from: "backend/logs/models.py",          items: [{name: ActivityLog, status: available}, {name: SystemLog, status: available}]}
+        - {from: "backend/logs/serializers.py",     items: [{name: ActivityLogSerializer, status: available}, {name: SystemLogSerializer, status: available}]}
     exports:
-      - {name: ActivityLogViewSet, kind: class, type: DRF ReadOnlyModelViewSet, description: "superuser sees all; group admins see scoped by member"}
-      - {name: SystemLogViewSet,   kind: class, type: DRF ReadOnlyModelViewSet, description: "superuser ONLY"}
+      - {name: ActivityLogListView,   kind: class, type: DRF APIView, endpoint: "GET /api/logs/activity/",          auth: can_manage_permissions, note: "25/page, filterable by actor/action/date/ip"}
+      - {name: ActivityLogDetailView, kind: class, type: DRF APIView, endpoint: "GET /api/logs/activity/{id}/",     auth: can_manage_permissions}
+      - {name: SystemLogListView,     kind: class, type: DRF APIView, endpoint: "GET /api/logs/system/",            auth: superuser, note: "25/page, filterable by level/source/date"}
+      - {name: SystemLogDetailView,   kind: class, type: DRF APIView, endpoint: "GET /api/logs/system/{id}/",       auth: superuser}
     needed_by:
-      - {file: "backend/logs/urls.py", items: [ActivityLogViewSet, SystemLogViewSet], status: pending}
+      - {file: "backend/logs/urls.py", items: [ActivityLogListView, ActivityLogDetailView, SystemLogListView, SystemLogDetailView], status: available}
 
   "backend/logs/urls.py":
-    status: pending
+    status: done
     imports:
-      external: [{from: rest_framework.routers, items: [DefaultRouter]}]
+      external: [{from: django.urls, items: [path]}]
       internal:
-        - {from: "backend/logs/views.py", items: [{name: ActivityLogViewSet, status: pending}, {name: SystemLogViewSet, status: pending}]}
+        - {from: "backend/logs/views.py", items: [{name: ActivityLogListView, status: available}, {name: ActivityLogDetailView, status: available}, {name: SystemLogListView, status: available}, {name: SystemLogDetailView, status: available}]}
     exports:
-      - {name: urlpatterns, kind: constant, type: list}
+      - {name: urlpatterns, kind: constant, type: list, routes: ["GET activity/", "GET activity/{id}/", "GET system/", "GET system/{id}/"]}
     needed_by:
-      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: in-progress}
+      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: available}
 
   # ─── PAYMENTS ──────────────────────────────────────────────────────────────
 
