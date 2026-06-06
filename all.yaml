@@ -13,7 +13,7 @@ rules:
   after_build: update exports + update imports with status
 
 progress:
-  current_phase: 8
+  current_phase: 9
   current_task: complete
   phases:
     1:
@@ -50,7 +50,8 @@ progress:
       done: [django-jazzmin added, JAZZMIN_SETTINGS + JAZZMIN_UI_TWEAKS, i18n setup, core/admin.py, accounts/admin.py, fund/admin.py + balance templates, posts/admin.py, logs/admin.py, payments/admin.py, can_view_balance permission seed, FundBalanceView gated on can_view_balance]
     9:
       name: frontend
-      status: pending
+      status: done
+      done: [lib/api.ts (axios + interceptors + unwrap), authStore, langStore, i18n, messages en/fa, middleware, layouts, Navbar, Footer, animations (IranianSymbols, PageTransition, SplashScreen), pages (landing, login, register, posts, posts/[id], expenses, contribute, profile, contact, forbidden, unavailable, not-found)]
     10:
       name: payment integration (Stripe / Google Pay)
       status: pending
@@ -1025,3 +1026,167 @@ files:
   # DefaultSetting keys reserved: payment_stripe_enabled, payment_stripe_public_key,
   #   payment_stripe_secret_key, payment_stripe_webhook_secret,
   #   payment_google_pay_enabled
+
+  # ─── FRONTEND (Phase 7A) — Next.js 14 App Router, TypeScript, next-intl ────
+
+  "frontend/lib/api.ts":
+    status: done
+    kind: module
+    note: "axios instance + interceptors: attaches JWT, unwraps {success,message,data} → data (leaves raw paginated/auth payloads untouched), 401 refresh-queue, 403→/forbidden, 404→/not-found, 503→/unavailable"
+    exports:
+      - {name: authAPI, kind: object, methods: [register, login, logout, getProfile, refreshToken]}
+      - {name: postsAPI, kind: object, methods: [getList, getDetail, getComments, createComment]}
+      - {name: fundAPI, kind: object, methods: [getBalance, getContributions, getExpenses]}
+      - {name: paymentsAPI, kind: object, methods: [getMethods, initiate, uploadReceipt(field=receipt_image), getStatus]}
+      - {name: membersAPI, kind: object, methods: [getProfile, updateProfile, changePassword]}
+      - {name: settingsAPI, kind: object, methods: [getPublicSettings], note: "raw axios.get bypassing shared interceptor — avoids 403→/forbidden redirect for guests on public /contact page"}
+      - {name: types, kind: type, items: [ApiResponse, PostAuthor, PostImage, PostSummary, PostDetail, Comment, Paginated<T>, FundBalance]}
+    needed_by:
+      - {file: "frontend/app/[locale]/**/page.tsx", items: [authAPI, postsAPI, fundAPI, paymentsAPI, membersAPI, settingsAPI], status: available}
+
+  "frontend/store/authStore.ts":
+    status: done
+    kind: module
+    note: "zustand + persist; holds member, accessToken, refreshToken, isAuthenticated, hasPermission(codename); login/logout/setTokens"
+
+  "frontend/store/langStore.ts":
+    status: done
+    kind: module
+    note: "zustand + persist; holds locale (en/fa), setLocale, syncs with localStorage 'lang' read by lib/api.ts getLocalePrefix()"
+
+  "frontend/lib/i18n.ts":
+    status: done
+    kind: module
+    note: "next-intl request config — loads messages/{locale}.json, notFound() on unsupported locale"
+
+  "frontend/lib/auth.ts":
+    status: done
+    kind: module
+
+  "frontend/messages/en.json":
+    status: done
+    kind: data
+    note: "translation strings for namespaces: nav, home, posts, expenses, contribute, profile, contact, login, register, errors, footer, etc."
+
+  "frontend/messages/fa.json":
+    status: done
+    kind: data
+    note: "Persian mirror of en.json — RTL layout driven by locale"
+
+  "frontend/next.config.mjs":
+    status: done
+    kind: config
+    note: "renamed from next.config.ts — Next.js 14.2.5 does not support TS config files (added in Next 15); wraps config with createNextIntlPlugin"
+
+  "frontend/middleware.ts":
+    status: done
+    kind: config
+    note: "next-intl middleware — locales: [en, fa], defaultLocale: en, localePrefix: always"
+
+  "frontend/app/layout.tsx":
+    status: done
+    kind: component
+
+  "frontend/app/[locale]/layout.tsx":
+    status: done
+    kind: component
+    note: "server layout — wraps children with NextIntlClientProvider + ClientLayout"
+
+  "frontend/app/[locale]/ClientLayout.tsx":
+    status: done
+    kind: component
+    note: "renders SplashScreen → Navbar → main → Footer"
+
+  "frontend/components/layout/Navbar.tsx":
+    status: done
+    kind: component
+    note: "glassmorphism nav — mobile drawer, language switcher, auth dropdown (login/register/profile/logout via authStore)"
+
+  "frontend/components/layout/Footer.tsx":
+    status: done
+    kind: component
+
+  "frontend/components/animations/IranianSymbols.tsx":
+    status: done
+    kind: component
+    exports: [LionAndSun]
+
+  "frontend/components/animations/PageTransition.tsx":
+    status: done
+    kind: component
+
+  "frontend/components/animations/SplashScreen.tsx":
+    status: done
+    kind: component
+
+  "frontend/app/[locale]/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}"
+    note: "landing — fundAPI.getBalance() + postsAPI.getList(1,'') (latest 3 posts)"
+
+  "frontend/app/[locale]/login/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/login"
+    note: "authAPI.login → destructures {tokens, member}, persists tokens to localStorage + authStore.login()"
+
+  "frontend/app/[locale]/register/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/register"
+    note: "authAPI.register → same {tokens, member} pattern as login; payload includes password_confirm"
+
+  "frontend/app/[locale]/posts/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/posts"
+    note: "postsAPI.getList(page, search) → Paginated<PostSummary>; debounced search, prev/next pagination"
+
+  "frontend/app/[locale]/posts/[id]/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/posts/{id}"
+    note: "postsAPI.getDetail → {post, comments}; postsAPI.getComments → Comment[] (filters is_approved); postsAPI.createComment for guest/member comment submission"
+
+  "frontend/app/[locale]/expenses/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/expenses"
+    note: "fundAPI.getExpenses → raw Paginated<Expense> (no wrapper, via _paginate); fundAPI.getBalance → FundBalance (gated on can_view_balance permission)"
+
+  "frontend/app/[locale]/contribute/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/contribute"
+    note: "4-step wizard — paymentsAPI.getMethods → {methods}; paymentsAPI.initiate → {is_available, contribution_id, instructions, ...}; paymentsAPI.uploadReceipt (multipart, field=receipt_image)"
+
+  "frontend/app/[locale]/profile/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/profile"
+    note: "membersAPI.updateProfile → Member; membersAPI.changePassword"
+
+  "frontend/app/[locale]/contact/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/contact"
+    note: "settingsAPI.getPublicSettings (graceful null on error/403) for contact_email/contact_phone; mailto: form fallback"
+
+  "frontend/app/[locale]/forbidden/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/forbidden"
+    note: "target of axios interceptor 403 redirect; errors.forbidden_* translation keys"
+
+  "frontend/app/[locale]/unavailable/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/unavailable"
+    note: "target of axios interceptor 503 redirect; errors.unavailable_* translation keys"
+
+  "frontend/app/[locale]/not-found/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/not-found"
+    note: "target of axios interceptor 404 redirect; errors.not_found_* translation keys"

@@ -1,0 +1,233 @@
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100;200;300;400;500;600;700;800;900&family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── CSS Custom Properties ─────────────────────────────────────────────── */
+:root {
+  --neon-cyan:    #00ffff;
+  --neon-violet:  #8b5cf6;
+  --neon-gold:    #fbbf24;
+  --neon-green:   #10b981;
+  --neon-red:     #ef4444;
+  --neon-amber:   #f59e0b;
+  --glass-bg:     rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --dark-bg:      #0a0a0f;
+  --dark-surface: #111118;
+}
+
+/* ─── Base / Reset ───────────────────────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--dark-bg);
+  color: #e2e8f0;
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* RTL support when Persian locale is active */
+html[lang='fa'] body,
+body[dir='rtl'] {
+  font-family: 'Vazirmatn', sans-serif;
+  direction: rtl;
+  text-align: right;
+}
+
+/* ─── Focus Visible ──────────────────────────────────────────────────────── */
+*:focus-visible {
+  outline: 2px solid #00ffff;
+  outline-offset: 2px;
+}
+
+/* ─── Scrollbar Styling ─────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--dark-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 255, 0.6);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 255, 255, 0.3) var(--dark-bg);
+}
+
+/* ─── Glass Card ─────────────────────────────────────────────────────────── */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.1);
+  border-radius: 1rem;
+}
+
+/* ─── Neon Text ──────────────────────────────────────────────────────────── */
+.neon-text {
+  text-shadow: 0 0 10px currentColor;
+}
+
+/* ─── Neon Glow ──────────────────────────────────────────────────────────── */
+.neon-glow {
+  filter: drop-shadow(0 0 8px currentColor);
+}
+
+/* ─── Neon Border Helpers ────────────────────────────────────────────────── */
+.neon-border-cyan {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.3), inset 0 0 10px rgba(0, 255, 255, 0.05);
+}
+
+.neon-border-violet {
+  border-color: var(--neon-violet);
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.3), inset 0 0 10px rgba(139, 92, 246, 0.05);
+}
+
+.neon-border-gold {
+  border-color: var(--neon-gold);
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.3), inset 0 0 10px rgba(251, 191, 36, 0.05);
+}
+
+/* ─── Button Base ────────────────────────────────────────────────────────── */
+.btn-neon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.btn-neon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-cyan {
+  background: rgba(0, 255, 255, 0.1);
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+}
+
+.btn-cyan:hover:not(:disabled) {
+  background: rgba(0, 255, 255, 0.2);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+  text-shadow: 0 0 8px var(--neon-cyan);
+}
+
+.btn-violet {
+  background: rgba(139, 92, 246, 0.1);
+  border-color: var(--neon-violet);
+  color: var(--neon-violet);
+}
+
+.btn-violet:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.2);
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+  text-shadow: 0 0 8px var(--neon-violet);
+}
+
+.btn-gold {
+  background: rgba(251, 191, 36, 0.1);
+  border-color: var(--neon-gold);
+  color: var(--neon-gold);
+}
+
+.btn-gold:hover:not(:disabled) {
+  background: rgba(251, 191, 36, 0.2);
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.4);
+  text-shadow: 0 0 8px var(--neon-gold);
+}
+
+/* ─── Input Base ─────────────────────────────────────────────────────────── */
+.input-glass {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+  color: #e2e8f0;
+  padding: 0.625rem 1rem;
+  width: 100%;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input-glass::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.input-glass:focus {
+  outline: none;
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+}
+
+/* ─── Prose Overrides (dark) ─────────────────────────────────────────────── */
+.prose {
+  --tw-prose-body: #cbd5e1;
+  --tw-prose-headings: #e2e8f0;
+  --tw-prose-links: var(--neon-cyan);
+  --tw-prose-bold: #f1f5f9;
+  --tw-prose-code: var(--neon-violet);
+  --tw-prose-quotes: #94a3b8;
+  --tw-prose-hr: rgba(255, 255, 255, 0.1);
+}
+
+/* ─── Gradient Backgrounds ────────────────────────────────────────────────── */
+.bg-dark-gradient {
+  background: linear-gradient(135deg, var(--dark-bg) 0%, #0d0d1a 50%, var(--dark-bg) 100%);
+}
+
+.bg-neon-gradient {
+  background: linear-gradient(135deg, rgba(0, 255, 255, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+}
+
+/* ─── Animated Background Grid ───────────────────────────────────────────── */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+/* ─── Loading Spinner ────────────────────────────────────────────────────── */
+.spinner {
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 2px solid rgba(0, 255, 255, 0.2);
+  border-top-color: var(--neon-cyan);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── RTL-aware flex helpers ─────────────────────────────────────────────── */
+[dir='rtl'] .rtl-mirror {
+  transform: scaleX(-1);
+}

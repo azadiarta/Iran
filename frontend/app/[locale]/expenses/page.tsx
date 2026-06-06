@@ -1,0 +1,308 @@
+'use client';
+import { useState, useEffect, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
+import { useParams, useRouter } from 'next/navigation';
+import Image from 'next/image';
+import { DollarSign, User, Calendar, ChevronLeft, ChevronRight, X, Wallet, Receipt } from 'lucide-react';
+import { fundAPI } from '@/lib/api';
+import type { FundBalance } from '@/lib/api';
+import useAuthStore from '@/store/authStore';
+
+interface ExpenseAuthor {
+  display_name: string;
+}
+
+interface Expense {
+  id: number;
+  withdrawn_by: ExpenseAuthor;
+  amount: number;
+  currency: string;
+  short_reason: string;
+  description?: string;
+  expense_date: string;
+  receipt_image?: string | null;
+}
+
+interface ExpensesResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Expense[];
+}
+
+export default function ExpensesPage() {
+  const t = useTranslations('expenses');
+  const params = useParams();
+  const router = useRouter();
+  const locale = (params?.locale as string) || 'en';
+  const { hasPermission } = useAuthStore();
+
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [balance, setBalance] = useState<FundBalance | null>(null);
+  const [loadingExpenses, setLoadingExpenses] = useState(true);
+  const [loadingBalance, setLoadingBalance] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrev, setHasPrev] = useState(false);
+  const [receiptModal, setReceiptModal] = useState<string | null>(null);
+
+  const canViewBalance = hasPermission('can_view_balance');
+  const pageSize = 10;
+
+  const fetchExpenses = useCallback(
+    async (pageNum: number) => {
+      setLoadingExpenses(true);
+      try {
+        const res = await fundAPI.getExpenses(pageNum);
+        const raw = res.data as unknown as ExpensesResponse;
+        setExpenses(raw.results || []);
+        setTotalCount(raw.count || 0);
+        setHasNext(!!raw.next);
+        setHasPrev(!!raw.previous);
+      } catch (err: unknown) {
+        const axiosErr = err as { response?: { status?: number } };
+        if (axiosErr?.response?.status === 403) {
+          router.push(`/${locale}/forbidden`);
+          return;
+        }
+        setExpenses([]);
+      } finally {
+        setLoadingExpenses(false);
+      }
+    },
+    [locale, router]
+  );
+
+  const fetchBalance = useCallback(async () => {
+    if (!canViewBalance) {
+      setLoadingBalance(false);
+      return;
+    }
+    setLoadingBalance(true);
+    try {
+      const res = await fundAPI.getBalance();
+      const data = res.data as unknown as FundBalance;
+      setBalance(data);
+    } catch {
+      setBalance(null);
+    } finally {
+      setLoadingBalance(false);
+    }
+  }, [canViewBalance]);
+
+  useEffect(() => {
+    Promise.all([fetchExpenses(1), fetchBalance()]);
+  }, [fetchExpenses, fetchBalance]);
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    fetchExpenses(newPage);
+  };
+
+  const formatDate = (dateStr: string) => {
+    try {
+      return new Date(dateStr).toLocaleDateString(
+        locale === 'fa' ? 'fa-IR' : 'en-GB',
+        { year: 'numeric', month: 'short', day: 'numeric' }
+      );
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const formatAmount = (amount: number, currency: string) => {
+    const symbol =
+      currency === 'GBP'
+        ? '£'
+        : currency === 'USD'
+          ? '$'
+          : currency === 'EUR'
+            ? '€'
+            : currency + ' ';
+    return `${symbol}${Number(amount).toLocaleString('en-GB', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0f] text-white">
+      <div className="max-w-4xl mx-auto px-4 py-10">
+        {/* Page heading */}
+        <h1
+          className="text-3xl font-bold mb-8"
+          style={{ color: '#00ffff', textShadow: '0 0 20px rgba(0,255,255,0.5)' }}
+        >
+          {t('title')}
+        </h1>
+
+        {/* Balance card */}
+        {canViewBalance && (
+          <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 mb-8">
+            <div className="flex items-center gap-3 mb-2">
+              <Wallet className="w-5 h-5" style={{ color: '#10b981' }} />
+              <span className="text-white/60 text-sm">{t('balance_label')}</span>
+            </div>
+            {loadingBalance ? (
+              <div className="animate-pulse">
+                <div className="h-10 bg-white/10 rounded-xl w-40" />
+              </div>
+            ) : balance ? (
+              <p
+                className="text-4xl font-bold"
+                style={{ color: '#10b981', textShadow: '0 0 16px rgba(16,185,129,0.5)' }}
+              >
+                {formatAmount(balance.balance, balance.currency)}
+              </p>
+            ) : (
+              <p className="text-white/40 text-sm">{t('balance_unavailable')}</p>
+            )}
+          </div>
+        )}
+
+        {/* Expenses list */}
+        {loadingExpenses ? (
+          <div className="space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <div
+                key={i}
+                className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-5 animate-pulse"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-2 flex-1">
+                    <div className="h-5 bg-white/10 rounded w-1/3" />
+                    <div className="h-4 bg-white/10 rounded w-2/3" />
+                  </div>
+                  <div className="h-8 bg-white/10 rounded w-20" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : expenses.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <Receipt className="w-12 h-12 text-white/20" />
+            <p className="text-white/40 text-lg">{t('no_expenses')}</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {expenses.map((expense) => (
+              <div
+                key={expense.id}
+                className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-5 hover:border-white/20 transition-colors"
+              >
+                <div className="flex items-start gap-4">
+                  {/* Receipt thumbnail */}
+                  {expense.receipt_image && (
+                    <button
+                      onClick={() => setReceiptModal(expense.receipt_image!)}
+                      className="flex-shrink-0 rounded-xl overflow-hidden border border-white/10 hover:border-[#00ffff]/50 transition-colors"
+                    >
+                      <Image
+                        src={expense.receipt_image}
+                        alt="Receipt"
+                        width={50}
+                        height={50}
+                        className="object-cover w-[50px] h-[50px]"
+                      />
+                    </button>
+                  )}
+
+                  {/* Expense info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div className="min-w-0">
+                        <p className="font-bold text-white text-base truncate">
+                          {expense.short_reason}
+                        </p>
+                        {expense.description && (
+                          <p className="text-white/50 text-sm truncate mt-0.5">
+                            {expense.description}
+                          </p>
+                        )}
+                      </div>
+                      <p
+                        className="font-bold text-lg flex-shrink-0"
+                        style={{ color: '#10b981', textShadow: '0 0 10px rgba(16,185,129,0.4)' }}
+                      >
+                        {formatAmount(expense.amount, expense.currency)}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-4 mt-3 flex-wrap">
+                      <span
+                        className="flex items-center gap-1.5 text-sm"
+                        style={{ color: '#00ffff' }}
+                      >
+                        <User className="w-3.5 h-3.5" />
+                        {expense.withdrawn_by?.display_name || 'Admin'}
+                      </span>
+                      <span className="flex items-center gap-1.5 text-sm text-white/50">
+                        <Calendar className="w-3.5 h-3.5" />
+                        {formatDate(expense.expense_date)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {!loadingExpenses && totalCount > pageSize && (
+          <div className="flex items-center justify-between mt-8">
+            <button
+              onClick={() => handlePageChange(page - 1)}
+              disabled={!hasPrev}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-white"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              {t('prev')}
+            </button>
+
+            <span className="text-white/50 text-sm">
+              {t('page_info', { page, total: Math.ceil(totalCount / pageSize) })}
+            </span>
+
+            <button
+              onClick={() => handlePageChange(page + 1)}
+              disabled={!hasNext}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-white"
+            >
+              {t('next')}
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Receipt modal */}
+      {receiptModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={() => setReceiptModal(null)}
+        >
+          <div
+            className="relative max-w-2xl w-full rounded-2xl overflow-hidden border border-white/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setReceiptModal(null)}
+              className="absolute top-3 right-3 z-10 p-1.5 rounded-lg bg-black/60 hover:bg-black/80 transition-colors"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+            <Image
+              src={receiptModal}
+              alt="Receipt"
+              width={800}
+              height={600}
+              className="w-full h-auto object-contain"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

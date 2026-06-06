@@ -1,0 +1,492 @@
+'use client';
+import { useState, useEffect, useRef } from 'react';
+import { useTranslations } from 'next-intl';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { motion, useInView } from 'framer-motion';
+import { Users, TrendingUp, Wallet, ArrowRight, CheckCircle } from 'lucide-react';
+import { LionAndSun, GeometricPattern, FaravaharSimple } from '@/components/animations/IranianSymbols';
+import { postsAPI, fundAPI } from '@/lib/api';
+import useAuthStore from '@/store/authStore';
+import type { PostSummary, FundBalance } from '@/lib/api';
+
+// ─── Animated count-up hook ──────────────────────────────────────────────────
+
+function useCountUp(target: number, duration: number = 1500, enabled: boolean = true) {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    if (!enabled || target === 0) {
+      setValue(target);
+      return;
+    }
+    let start: number | null = null;
+    const step = (timestamp: number) => {
+      if (!start) start = timestamp;
+      const progress = Math.min((timestamp - start) / duration, 1);
+      setValue(Math.floor(progress * target));
+      if (progress < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, [target, duration, enabled]);
+  return value;
+}
+
+// ─── Section animation wrapper ───────────────────────────────────────────────
+
+function FadeInSection({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: '-80px' });
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 40 }}
+      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }}
+      transition={{ duration: 0.7, delay, ease: 'easeOut' }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+// ─── Stat Card ───────────────────────────────────────────────────────────────
+
+function StatCard({
+  icon: Icon,
+  value,
+  label,
+  prefix = '',
+  loading,
+}: {
+  icon: React.ElementType;
+  value: number | string;
+  label: string;
+  prefix?: string;
+  loading: boolean;
+}) {
+  const numericValue = typeof value === 'number' ? value : 0;
+  const counted = useCountUp(numericValue, 1500, !loading && typeof value === 'number');
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 flex flex-col items-center gap-3">
+      <div
+        className="w-12 h-12 rounded-xl flex items-center justify-center"
+        style={{ backgroundColor: 'rgba(0,255,255,0.1)', color: '#00ffff' }}
+      >
+        <Icon size={24} />
+      </div>
+      {loading ? (
+        <div className="h-8 w-24 rounded-lg bg-white/10 animate-pulse" />
+      ) : (
+        <p
+          className="text-3xl font-bold"
+          style={{ color: '#00ffff', textShadow: '0 0 10px #00ffff' }}
+        >
+          {typeof value === 'string' ? value : `${prefix}${counted.toLocaleString()}`}
+        </p>
+      )}
+      <p className="text-white/60 text-sm text-center">{label}</p>
+    </div>
+  );
+}
+
+// ─── Skeleton card ────────────────────────────────────────────────────────────
+
+function SkeletonPostCard() {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 space-y-3">
+      <div className="h-5 w-3/4 rounded bg-white/10 animate-pulse" />
+      <div className="h-4 w-1/2 rounded bg-white/10 animate-pulse" />
+      <div className="h-4 w-1/3 rounded bg-white/10 animate-pulse" />
+      <div className="h-8 w-28 rounded-lg bg-white/10 animate-pulse mt-4" />
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+export default function LandingPage() {
+  const t = useTranslations();
+  const params = useParams();
+  const locale = params?.locale as string || 'en';
+  const { hasPermission } = useAuthStore();
+
+  const [balance, setBalance] = useState<FundBalance | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(true);
+
+  const [posts, setPosts] = useState<PostSummary[]>([]);
+  const [postsLoading, setPostsLoading] = useState(true);
+  const [postsError, setPostsError] = useState(false);
+
+  // Floating geometric patterns positions (stable — computed once)
+  const floatingPatterns = useRef([
+    { top: '8%', left: '5%', size: 60, rotate: 15 },
+    { top: '20%', right: '8%', size: 48, rotate: -20 },
+    { top: '55%', left: '3%', size: 56, rotate: 30 },
+    { bottom: '25%', right: '4%', size: 44, rotate: -10 },
+    { bottom: '10%', left: '15%', size: 52, rotate: 45 },
+    { top: '40%', right: '2%', size: 40, rotate: 60 },
+  ]).current;
+
+  useEffect(() => {
+    fundAPI.getBalance()
+      .then((res) => setBalance(res.data as unknown as FundBalance))
+      .catch(() => setBalance(null))
+      .finally(() => setBalanceLoading(false));
+
+    postsAPI.getList(1, '')
+      .then((res) => setPosts((res.data as unknown as { results: PostSummary[] }).results.slice(0, 3)))
+      .catch(() => setPostsError(true))
+      .finally(() => setPostsLoading(false));
+  }, []);
+
+  const canViewBalance = hasPermission('can_view_balance');
+
+  function formatDate(iso: string) {
+    try {
+      return new Date(iso).toLocaleDateString(locale === 'fa' ? 'fa-IR' : 'en-GB', {
+        year: 'numeric', month: 'short', day: 'numeric',
+      });
+    } catch {
+      return iso;
+    }
+  }
+
+  return (
+    <div style={{ background: '#0a0a0f', minHeight: '100vh' }}>
+
+      {/* ─── Hero Section ─────────────────────────────────────────────────── */}
+      <section
+        className="relative flex flex-col items-center justify-center overflow-hidden"
+        style={{ minHeight: '100vh' }}
+      >
+        {/* Background: LionAndSun centered */}
+        <div
+          className="absolute inset-0 flex items-center justify-center pointer-events-none select-none"
+          aria-hidden="true"
+        >
+          <div style={{ color: '#fbbf24', opacity: 0.15 }}>
+            <LionAndSun size={280} />
+          </div>
+        </div>
+
+        {/* Background: floating geometric patterns */}
+        {floatingPatterns.map((p, i) => (
+          <motion.div
+            key={i}
+            className="absolute pointer-events-none select-none"
+            style={{ color: '#fbbf24', opacity: 0.10, ...p }}
+            animate={{ rotate: [p.rotate, p.rotate + 360] }}
+            transition={{ duration: 25 + i * 5, repeat: Infinity, ease: 'linear' }}
+            aria-hidden="true"
+          >
+            <GeometricPattern size={p.size} />
+          </motion.div>
+        ))}
+
+        {/* Hero content */}
+        <div className="relative z-10 flex flex-col items-center text-center px-4 max-w-3xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: -30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+          >
+            <div style={{ color: '#fbbf24', marginBottom: '1rem' }}>
+              <LionAndSun size={72} animated />
+            </div>
+          </motion.div>
+
+          <motion.h1
+            className="text-5xl sm:text-6xl md:text-7xl font-black tracking-tight mb-6"
+            style={{
+              color: '#00ffff',
+              textShadow: '0 0 30px rgba(0,255,255,0.8), 0 0 60px rgba(0,255,255,0.4)',
+            }}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
+          >
+            {t('landing.headline')}
+          </motion.h1>
+
+          <motion.p
+            className="text-xl sm:text-2xl text-white/70 mb-10 max-w-xl"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.4 }}
+          >
+            {t('landing.tagline')}
+          </motion.p>
+
+          <motion.div
+            className="flex flex-wrap gap-4 justify-center"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.6 }}
+          >
+            <Link
+              href={`/${locale}/register`}
+              className="inline-flex items-center gap-2 px-8 py-3 rounded-xl font-semibold text-lg transition-all duration-200"
+              style={{
+                border: '1.5px solid #8b5cf6',
+                background: 'rgba(139,92,246,0.15)',
+                color: '#c4b5fd',
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(139,92,246,0.3)';
+                (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 0 20px rgba(139,92,246,0.5)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(139,92,246,0.15)';
+                (e.currentTarget as HTMLAnchorElement).style.boxShadow = 'none';
+              }}
+            >
+              {t('landing.cta_join')}
+              <ArrowRight size={18} />
+            </Link>
+
+            <Link
+              href={`/${locale}/contribute`}
+              className="inline-flex items-center gap-2 px-8 py-3 rounded-xl font-semibold text-lg transition-all duration-200"
+              style={{
+                border: '1.5px solid #10b981',
+                background: 'rgba(16,185,129,0.15)',
+                color: '#6ee7b7',
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(16,185,129,0.3)';
+                (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 0 20px rgba(16,185,129,0.5)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(16,185,129,0.15)';
+                (e.currentTarget as HTMLAnchorElement).style.boxShadow = 'none';
+              }}
+            >
+              {t('landing.cta_contribute')}
+              <TrendingUp size={18} />
+            </Link>
+          </motion.div>
+        </div>
+
+        {/* Scroll indicator */}
+        <motion.div
+          className="absolute bottom-8 flex flex-col items-center gap-1 text-white/30"
+          animate={{ y: [0, 8, 0] }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          <ArrowRight
+            size={20}
+            style={{ transform: 'rotate(90deg)' }}
+          />
+        </motion.div>
+      </section>
+
+      {/* ─── Stats Bar ────────────────────────────────────────────────────── */}
+      <section
+        className="py-12 px-4"
+        style={{ background: 'rgba(255,255,255,0.02)', borderTop: '1px solid rgba(255,255,255,0.06)' }}
+      >
+        <FadeInSection>
+          <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            <StatCard
+              icon={Users}
+              value="—"
+              label={t('landing.stats_members')}
+              loading={false}
+            />
+            <StatCard
+              icon={TrendingUp}
+              value={balance?.total_contributions ?? 0}
+              prefix="£"
+              label={t('landing.stats_contributions')}
+              loading={balanceLoading}
+            />
+            {canViewBalance && (
+              <StatCard
+                icon={Wallet}
+                value={balance?.balance ?? 0}
+                prefix="£"
+                label={t('landing.stats_balance')}
+                loading={balanceLoading}
+              />
+            )}
+          </div>
+        </FadeInSection>
+      </section>
+
+      {/* ─── Recent Posts ─────────────────────────────────────────────────── */}
+      <section className="py-16 px-4">
+        <FadeInSection>
+          <div className="max-w-6xl mx-auto">
+            <h2
+              className="text-3xl font-bold text-center mb-10"
+              style={{ color: '#00ffff', textShadow: '0 0 10px rgba(0,255,255,0.6)' }}
+            >
+              {t('landing.posts_title')}
+            </h2>
+
+            {postsError ? (
+              <p className="text-center text-white/50 py-8">Could not load posts.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {postsLoading
+                  ? [0, 1, 2].map((i) => <SkeletonPostCard key={i} />)
+                  : posts.length === 0
+                  ? (
+                    <p className="col-span-3 text-center text-white/50 py-8">
+                      {t('posts.no_posts')}
+                    </p>
+                  )
+                  : posts.map((post, idx) => (
+                    <motion.div
+                      key={post.id}
+                      className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 flex flex-col gap-3 hover:border-white/20 transition-colors duration-200"
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.1 }}
+                    >
+                      <h3 className="text-white font-bold text-lg leading-snug line-clamp-2">
+                        {post.title}
+                      </h3>
+                      <p className="text-sm" style={{ color: '#00ffff' }}>
+                        {post.author?.display_name}
+                      </p>
+                      <p className="text-white/50 text-xs">
+                        {formatDate(post.created_at)}
+                      </p>
+                      <div className="mt-auto pt-2">
+                        <Link
+                          href={`/${locale}/posts/${post.id}`}
+                          className="inline-flex items-center gap-1 text-sm font-medium transition-colors duration-200"
+                          style={{ color: '#00ffff' }}
+                          onMouseEnter={(e) => (e.currentTarget.style.textShadow = '0 0 8px #00ffff')}
+                          onMouseLeave={(e) => (e.currentTarget.style.textShadow = 'none')}
+                        >
+                          {t('posts.read_more')}
+                          <ArrowRight size={14} />
+                        </Link>
+                      </div>
+                    </motion.div>
+                  ))
+                }
+              </div>
+            )}
+          </div>
+        </FadeInSection>
+      </section>
+
+      {/* ─── How It Works ─────────────────────────────────────────────────── */}
+      <section
+        className="py-16 px-4"
+        style={{ background: 'rgba(255,255,255,0.02)', borderTop: '1px solid rgba(255,255,255,0.06)' }}
+      >
+        <FadeInSection delay={0.1}>
+          <div className="max-w-5xl mx-auto">
+            <h2
+              className="text-3xl font-bold text-center mb-12"
+              style={{ color: '#00ffff', textShadow: '0 0 10px rgba(0,255,255,0.6)' }}
+            >
+              {t('landing.how_title')}
+            </h2>
+
+            <div className="flex flex-wrap justify-center gap-6 md:gap-0 md:items-start">
+              {/* Step 1 */}
+              <div className="flex-1 min-w-[200px] max-w-xs">
+                <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 text-center">
+                  <div
+                    className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"
+                    style={{ background: 'rgba(0,255,255,0.1)', color: '#00ffff' }}
+                  >
+                    <CheckCircle size={28} />
+                  </div>
+                  <h3 className="text-white font-bold text-lg mb-2">{t('landing.step1_title')}</h3>
+                  <p className="text-white/60 text-sm">{t('landing.step1_desc')}</p>
+                </div>
+              </div>
+
+              {/* Arrow (desktop only) */}
+              <div className="hidden md:flex items-center px-3 mt-12" aria-hidden="true">
+                <ArrowRight size={24} className="text-white/20" />
+              </div>
+
+              {/* Step 2 */}
+              <div className="flex-1 min-w-[200px] max-w-xs">
+                <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 text-center">
+                  <div
+                    className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"
+                    style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981' }}
+                  >
+                    <TrendingUp size={28} />
+                  </div>
+                  <h3 className="text-white font-bold text-lg mb-2">{t('landing.step2_title')}</h3>
+                  <p className="text-white/60 text-sm">{t('landing.step2_desc')}</p>
+                </div>
+              </div>
+
+              {/* Arrow (desktop only) */}
+              <div className="hidden md:flex items-center px-3 mt-12" aria-hidden="true">
+                <ArrowRight size={24} className="text-white/20" />
+              </div>
+
+              {/* Step 3 */}
+              <div className="flex-1 min-w-[200px] max-w-xs">
+                <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 text-center">
+                  <div
+                    className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"
+                    style={{ background: 'rgba(139,92,246,0.1)', color: '#8b5cf6' }}
+                  >
+                    <Wallet size={28} />
+                  </div>
+                  <h3 className="text-white font-bold text-lg mb-2">{t('landing.step3_title')}</h3>
+                  <p className="text-white/60 text-sm">{t('landing.step3_desc')}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </FadeInSection>
+      </section>
+
+      {/* ─── CTA Section ──────────────────────────────────────────────────── */}
+      <section className="py-16 px-4">
+        <FadeInSection delay={0.1}>
+          <div className="max-w-2xl mx-auto text-center">
+            <div style={{ color: '#fbbf24', display: 'inline-block', marginBottom: '1.5rem' }}>
+              <FaravaharSimple size={80} animated />
+            </div>
+            <h2
+              className="text-4xl font-black mb-6"
+              style={{
+                color: '#ffffff',
+                textShadow: '0 0 20px rgba(255,255,255,0.3)',
+              }}
+            >
+              Ready to join?
+            </h2>
+            <p className="text-white/60 text-lg mb-8">{t('landing.tagline')}</p>
+            <Link
+              href={`/${locale}/register`}
+              className="inline-flex items-center gap-2 px-10 py-4 rounded-xl font-bold text-xl transition-all duration-200"
+              style={{
+                border: '2px solid #10b981',
+                background: 'rgba(16,185,129,0.15)',
+                color: '#10b981',
+                textShadow: '0 0 8px rgba(16,185,129,0.5)',
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(16,185,129,0.3)';
+                (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 0 30px rgba(16,185,129,0.5)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(16,185,129,0.15)';
+                (e.currentTarget as HTMLAnchorElement).style.boxShadow = 'none';
+              }}
+            >
+              {t('landing.cta_join')}
+              <ArrowRight size={22} />
+            </Link>
+          </div>
+        </FadeInSection>
+      </section>
+
+    </div>
+  );
+}
