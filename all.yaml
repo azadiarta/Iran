@@ -13,7 +13,7 @@ rules:
   after_build: update exports + update imports with status
 
 progress:
-  current_phase: 1
+  current_phase: 3
   current_task: complete
   phases:
     1:
@@ -21,9 +21,26 @@ progress:
       status: done
       done: [entities defined, models created, split into 5 apps, project setup, migrations verified]
     2:
-      name: backend API
+      name: project structure
+      status: done
+      done: [groupfund project, 5 apps, settings.py, requirements.txt, .env.example]
+    3:
+      name: authentication system
+      status: done
+      done: [Member→AbstractBaseUser, MemberAuthBackend, JWT simplejwt, register/login/logout/profile views, HasGroupPermission, IsSuperuser, IsActiveMember, accounts/urls, groupfund/urls]
+    4:
+      name: backend API (fund, posts, logs, core)
       status: pending
-      next: [serializers, views, urls, auth_backend, payments/service]
+      next: [serializers, views, urls for fund/posts/logs/core, payments/service]
+    5:
+      name: frontend
+      status: pending
+    6:
+      name: payment integration
+      status: pending
+    7:
+      name: deploy
+      status: pending
     3:
       name: frontend
       status: pending
@@ -42,26 +59,31 @@ files:
     status: done
     kind: config
     key_settings:
-      installed_apps: [django.contrib.contenttypes, django.contrib.staticfiles, rest_framework, corsheaders, core, accounts, fund, posts, logs]
+      installed_apps: [django.contrib.admin, django.contrib.auth, django.contrib.contenttypes, django.contrib.sessions, django.contrib.messages, django.contrib.staticfiles, rest_framework, rest_framework_simplejwt.token_blacklist, corsheaders, core, accounts, fund, posts, logs]
+      auth_user_model: accounts.Member
+      authentication_backends: [accounts.backends.MemberAuthBackend]
       db_engine: postgresql (override: DB_ENGINE env for local sqlite testing)
       db_env_vars: [DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT]
       media: MEDIA_ROOT=backend/media, MEDIA_URL=/media/
       static: STATIC_ROOT=backend/staticfiles, STATIC_URL=/static/
       cors: CORS_ALLOWED_ORIGINS from env
       auth_env_vars: [SECRET_KEY, DEBUG, ALLOWED_HOSTS]
+      simple_jwt: ACCESS=1day, REFRESH=7days, ROTATE=true, BLACKLIST=true
+      drf_default_auth: JWTAuthentication
+      drf_default_permission: IsAuthenticated
     imports:
-      external: [{from: os, items: [environ]}, {from: pathlib, items: [Path]}]
+      external: [{from: os, items: [environ]}, {from: pathlib, items: [Path]}, {from: datetime, items: [timedelta]}]
       internal: []
     exports: []
     needed_by: []
 
   "backend/groupfund/urls.py":
-    status: in-progress
+    status: done
     imports:
-      external: [{from: django.urls, items: [path, include]}]
+      external: [{from: django.contrib, items: [admin]}, {from: django.urls, items: [path, include]}]
       internal:
+        - {file: "backend/accounts/urls.py", items: [urlpatterns], status: available}
         - {file: "backend/core/urls.py",     items: [urlpatterns], status: pending}
-        - {file: "backend/accounts/urls.py", items: [urlpatterns], status: pending}
         - {file: "backend/fund/urls.py",     items: [urlpatterns], status: pending}
         - {file: "backend/posts/urls.py",    items: [urlpatterns], status: pending}
         - {file: "backend/logs/urls.py",     items: [urlpatterns], status: pending}
@@ -130,14 +152,22 @@ files:
 
   "backend/accounts/models.py":
     status: done
+    note: "Member updated to AbstractBaseUser for AUTH_USER_MODEL + simplejwt support"
     imports:
       external:
         - {from: uuid, items: [uuid4]}
         - {from: django.db, items: [models]}
         - {from: django.core.exceptions, items: [ValidationError]}
+        - {from: django.contrib.auth.models, items: [AbstractBaseUser, BaseUserManager]}
       internal:
         - {from: "backend/core/models.py", items: [{name: Permission, status: available}]}
     exports:
+      - name: MemberManager
+        kind: class
+        type: Django BaseUserManager
+        methods:
+          - {signature: "create_user(password, **extra_fields) -> Member"}
+          - {signature: "create_superuser(email, password, **extra_fields) -> Member", note: "terminal only — no API endpoint"}
       - name: AccessGroup
         kind: class
         type: Django Model
@@ -151,88 +181,123 @@ files:
         meta: {ordering: [name]}
       - name: Member
         kind: class
-        type: Django Model
+        type: Django AbstractBaseUser
         fields:
           id: UUID, pk, auto
           full_name: str(35)
           display_name: str(20), blank
-          group: FK → AccessGroup, PROTECT
-          phone: str(20), blank
-          email: EmailField, blank
-          password: str(128), hashed via make_password()
+          group: FK → AccessGroup, PROTECT, null=True (superuser may have no group)
+          phone: str(20), unique, null=True (stored as NULL not '')
+          email: EmailField, unique, null=True (stored as NULL not '')
+          password: from AbstractBaseUser (set via set_password())
+          last_login: from AbstractBaseUser
           is_active: bool, default True
+          is_staff: bool, default False
+          is_superuser: bool, default False
           created_at: datetime, auto
           updated_at: datetime, auto
+        username_field: email
+        required_fields: [full_name]
         validation: "clean() → phone OR email required"
         meta: {ordering: [full_name]}
     needed_by:
-      - {file: "backend/fund/models.py",           items: [Member], status: available}
-      - {file: "backend/posts/models.py",          items: [Member], status: available}
-      - {file: "backend/logs/models.py",           items: [Member], status: available}
-      - {file: "backend/accounts/serializers.py",  items: [AccessGroup, Member], status: pending}
-      - {file: "backend/accounts/views.py",        items: [AccessGroup, Member], status: pending}
-      - {file: "backend/accounts/auth_backend.py", items: [Member], status: pending}
+      - {file: "backend/fund/models.py",          items: [Member], status: available}
+      - {file: "backend/posts/models.py",         items: [Member], status: available}
+      - {file: "backend/logs/models.py",          items: [Member], status: available}
+      - {file: "backend/accounts/backends.py",    items: [Member], status: available}
+      - {file: "backend/accounts/serializers.py", items: [AccessGroup, Member], status: available}
+      - {file: "backend/accounts/views.py",       items: [Member], status: available}
 
-  "backend/accounts/auth_backend.py":
-    status: pending
+  "backend/accounts/backends.py":
+    status: done
     imports:
-      external:
-        - {from: django.contrib.auth.hashers, items: [check_password]}
-        - {from: django.db.models, items: [Q]}
+      external: [{from: django.contrib.auth.backends, items: [BaseBackend]}]
       internal:
         - {from: "backend/accounts/models.py", items: [{name: Member, status: available}]}
     exports:
       - name: MemberAuthBackend
         kind: class
+        type: Django auth backend
         methods:
-          - {signature: "authenticate(request, identifier: str, password: str) -> Member | None", note: "identifier = phone or email, checks both fields"}
+          - {signature: "authenticate(request, credential: str, password: str) -> Member | None", note: "'@' in credential → email lookup, else phone lookup"}
           - {signature: "get_user(user_id: UUID) -> Member | None"}
     needed_by:
-      - {file: "backend/accounts/views.py", items: [MemberAuthBackend], status: pending}
+      - {file: "backend/groupfund/settings.py", items: [MemberAuthBackend], status: available}
 
   "backend/accounts/serializers.py":
-    status: pending
-    imports:
-      external: [{from: rest_framework, items: [serializers]}, {from: django.contrib.auth.hashers, items: [make_password]}]
-      internal:
-        - {from: "backend/accounts/models.py",  items: [{name: AccessGroup, status: available}, {name: Member, status: available}]}
-        - {from: "backend/core/serializers.py", items: [{name: PermissionSerializer, status: pending}]}
-    exports:
-      - {name: AccessGroupSerializer,  kind: class, type: DRF ModelSerializer, fields: [id, name, description, permissions(nested PermissionSerializer)]}
-      - {name: MemberSerializer,       kind: class, type: DRF ModelSerializer, fields: [id, full_name, display_name, group, phone, email, is_active, created_at]}
-      - {name: MemberCreateSerializer, kind: class, type: DRF ModelSerializer, fields: [full_name, display_name, group, phone, email, password], note: "hashes password via make_password() on save"}
-      - {name: LoginSerializer,        kind: class, type: DRF Serializer,      fields: [identifier(str), password(str)]}
-    needed_by:
-      - {file: "backend/accounts/views.py", items: [AccessGroupSerializer, MemberSerializer, MemberCreateSerializer, LoginSerializer], status: pending}
-
-  "backend/accounts/views.py":
-    status: pending
+    status: done
     imports:
       external:
-        - {from: rest_framework.viewsets, items: [ModelViewSet]}
-        - {from: rest_framework.views, items: [APIView]}
-        - {from: rest_framework.response, items: [Response]}
+        - {from: rest_framework, items: [serializers]}
+        - {from: rest_framework_simplejwt.tokens, items: [RefreshToken]}
       internal:
-        - {from: "backend/accounts/models.py",      items: [{name: AccessGroup, status: available}, {name: Member, status: available}]}
-        - {from: "backend/accounts/serializers.py", items: [{name: AccessGroupSerializer, status: pending}, {name: MemberSerializer, status: pending}, {name: MemberCreateSerializer, status: pending}, {name: LoginSerializer, status: pending}]}
-        - {from: "backend/accounts/auth_backend.py",items: [{name: MemberAuthBackend, status: pending}]}
+        - {from: "backend/accounts/models.py", items: [{name: AccessGroup, status: available}, {name: Member, status: available}]}
+        - {from: "backend/core/models.py",     items: [{name: Permission, status: available}]}
     exports:
-      - {name: AccessGroupViewSet, kind: class, type: DRF ModelViewSet}
-      - {name: MemberViewSet,      kind: class, type: DRF ModelViewSet}
-      - {name: LoginView,          kind: class, type: DRF APIView, description: "authenticates via MemberAuthBackend, returns JWT tokens"}
+      - name: RegisterSerializer
+        kind: class
+        type: DRF ModelSerializer
+        fields: [full_name, display_name, phone, email, password(write_only), password_confirm(write_only)]
+        validation: [phone OR email required, passwords match, phone/email unique]
+        on_save: [set_password(), assign default AccessGroup]
+      - name: LoginSerializer
+        kind: class
+        type: DRF Serializer
+        fields: [credential(str — phone or email), password(write_only)]
+      - name: MemberProfileSerializer
+        kind: class
+        type: DRF ModelSerializer
+        fields: [id, full_name, display_name, email, phone, group_name, group_permissions(list), is_active, created_at]
+        note: "group_permissions returns ['*'] for superuser"
     needed_by:
-      - {file: "backend/accounts/urls.py", items: [AccessGroupViewSet, MemberViewSet, LoginView], status: pending}
+      - {file: "backend/accounts/views.py", items: [RegisterSerializer, LoginSerializer, MemberProfileSerializer], status: available}
+
+  "backend/accounts/permissions.py":
+    status: done
+    imports:
+      external: [{from: rest_framework.permissions, items: [BasePermission]}]
+      internal: []
+    exports:
+      - {name: IsActiveMember,       kind: class,    type: DRF BasePermission, description: "passes if member.is_active=True"}
+      - {name: IsSuperuser,          kind: class,    type: DRF BasePermission, description: "passes ONLY for superuser — no API endpoint creates superuser"}
+      - {name: HasGroupPermission,   kind: function, signature: "(codename: str) -> Type[BasePermission]", description: "factory — returns a permission class that checks group.permissions for the given codename; superuser always passes"}
+    needed_by:
+      - {file: "backend/fund/views.py",  items: [HasGroupPermission, IsActiveMember], status: pending}
+      - {file: "backend/posts/views.py", items: [HasGroupPermission, IsActiveMember], status: pending}
+      - {file: "backend/logs/views.py",  items: [HasGroupPermission, IsSuperuser],    status: pending}
+
+  "backend/accounts/views.py":
+    status: done
+    imports:
+      external:
+        - {from: django.contrib.auth, items: [authenticate]}
+        - {from: rest_framework.permissions, items: [AllowAny, IsAuthenticated]}
+        - {from: rest_framework.response, items: [Response]}
+        - {from: rest_framework.views, items: [APIView]}
+        - {from: rest_framework_simplejwt.tokens, items: [RefreshToken]}
+        - {from: rest_framework_simplejwt.exceptions, items: [TokenError]}
+      internal:
+        - {from: "backend/accounts/models.py",      items: [{name: Member, status: available}]}
+        - {from: "backend/accounts/serializers.py", items: [{name: RegisterSerializer, status: available}, {name: LoginSerializer, status: available}, {name: MemberProfileSerializer, status: available}]}
+        - {from: "backend/logs/models.py",          items: [{name: ActivityLog, status: available}]}
+    exports:
+      - {name: RegisterView, kind: class, type: DRF APIView, endpoint: "POST /api/auth/register/", auth: public,         logs: registered}
+      - {name: LoginView,    kind: class, type: DRF APIView, endpoint: "POST /api/auth/login/",    auth: public,         logs: login / failed_login}
+      - {name: LogoutView,   kind: class, type: DRF APIView, endpoint: "POST /api/auth/logout/",   auth: required,       logs: logout, note: "blacklists refresh token"}
+      - {name: ProfileView,  kind: class, type: DRF APIView, endpoint: "GET /api/auth/profile/",   auth: required}
+    needed_by:
+      - {file: "backend/accounts/urls.py", items: [RegisterView, LoginView, LogoutView, ProfileView], status: available}
 
   "backend/accounts/urls.py":
-    status: pending
+    status: done
     imports:
-      external: [{from: rest_framework.routers, items: [DefaultRouter]}, {from: django.urls, items: [path]}]
+      external: [{from: django.urls, items: [path]}, {from: rest_framework_simplejwt.views, items: [TokenRefreshView]}]
       internal:
-        - {from: "backend/accounts/views.py", items: [{name: AccessGroupViewSet, status: pending}, {name: MemberViewSet, status: pending}, {name: LoginView, status: pending}]}
+        - {from: "backend/accounts/views.py", items: [{name: RegisterView, status: available}, {name: LoginView, status: available}, {name: LogoutView, status: available}, {name: ProfileView, status: available}]}
     exports:
-      - {name: urlpatterns, kind: constant, type: list}
+      - {name: urlpatterns, kind: constant, type: list, routes: ["POST register/", "POST login/", "POST logout/", "GET profile/", "POST token/refresh/"]}
     needed_by:
-      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: in-progress}
+      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: available}
 
   # ─── FUND APP ──────────────────────────────────────────────────────────────
 
