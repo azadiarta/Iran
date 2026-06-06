@@ -17,3 +17,25 @@ class Permission(models.Model):
 
     def __str__(self):
         return self.label
+
+
+# Default seeds (set via Django admin by superuser):
+#   default_group = <UUID of AccessGroup with is_default=True>
+#   default_currency = GBP
+#   require_comment_approval = true
+#   max_receipt_image_size_mb = 5
+
+class DefaultSetting(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    key = models.CharField(max_length=100, unique=True)
+    value = models.TextField()
+    description = models.CharField(max_length=350, blank=True)
+    updated_by = models.ForeignKey(
+        'accounts.Member', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='setting_changes',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'{self.key} = {self.value}'

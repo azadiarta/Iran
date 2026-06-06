@@ -44,7 +44,8 @@ class Contribution(models.Model):
 class Expense(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     withdrawn_by = models.ForeignKey(
-        'accounts.Member', on_delete=models.PROTECT, related_name='expenses',
+        'accounts.Member', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='expenses',
     )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     short_reason = models.CharField(max_length=100)

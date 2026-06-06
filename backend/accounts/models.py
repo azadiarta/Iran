@@ -21,6 +21,14 @@ class MemberManager(BaseUserManager):
         return self.create_user(email=email, password=password, **extra_fields)
 
 
+def get_default_group_id():
+    try:
+        group = AccessGroup.objects.filter(is_default=True).first()
+        return group.id if group else None
+    except Exception:
+        return None
+
+
 # Superuser bypasses ALL permission checks — never enforce group perms for superuser.
 # No group can modify or delete the superuser account.
 # can_contribute + can_comment must be assigned to every new group by default.
@@ -28,12 +36,18 @@ class AccessGroup(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=20, unique=True)
     description = models.CharField(max_length=350, blank=True)
+    is_default = models.BooleanField(default=False)
     permissions = models.ManyToManyField('core.Permission', blank=True, related_name='groups')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['name']
+
+    def save(self, *args, **kwargs):
+        if self.is_default:
+            AccessGroup.objects.filter(is_default=True).exclude(pk=self.pk).update(is_default=False)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
@@ -47,7 +61,8 @@ class Member(AbstractBaseUser):
     full_name = models.CharField(max_length=35)
     display_name = models.CharField(max_length=20, blank=True)
     group = models.ForeignKey(
-        AccessGroup, on_delete=models.PROTECT,
+        AccessGroup, on_delete=models.SET_DEFAULT,
+        default=get_default_group_id,
         related_name='members', null=True, blank=True,
     )
     phone = models.CharField(max_length=20, unique=True, null=True, blank=True, default=None)

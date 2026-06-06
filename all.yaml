@@ -13,7 +13,7 @@ rules:
   after_build: update exports + update imports with status
 
 progress:
-  current_phase: 3
+  current_phase: 4
   current_task: complete
   phases:
     1:
@@ -29,25 +29,20 @@ progress:
       status: done
       done: [Member→AbstractBaseUser, MemberAuthBackend, JWT simplejwt, register/login/logout/profile views, HasGroupPermission, IsSuperuser, IsActiveMember, accounts/urls, groupfund/urls]
     4:
+      name: model updates + signals + utils
+      status: done
+      done: [DefaultSetting model, AccessGroup.is_default + save(), get_default_group_id(), Member.group SET_DEFAULT, Expense.withdrawn_by SET_NULL, Post.author SET_NULL, core/signals.py, core/utils.py, core/apps.py ready(), migrations verified]
+    5:
       name: backend API (fund, posts, logs, core)
       status: pending
       next: [serializers, views, urls for fund/posts/logs/core, payments/service]
-    5:
-      name: frontend
-      status: pending
     6:
-      name: payment integration
+      name: frontend
       status: pending
     7:
-      name: deploy
-      status: pending
-    3:
-      name: frontend
-      status: pending
-    4:
       name: payment integration
       status: pending
-    5:
+    8:
       name: deploy
       status: pending
 
@@ -108,10 +103,61 @@ files:
           description: str(350), blank
           created_at: datetime, auto
         meta: {ordering: [codename]}
+      - name: DefaultSetting
+        kind: class
+        type: Django Model
+        fields:
+          id: UUID, pk, auto
+          key: str(100), unique
+          value: text
+          description: str(350), blank
+          updated_by: FK → accounts.Member, SET_NULL, null
+          created_at: datetime, auto
+          updated_at: datetime, auto
+        seeds: [default_group=<UUID>, default_currency=GBP, require_comment_approval=true, max_receipt_image_size_mb=5]
     needed_by:
       - {file: "backend/accounts/models.py",  items: [Permission], status: available}
-      - {file: "backend/core/serializers.py", items: [Permission], status: pending}
-      - {file: "backend/core/views.py",       items: [Permission], status: pending}
+      - {file: "backend/core/serializers.py", items: [Permission, DefaultSetting], status: pending}
+      - {file: "backend/core/views.py",       items: [Permission, DefaultSetting], status: pending}
+
+  "backend/core/apps.py":
+    status: done
+    imports:
+      external: [{from: django.apps, items: [AppConfig]}]
+      internal:
+        - {from: "backend/core/signals.py", items: [signal handlers], status: available}
+    exports: []
+    needed_by: []
+
+  "backend/core/signals.py":
+    status: done
+    imports:
+      external: [{from: django.db.models.signals, items: [pre_delete]}, {from: django.dispatch, items: [receiver]}]
+      internal:
+        - {from: "backend/accounts/models.py", items: [{name: AccessGroup, status: available}, {name: Member, status: available}]}
+        - {from: "backend/posts/models.py",    items: [{name: Comment, status: available}]}
+        - {from: "backend/logs/models.py",     items: [{name: ActivityLog, status: available}]}
+    exports:
+      - {name: on_access_group_delete, kind: function, description: "moves members to default group before AccessGroup deletion"}
+      - {name: on_post_delete,         kind: function, description: "cascades comments + logs deleted_post"}
+      - {name: on_expense_delete,      kind: function, description: "cascades comments + logs deleted_expense"}
+      - {name: on_member_delete,       kind: function, description: "logs deleted_member"}
+    needed_by:
+      - {file: "backend/core/apps.py", items: [signal handlers], status: available}
+
+  "backend/core/utils.py":
+    status: done
+    imports:
+      external: [{from: rest_framework.response, items: [Response]}]
+      internal: []
+    exports:
+      - {name: api_success, kind: function, signature: "(data=None, message='', status_code=200) -> Response", description: "returns {success: true, message, data}"}
+      - {name: api_error,   kind: function, signature: "(message='', status_code=400, errors=None) -> Response", description: "returns {success: false, message, errors}"}
+    needed_by:
+      - {file: "backend/accounts/views.py", items: [api_success, api_error], status: available}
+      - {file: "backend/fund/views.py",     items: [api_success, api_error], status: pending}
+      - {file: "backend/posts/views.py",    items: [api_success, api_error], status: pending}
+      - {file: "backend/logs/views.py",     items: [api_success, api_error], status: pending}
 
   "backend/core/serializers.py":
     status: pending
@@ -162,6 +208,10 @@ files:
       internal:
         - {from: "backend/core/models.py", items: [{name: Permission, status: available}]}
     exports:
+      - name: get_default_group_id
+        kind: function
+        signature: "() -> UUID | None"
+        description: "returns id of AccessGroup with is_default=True; returns None if none exists or DB unavailable"
       - name: MemberManager
         kind: class
         type: Django BaseUserManager
@@ -175,6 +225,7 @@ files:
           id: UUID, pk, auto
           name: str(20), unique
           description: str(350), blank
+          is_default: bool, default False (save() enforces at most one default at a time)
           permissions: M2M → core.Permission
           created_at: datetime, auto
           updated_at: datetime, auto
@@ -186,7 +237,7 @@ files:
           id: UUID, pk, auto
           full_name: str(35)
           display_name: str(20), blank
-          group: FK → AccessGroup, PROTECT, null=True (superuser may have no group)
+          group: FK → AccessGroup, SET_DEFAULT (default=get_default_group_id), null=True
           phone: str(20), unique, null=True (stored as NULL not '')
           email: EmailField, unique, null=True (stored as NULL not '')
           password: from AbstractBaseUser (set via set_password())
@@ -328,7 +379,7 @@ files:
         type: Django Model
         fields:
           id: UUID, pk, auto
-          withdrawn_by: FK → accounts.Member, PROTECT
+          withdrawn_by: FK → accounts.Member, SET_NULL, null=True
           amount: decimal(10,2)
           short_reason: str(100)
           description: text, blank
@@ -404,7 +455,7 @@ files:
         type: Django Model
         fields:
           id: UUID, pk, auto
-          author: FK → accounts.Member, PROTECT
+          author: FK → accounts.Member, SET_NULL, null=True
           title: str(150)
           body: text
           created_at: datetime, auto

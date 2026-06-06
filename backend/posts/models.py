@@ -8,7 +8,8 @@ from django.db import models
 class Post(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     author = models.ForeignKey(
-        'accounts.Member', on_delete=models.PROTECT, related_name='posts',
+        'accounts.Member', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='posts',
     )
     title = models.CharField(max_length=150)
     body = models.TextField()
