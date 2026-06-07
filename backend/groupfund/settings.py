@@ -19,6 +19,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
+    'storages',
     'core',
     'accounts',
     'fund',
@@ -77,12 +78,37 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# NOTE: Railway's filesystem is ephemeral — uploaded media (post images, payment
-# receipts) stored under MEDIA_ROOT does NOT survive redeploys/restarts. For a
-# production deployment with persistent uploads, replace this with a cloud
-# storage backend (e.g. django-storages + S3-compatible bucket).
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+# Railway's filesystem is ephemeral, so uploaded media (post images, payment
+# receipts) must live in an S3-compatible bucket (AWS S3, Cloudflare R2,
+# Backblaze B2, ...) rather than on local disk. Set AWS_STORAGE_BUCKET_NAME
+# (+ credentials) to switch media storage to the bucket; otherwise local
+# MEDIA_ROOT is used (fine for local development).
+AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME', '')
+
+if AWS_STORAGE_BUCKET_NAME:
+    AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID', '')
+    AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY', '')
+    AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', '')
+    AWS_S3_ENDPOINT_URL = os.environ.get('AWS_S3_ENDPOINT_URL', '') or None
+    AWS_S3_CUSTOM_DOMAIN = os.environ.get('AWS_S3_CUSTOM_DOMAIN', '') or None
+    AWS_DEFAULT_ACL = None
+    AWS_QUERYSTRING_AUTH = False
+    AWS_S3_FILE_OVERWRITE = False
+
+    # Old-style setting kept (rather than STORAGES) because Django raises
+    # ImproperlyConfigured if STORAGES and STATICFILES_STORAGE are both set,
+    # and STATICFILES_STORAGE (whitenoise) is configured unconditionally above.
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3.S3Storage'
+
+    if AWS_S3_CUSTOM_DOMAIN:
+        MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/'
+    elif AWS_S3_ENDPOINT_URL:
+        MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/'
+    else:
+        MEDIA_URL = f'https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com/'
+else:
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

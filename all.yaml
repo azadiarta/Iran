@@ -58,7 +58,7 @@ progress:
     11:
       name: deploy
       status: done
-      done: [requirements.txt (gunicorn, whitenoise), backend/groupfund/wsgi.py, whitenoise middleware + STATICFILES_STORAGE, production security settings (SECURE_SSL_REDIRECT/HSTS/SESSION_COOKIE_SECURE/CSRF_COOKIE_SECURE/SECURE_PROXY_SSL_HEADER, conditional on DEBUG), LOGGING config, Procfile (release: migrate+collectstatic, web: gunicorn), runtime.txt, .env.example documented for production + ephemeral-media-storage limitation, frontend/next.config.mjs dynamic remotePatterns from NEXT_PUBLIC_API_URL]
+      done: [requirements.txt (gunicorn, whitenoise, django-storages, boto3), backend/groupfund/wsgi.py, whitenoise middleware + STATICFILES_STORAGE, "S3-compatible media storage (DEFAULT_FILE_STORAGE=storages.backends.s3.S3Storage) — conditional on AWS_STORAGE_BUCKET_NAME env var, falls back to local MEDIA_ROOT for dev; supports AWS S3 / Cloudflare R2 / Backblaze B2 via AWS_S3_ENDPOINT_URL + AWS_S3_CUSTOM_DOMAIN", production security settings (SECURE_SSL_REDIRECT/HSTS/SESSION_COOKIE_SECURE/CSRF_COOKIE_SECURE/SECURE_PROXY_SSL_HEADER, conditional on DEBUG), LOGGING config, Procfile (release: migrate+collectstatic, web: gunicorn), runtime.txt, .env.example documented for production + S3 bucket env vars, frontend/next.config.mjs dynamic remotePatterns from NEXT_PUBLIC_API_URL]
 
 files:
 
@@ -73,9 +73,10 @@ files:
       authentication_backends: [accounts.backends.MemberAuthBackend]
       db_engine: postgresql (override: DB_ENGINE env for local sqlite testing)
       db_env_vars: [DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT]
-      media: "MEDIA_ROOT=backend/media, MEDIA_URL=/media/ — NOTE: ephemeral on Railway, documented in .env.example; needs cloud storage (e.g. django-storages+S3) for persistent uploads in production"
+      media: "conditional on AWS_STORAGE_BUCKET_NAME env var: if set → DEFAULT_FILE_STORAGE=storages.backends.s3.S3Storage (django-storages), MEDIA_URL derived from AWS_S3_CUSTOM_DOMAIN / AWS_S3_ENDPOINT_URL / default S3 URL (supports AWS S3, Cloudflare R2, Backblaze B2, ...); if unset → local MEDIA_ROOT=backend/media, MEDIA_URL=/media/ for dev. DEFAULT_FILE_STORAGE used (not STORAGES dict) — Django raises ImproperlyConfigured if both STORAGES and STATICFILES_STORAGE are set"
       static: "STATIC_ROOT=backend/staticfiles, STATIC_URL=/static/, STATICFILES_STORAGE=whitenoise.storage.CompressedManifestStaticFilesStorage"
       middleware: "whitenoise.middleware.WhiteNoiseMiddleware added directly after SecurityMiddleware"
+      storages_app: "'storages' (django-storages) added to INSTALLED_APPS"
       cors: CORS_ALLOWED_ORIGINS from env
       auth_env_vars: [SECRET_KEY, DEBUG, ALLOWED_HOSTS]
       simple_jwt: ACCESS=1day, REFRESH=7days, ROTATE=true, BLACKLIST=true
