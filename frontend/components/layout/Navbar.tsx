@@ -78,6 +78,10 @@ export default function Navbar({ locale }: NavbarProps) {
       // ignore — proceed with client-side logout regardless
     }
     logout();
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+    }
     setUserDropOpen(false);
     setMobileOpen(false);
     router.push(`/${locale}/login`);

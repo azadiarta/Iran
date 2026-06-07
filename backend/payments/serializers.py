@@ -24,7 +24,7 @@ class PaymentInitiateSerializer(serializers.Serializer):
 
 
 class ReceiptUploadSerializer(serializers.Serializer):
-    receipt_image = serializers.ImageField()
+    receipt_image = serializers.FileField()
 
     def validate_receipt_image(self, value):
         ext = value.name.rsplit('.', 1)[-1].lower() if '.' in value.name else ''

@@ -83,7 +83,7 @@ class LoginView(APIView):
 
             _log(actor=actor, actor_display=display, action='failed_login',
                  ip=ip, extra={'credential': credential})
-            return Response({'error': 'Invalid credentials.'}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({'message': 'Invalid credentials.'}, status=status.HTTP_401_UNAUTHORIZED)
 
         refresh = RefreshToken.for_user(member)
         _log(actor=member, actor_display=member.display_name or member.full_name,

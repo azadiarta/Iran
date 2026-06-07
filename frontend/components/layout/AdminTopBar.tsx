@@ -42,6 +42,10 @@ export default function AdminTopBar({ locale, onToggleSidebar, pendingCommentCou
       // ignore — proceed with client-side logout regardless
     }
     logout();
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+    }
     setDropOpen(false);
     router.push(`/${locale}/login`);
   }
