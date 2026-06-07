@@ -13,8 +13,8 @@ rules:
   after_build: update exports + update imports with status
 
 progress:
-  current_phase: 9
-  current_task: complete
+  current_phase: 11
+  current_task: "complete (except phase 10 — deferred per project decision)"
   phases:
     1:
       name: database
@@ -51,13 +51,14 @@ progress:
     9:
       name: frontend
       status: done
-      done: [lib/api.ts (axios + interceptors + unwrap), authStore, langStore, i18n, messages en/fa, middleware, layouts, Navbar, Footer, animations (IranianSymbols, PageTransition, SplashScreen), pages (landing, login, register, posts, posts/[id], expenses, contribute, profile, contact, forbidden, unavailable, not-found), "ADMIN PANEL (7B): admin design system (styles/admin.css), AdminLayout/AdminTopBar/AdminSidebar + route protection, reusable admin components (AdminTable/AdminModal/AdminConfirmDialog/AdminStatCard/AdminBadge/admin form fields), toast system, 12 admin pages (dashboard/members/members-detail/groups/contributions/expenses/posts/comments/payments/settings/logs-activity/logs-system) — see Phase 7B section below for full file list + 2 flagged backend gaps (no global comments endpoint, no permissions-list endpoint)"]
+      done: [lib/api.ts (axios + interceptors + unwrap), authStore, langStore, i18n, messages en/fa, middleware, layouts, Navbar, Footer, animations (IranianSymbols, PageTransition, SplashScreen), pages (landing, login, register, posts, posts/[id], expenses, contribute, profile, contact, help, forbidden, unavailable, not-found), "ADMIN PANEL (7B): admin design system (styles/admin.css), AdminLayout/AdminTopBar/AdminSidebar + route protection, reusable admin components (AdminTable/AdminModal/AdminConfirmDialog/AdminStatCard/AdminBadge/admin form fields), toast system, 12 admin pages (dashboard/members/members-detail/groups/contributions/expenses/posts/comments/payments/settings/logs-activity/logs-system) — see Phase 7B section below; both flagged backend gaps (global comments endpoint, permissions-list endpoint) are now RESOLVED", "/help page (frontend/app/[locale]/help/page.tsx): permission-gated site guide — sections shown depend on guest/member/admin status & group permissions, new 'help' i18n namespace in messages/{en,fa}.json, linked from Navbar + Footer"]
     10:
       name: payment integration (Stripe / Google Pay)
       status: pending
     11:
       name: deploy
-      status: pending
+      status: done
+      done: [requirements.txt (gunicorn, whitenoise), backend/groupfund/wsgi.py, whitenoise middleware + STATICFILES_STORAGE, production security settings (SECURE_SSL_REDIRECT/HSTS/SESSION_COOKIE_SECURE/CSRF_COOKIE_SECURE/SECURE_PROXY_SSL_HEADER, conditional on DEBUG), LOGGING config, Procfile (release: migrate+collectstatic, web: gunicorn), runtime.txt, .env.example documented for production + ephemeral-media-storage limitation, frontend/next.config.mjs dynamic remotePatterns from NEXT_PUBLIC_API_URL]
 
 files:
 
@@ -72,17 +73,31 @@ files:
       authentication_backends: [accounts.backends.MemberAuthBackend]
       db_engine: postgresql (override: DB_ENGINE env for local sqlite testing)
       db_env_vars: [DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT]
-      media: MEDIA_ROOT=backend/media, MEDIA_URL=/media/
-      static: STATIC_ROOT=backend/staticfiles, STATIC_URL=/static/
+      media: "MEDIA_ROOT=backend/media, MEDIA_URL=/media/ — NOTE: ephemeral on Railway, documented in .env.example; needs cloud storage (e.g. django-storages+S3) for persistent uploads in production"
+      static: "STATIC_ROOT=backend/staticfiles, STATIC_URL=/static/, STATICFILES_STORAGE=whitenoise.storage.CompressedManifestStaticFilesStorage"
+      middleware: "whitenoise.middleware.WhiteNoiseMiddleware added directly after SecurityMiddleware"
       cors: CORS_ALLOWED_ORIGINS from env
       auth_env_vars: [SECRET_KEY, DEBUG, ALLOWED_HOSTS]
       simple_jwt: ACCESS=1day, REFRESH=7days, ROTATE=true, BLACKLIST=true
       drf_default_auth: JWTAuthentication
       drf_default_permission: IsAuthenticated
+      production_security: "SECURE_PROXY_SSL_HEADER always set (Railway TLS-terminating proxy); when DEBUG=False also sets SECURE_SSL_REDIRECT/SECURE_HSTS_SECONDS/SECURE_HSTS_INCLUDE_SUBDOMAINS/SECURE_HSTS_PRELOAD/SESSION_COOKIE_SECURE/CSRF_COOKIE_SECURE/X_FRAME_OPTIONS"
+      logging: "console handler; INFO in DEBUG, WARNING in production"
     imports:
       external: [{from: os, items: [environ]}, {from: pathlib, items: [Path]}, {from: datetime, items: [timedelta]}]
       internal: []
     exports: []
+    needed_by: []
+
+  "backend/groupfund/wsgi.py":
+    status: done
+    kind: config
+    note: "standard Django WSGI entry-point — required by gunicorn for production deploys (Procfile: web: gunicorn groupfund.wsgi)"
+    imports:
+      external: [{from: os, items: [environ]}, {from: django.core.wsgi, items: [get_wsgi_application]}]
+      internal: []
+    exports:
+      - {name: application, kind: constant, type: WSGI application}
     needed_by: []
 
   "backend/groupfund/urls.py":
@@ -98,8 +113,21 @@ files:
         - {file: "backend/logs/urls.py",            items: [urlpatterns], status: available}
         - {file: "backend/core/settings_urls.py",   items: [urlpatterns], status: available}
         - {file: "backend/core/dashboard_urls.py",  items: [urlpatterns], status: available}
+        - {file: "backend/core/urls.py",            items: [urlpatterns], status: available}
         - {file: "backend/payments/urls.py",         items: [urlpatterns], status: available}
     exports: []
+    needed_by: []
+
+  "Procfile":
+    status: done
+    kind: config
+    note: "Railway/Heroku-style process file at repo root — release phase runs migrations + collectstatic, web phase runs gunicorn against groupfund.wsgi"
+    needed_by: []
+
+  "runtime.txt":
+    status: done
+    kind: config
+    note: "pins Python runtime version for the deploy platform (python-3.12)"
     needed_by: []
 
   # ─── ADMIN ────────────────────────────────────────────────────────────────
@@ -347,27 +375,30 @@ files:
       - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: available}
 
   "backend/core/views.py":
-    status: pending
-    note: "PermissionViewSet for listing permissions — deferred to later phase"
+    status: done
+    note: "PermissionListView — implemented as a plain DRF APIView (matching the codebase's 100% APIView convention; no ReadOnlyModelViewSet/DefaultRouter is used anywhere else in the project)"
     imports:
-      external: [{from: rest_framework.viewsets, items: [ReadOnlyModelViewSet]}]
+      external: [{from: rest_framework.permissions, items: [IsAuthenticated]}, {from: rest_framework.views, items: [APIView]}]
       internal:
+        - {from: "backend/accounts/permissions.py", items: [{name: HasGroupPermission, status: available}]}
         - {from: "backend/core/models.py",      items: [{name: Permission, status: available}]}
         - {from: "backend/core/serializers.py", items: [{name: PermissionSerializer, status: available}]}
+        - {from: "backend/core/utils.py",       items: [{name: api_success, status: available}]}
     exports:
-      - {name: PermissionViewSet, kind: class, type: DRF ReadOnlyModelViewSet}
+      - {name: PermissionListView, kind: class, type: DRF APIView, endpoint: "GET /api/permissions/", auth: can_manage_permissions}
     needed_by:
-      - {file: "backend/core/urls.py", items: [PermissionViewSet], status: pending}
+      - {file: "backend/core/urls.py", items: [PermissionListView], status: available}
 
   "backend/core/urls.py":
-    status: pending
+    status: done
     imports:
-      external: [{from: rest_framework.routers, items: [DefaultRouter]}]
+      external: [{from: django.urls, items: [path]}]
       internal:
-        - {from: "backend/core/views.py", items: [{name: PermissionViewSet, status: pending}]}
+        - {from: "backend/core/views.py", items: [{name: PermissionListView, status: available}]}
     exports:
-      - {name: urlpatterns, kind: constant, type: list}
-    needed_by: []
+      - {name: urlpatterns, kind: constant, type: list, routes: ["GET /"]}
+    needed_by:
+      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: available}
 
   # ─── ACCOUNTS APP ──────────────────────────────────────────────────────────
 
@@ -789,6 +820,7 @@ files:
       - {name: PostImageDeleteView,   kind: class, type: DRF APIView, endpoint: "DELETE /api/posts/{id}/images/{img_id}/delete/", auth: author or can_manage_permissions}
       - {name: CommentListView,       kind: class, type: DRF APIView, endpoint: "GET    /api/posts/{id}/comments/ or /api/fund/expenses/{id}/comments/", auth: public}
       - {name: CommentCreateView,     kind: class, type: DRF APIView, endpoint: "POST   /api/posts/{id}/comments/create/ or /api/fund/expenses/{id}/comments/create/", auth: optional(guests allowed), note: "always is_approved=False"}
+      - {name: CommentGlobalListView, kind: class, type: DRF APIView, endpoint: "GET    /api/posts/comments/", auth: can_approve_comments, note: "paginated (_paginate), filterable by is_approved/target_type/search — closes Phase 7B gap #1"}
       - {name: CommentApproveView,    kind: class, type: DRF APIView, endpoint: "PATCH  /api/posts/comments/{id}/approve/",   auth: can_approve_comments}
       - {name: CommentDeleteView,     kind: class, type: DRF APIView, endpoint: "DELETE /api/posts/comments/{id}/delete/",    auth: can_manage_permissions}
     needed_by:
@@ -1178,6 +1210,12 @@ files:
     route: "/{locale}/contact"
     note: "settingsAPI.getPublicSettings (graceful null on error/403) for contact_email/contact_phone; mailto: form fallback"
 
+  "frontend/app/[locale]/help/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/help"
+    note: "site guide using useTranslations('help') (new i18n namespace in messages/en.json + fa.json) + same glass-morphism theme as /contact (LionAndSun, cyan/gold accents). Sections grouped guest/member/admin and gated via useAuthStore (member, hasPermission, is_superuser) with the same permission→section mapping as AdminSidebar (can_view_dashboard, can_manage_permissions, can_view_balance, can_post, can_approve_comments, superuser-only system_log) — only sections relevant to the visitor's access level are rendered. Linked from Navbar + Footer (nav.help / messages help namespace)."
+
   "frontend/app/[locale]/forbidden/page.tsx":
     status: done
     kind: page
@@ -1359,17 +1397,15 @@ files:
     route: "/{locale}/admin/logs/system"
     note: "logsAPI.getSystem(page,{level,source,date_from,date_to}) — read-only AdminTable (level→AdminBadge color) w/ filter form + detail AdminModal. Superuser-only"
 
-  # ─── PHASE 7B — KNOWN BACKEND GAPS (frontend cannot fully resolve; flagged for future API work) ──
-  # 1. NO global `/api/comments/` list endpoint exists — only per-target lists (approved-only)
-  #    and target-agnostic approve/delete actions. The spec's full "Comments" admin page
-  #    (filters: pending/all/approved/rejected, paginated table) is NOT buildable as specified.
-  #    Workaround used: dashboardAPI.getStats().pending_comments (last 5 pending only, no
-  #    pagination/filters) + real commentsAPI.approve/delete actions. A future backend task
-  #    should add a `CommentListView`-style global endpoint (e.g. GET /api/posts/comments/)
-  #    with is_approved/target_type filters and standard `_paginate()` response.
-  # 2. NO endpoint to list all available Permission objects — core/views.py PermissionViewSet
-  #    and core/urls.py remain `status: pending` and are not wired into groupfund/urls.py.
-  #    Workaround used in Groups create/edit modal: union of `permissions[]` already attached
-  #    to existing AccessGroups via groupsAPI.getList() — permissions not yet assigned to ANY
-  #    group will not appear in the checkbox grid. A future backend task should wire up
-  #    GET /api/permissions/ returning all seeded Permission rows.
+  # ─── PHASE 7B — KNOWN BACKEND GAPS — RESOLVED ─────────────────────────────────
+  # 1. RESOLVED: added `CommentGlobalListView` (GET /api/posts/comments/) in
+  #    backend/posts/views.py — paginated via `_paginate()`, filterable by
+  #    is_approved / target_type / search, gated on can_approve_comments.
+  #    frontend/app/[locale]/admin/comments/page.tsx rewritten to use
+  #    commentsAPI.getList() with full AdminTable + filter form + pagination
+  #    (the "backend limitation" warning box has been removed).
+  # 2. RESOLVED: added `PermissionListView` (GET /api/permissions/) in
+  #    backend/core/views.py + backend/core/urls.py, wired into groupfund/urls.py.
+  #    frontend/app/[locale]/admin/groups/page.tsx now loads the full permission
+  #    list via permissionsAPI.getList() instead of deriving a union from existing
+  #    groups — unattached permissions now appear in the checkbox grid.

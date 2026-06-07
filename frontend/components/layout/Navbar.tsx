@@ -52,6 +52,7 @@ export default function Navbar({ locale }: NavbarProps) {
     { key: 'posts', href: 'posts', label: t('posts') },
     { key: 'expenses', href: 'expenses', label: t('expenses') },
     { key: 'contribute', href: 'contribute', label: t('contribute') },
+    { key: 'help', href: 'help', label: t('help') },
     { key: 'contact', href: 'contact', label: t('contact') },
   ];
 

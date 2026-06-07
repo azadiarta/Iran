@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Plus, Edit2, Star, Trash2, Users, ShieldCheck } from 'lucide-react';
 import AdminModal from '@/components/admin/AdminModal';
@@ -10,7 +10,7 @@ import AdminPermissionCheckbox, { PermissionOption } from '@/components/admin/fi
 import { LionAndSun } from '@/components/animations/IranianSymbols';
 import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
-import { groupsAPI, AccessGroup } from '@/lib/api';
+import { groupsAPI, permissionsAPI, AccessGroup, Permission } from '@/lib/api';
 
 export default function AdminGroupsPage() {
   const params = useParams();
@@ -23,6 +23,7 @@ export default function AdminGroupsPage() {
   const isSuperuser = !!currentMember?.is_superuser;
 
   const [groups, setGroups] = useState<AccessGroup[]>([]);
+  const [allPermissions, setAllPermissions] = useState<PermissionOption[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -36,13 +37,6 @@ export default function AdminGroupsPage() {
   const [confirmDefault, setConfirmDefault] = useState<AccessGroup | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Derived union of all permissions seen across groups (workaround — no global permission-list endpoint)
-  const allPermissions: PermissionOption[] = useMemo(() => {
-    const map = new Map<string, PermissionOption>();
-    groups.forEach((g) => g.permissions.forEach((p) => map.set(p.codename, p)));
-    return Array.from(map.values());
-  }, [groups]);
-
   function load() {
     setLoading(true);
     groupsAPI
@@ -52,9 +46,20 @@ export default function AdminGroupsPage() {
       .finally(() => setLoading(false));
   }
 
+  function loadPermissions() {
+    permissionsAPI
+      .getList()
+      .then((res) => setAllPermissions(res.data as unknown as Permission[]))
+      .catch(() => showToast('error', isRTL ? 'بارگذاری دسترسی‌ها ناموفق بود' : 'Failed to load permissions'));
+  }
+
   useEffect(() => {
-    if (canManage) load();
-    else setLoading(false);
+    if (canManage) {
+      load();
+      loadPermissions();
+    } else {
+      setLoading(false);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canManage]);
 

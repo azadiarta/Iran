@@ -311,6 +311,18 @@ export const postsAPI = {
 // Comments API (admin moderation — target-agnostic actions)
 // ═══════════════════════════════════════════════════════════════════════════════
 export const commentsAPI = {
+  getList: (
+    page = 1,
+    filters: { is_approved?: 'true' | 'false'; target_type?: 'post' | 'expense'; search?: string } = {}
+  ) => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    if (filters.is_approved) params.set('is_approved', filters.is_approved);
+    if (filters.target_type) params.set('target_type', filters.target_type);
+    if (filters.search) params.set('search', filters.search);
+    return api.get<ApiResponse>(`/api/posts/comments/?${params.toString()}`);
+  },
+
   approve: (id: string) =>
     api.patch<ApiResponse>(`/api/posts/comments/${id}/approve/`),
 
@@ -536,6 +548,20 @@ export const groupsAPI = {
     api.patch<ApiResponse>(`/api/groups/${id}/set-default/`),
 
   delete: (id: string) => api.delete<ApiResponse>(`/api/groups/${id}/delete/`),
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Permissions API
+// ═══════════════════════════════════════════════════════════════════════════════
+export interface Permission {
+  id: string;
+  codename: string;
+  label: string;
+  description: string;
+}
+
+export const permissionsAPI = {
+  getList: () => api.get<ApiResponse>('/api/permissions/'),
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -1,4 +1,5 @@
 from django.contrib.contenttypes.models import ContentType
+from django.db import models
 from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
@@ -252,6 +253,34 @@ def _resolve_comment_target(target_type, pk):
     else:
         return None, None, api_error('Invalid target type.', status_code=400)
     return ct, obj.pk, None
+
+
+class CommentGlobalListView(APIView):
+    """GET /api/posts/comments/ — paginated, filterable global comment list (admin moderation)."""
+    permission_classes = [IsAuthenticated, HasGroupPermission('can_approve_comments')]
+
+    def get(self, request):
+        qs = Comment.objects.select_related('author').order_by('-created_at')
+
+        is_approved = request.query_params.get('is_approved')
+        if is_approved is not None:
+            qs = qs.filter(is_approved=is_approved.lower() in ('true', '1'))
+
+        target_type = request.query_params.get('target_type')
+        if target_type in ('post', 'expense'):
+            model = Post if target_type == 'post' else Expense
+            qs = qs.filter(content_type=ContentType.objects.get_for_model(model))
+
+        search = request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                models.Q(text__icontains=search)
+                | models.Q(guest_name__icontains=search)
+                | models.Q(author__full_name__icontains=search)
+                | models.Q(author__display_name__icontains=search)
+            )
+
+        return _paginate(qs, request, CommentSerializer)
 
 
 class CommentListView(APIView):

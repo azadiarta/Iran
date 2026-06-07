@@ -4,6 +4,7 @@ from posts.views import (
     CommentApproveView,
     CommentCreateView,
     CommentDeleteView,
+    CommentGlobalListView,
     CommentListView,
     PostCreateView,
     PostDeleteView,
@@ -29,6 +30,9 @@ urlpatterns = [
     # Comments on posts
     path('<uuid:pk>/comments/',             CommentListView.as_view(),   kwargs={'target_type': 'post'},   name='post-comment-list'),
     path('<uuid:pk>/comments/create/',      CommentCreateView.as_view(), kwargs={'target_type': 'post'},   name='post-comment-create'),
+
+    # Global comment list (admin moderation — target-agnostic)
+    path('comments/',                       CommentGlobalListView.as_view(), name='comment-global-list'),
 
     # Comment actions (approve/delete — target-agnostic)
     path('comments/<uuid:pk>/approve/',     CommentApproveView.as_view(),   name='comment-approve'),

@@ -17,6 +17,7 @@ export default function Footer({ locale }: FooterProps) {
   const navLinks = [
     { href: `/${locale}/posts`, label: tNav('posts') },
     { href: `/${locale}/expenses`, label: tNav('expenses') },
+    { href: `/${locale}/help`, label: tNav('help') },
     { href: `/${locale}/contact`, label: tNav('contact') },
   ];
 
