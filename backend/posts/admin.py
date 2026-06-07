@@ -1,4 +1,5 @@
 import json
+import logging
 
 from django.contrib import admin
 from django.contrib.contenttypes.admin import GenericTabularInline
@@ -8,6 +9,8 @@ from django.utils.translation import gettext_lazy as _
 
 from logs.models import ActivityLog
 from posts.models import Comment, Post, PostImage
+
+logger = logging.getLogger(__name__)
 
 
 def _get_ip(request):
@@ -116,6 +119,7 @@ class CommentAdmin(admin.ModelAdmin):
             label = str(obj.content_object)[:60] if obj.content_object else str(obj.object_id)
             return f'{obj.content_type} — {label}'
         except Exception:
+            logger.exception('Failed to render comment target for comment %s', obj.pk)
             return f'{obj.content_type} #{obj.object_id}'
     target.short_description = 'Target'
 

@@ -1,4 +1,7 @@
+import logging
+
 from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
@@ -9,6 +12,8 @@ from fund.models import Contribution
 from logs.models import ActivityLog
 from payments.factory import PaymentFactory
 from payments.serializers import PaymentInitiateSerializer, ReceiptUploadSerializer
+
+logger = logging.getLogger(__name__)
 
 
 def _log(actor, action, target=None, extra_data=None, ip=None):
@@ -43,6 +48,7 @@ class PaymentMethodsView(APIView):
         try:
             methods = PaymentFactory.all_methods()
         except Exception:
+            logger.exception('Failed to build the list of available payment methods')
             methods = []
         return api_success({'methods': methods})
 
@@ -50,6 +56,7 @@ class PaymentMethodsView(APIView):
 class PaymentInitiateView(APIView):
     permission_classes = [AllowAny]
 
+    @transaction.atomic
     def post(self, request):
         serializer = PaymentInitiateSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid():
@@ -99,6 +106,7 @@ class ReceiptUploadView(APIView):
     permission_classes = [AllowAny]
     parser_classes = [MultiPartParser, FormParser]
 
+    @transaction.atomic
     def post(self, request, pk):
         try:
             contribution = Contribution.objects.get(pk=pk)

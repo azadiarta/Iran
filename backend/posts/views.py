@@ -113,7 +113,7 @@ class PostDetailView(APIView):
         except Post.DoesNotExist:
             return api_error('Post not found.', status_code=404)
 
-        comments = Comment.objects.filter(
+        comments = Comment.objects.select_related('author').filter(
             content_type=ContentType.objects.get_for_model(Post),
             object_id=pk,
             is_approved=True,

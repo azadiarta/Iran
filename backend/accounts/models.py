@@ -1,7 +1,10 @@
+import logging
 import uuid
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 from django.core.exceptions import ValidationError
 from django.db import models
+
+logger = logging.getLogger(__name__)
 
 
 class MemberManager(BaseUserManager):
@@ -26,6 +29,7 @@ def get_default_group_id():
         group = AccessGroup.objects.filter(is_default=True).first()
         return group.id if group else None
     except Exception:
+        logger.exception('Failed to resolve the default access group id')
         return None
 
 

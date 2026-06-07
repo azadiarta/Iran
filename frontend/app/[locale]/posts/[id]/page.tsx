@@ -69,7 +69,7 @@ function StarDisplay({ rating }: { rating: number | null }) {
 
 // ─── Comment item ─────────────────────────────────────────────────────────────
 
-function CommentItem({ comment, locale }: { comment: Comment; locale: string }) {
+function CommentItem({ comment, locale, t }: { comment: Comment; locale: string; t: ReturnType<typeof useTranslations> }) {
   function formatDate(iso: string) {
     try {
       return new Date(iso).toLocaleDateString(locale === 'fa' ? 'fa-IR' : 'en-GB', {
@@ -90,7 +90,7 @@ function CommentItem({ comment, locale }: { comment: Comment; locale: string }) 
           >
             <User size={14} />
           </div>
-          <span className="text-sm font-medium text-white">{comment.author_label || 'Anonymous'}</span>
+          <span className="text-sm font-medium text-white">{comment.author_label || t('anonymous')}</span>
         </div>
         <div className="flex items-center gap-1.5 text-xs text-white/40">
           <Calendar size={11} />
@@ -213,13 +213,13 @@ export default function PostDetailPage() {
           'response' in err &&
           (err as { response?: { status?: number } }).response?.status === 404
         ) {
-          setPostError('Post not found.');
+          setPostError(t('not_found'));
         } else {
-          setPostError('Could not load this post. Please try again.');
+          setPostError(t('error_loading_detail'));
         }
       })
       .finally(() => setPostLoading(false));
-  }, [postId]);
+  }, [postId, t]);
 
   // Fetch comments
   useEffect(() => {
@@ -240,11 +240,11 @@ export default function PostDetailPage() {
     setCommentError('');
 
     if (!commentText.trim()) {
-      setCommentError('Comment text is required.');
+      setCommentError(t('comment_text_required'));
       return;
     }
     if (!isAuthenticated && !commentName.trim()) {
-      setCommentError('Your name is required.');
+      setCommentError(t('name_required'));
       return;
     }
 
@@ -277,7 +277,7 @@ export default function PostDetailPage() {
           res.data?.message || res.data?.detail || 'Failed to submit comment.'
         );
       } else {
-        setCommentError('Failed to submit comment. Please try again.');
+        setCommentError(t('comment_submit_error'));
       }
     } finally {
       setCommentSubmitting(false);
@@ -326,7 +326,7 @@ export default function PostDetailPage() {
             className="inline-flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors"
           >
             <ChevronLeft size={16} />
-            Back to posts
+            {t('back_to_posts')}
           </button>
         </div>
       </div>
@@ -345,7 +345,7 @@ export default function PostDetailPage() {
           className="inline-flex items-center gap-1.5 text-sm text-white/40 hover:text-white/80 transition-colors duration-200"
         >
           <ChevronLeft size={16} />
-          Back to posts
+          {t('back_to_posts')}
         </button>
 
         {/* Post container */}
@@ -370,7 +370,7 @@ export default function PostDetailPage() {
               </div>
               {post.updated_at !== post.created_at && (
                 <div className="text-white/30 text-xs">
-                  Updated: {formatDate(post.updated_at)}
+                  {t('updated_label', { date: formatDate(post.updated_at) })}
                 </div>
               )}
             </div>
@@ -392,19 +392,19 @@ export default function PostDetailPage() {
             <div className="space-y-3">
               <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
               <div className="grid grid-cols-3 gap-3">
-                {post.images.map((img) => (
+                {post.images.map((img, idx) => (
                   <button
                     key={img.id}
                     type="button"
                     onClick={() => setLightboxSrc(img.image)}
                     className="relative aspect-square rounded-xl overflow-hidden transition-all duration-200 hover:ring-2 hover:ring-cyan-400/50 focus:outline-none focus:ring-2 focus:ring-cyan-400"
                     style={{ background: 'rgba(255,255,255,0.05)' }}
-                    aria-label="View image"
+                    aria-label={`${post.title} — ${idx + 1}`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={img.thumbnail || img.image}
-                      alt=""
+                      alt={`${post.title} — ${idx + 1}`}
                       className="w-full h-full object-cover"
                     />
                   </button>
@@ -447,11 +447,11 @@ export default function PostDetailPage() {
               ))}
             </div>
           ) : comments.length === 0 ? (
-            <p className="text-white/30 text-sm py-4">No comments yet. Be the first!</p>
+            <p className="text-white/30 text-sm py-4">{t('no_comments')}</p>
           ) : (
             <div className="space-y-4">
               {comments.map((c) => (
-                <CommentItem key={c.id} comment={c} locale={locale} />
+                <CommentItem key={c.id} comment={c} locale={locale} t={t} />
               ))}
             </div>
           )}

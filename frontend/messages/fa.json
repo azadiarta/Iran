@@ -56,7 +56,18 @@
     "comment_text": "نظر خود را بنویسید...",
     "comment_rating": "امتیاز (اختیاری)",
     "comment_submit": "ارسال نظر",
-    "comment_pending": "نظر شما ثبت شد و در انتظار تأیید است."
+    "comment_pending": "نظر شما ثبت شد و در انتظار تأیید است.",
+    "anonymous": "ناشناس",
+    "comment_text_required": "متن نظر الزامی است.",
+    "name_required": "نام شما الزامی است.",
+    "comment_submit_error": "ارسال نظر ناموفق بود. لطفاً دوباره تلاش کنید.",
+    "back_to_posts": "بازگشت به اخبار",
+    "updated_label": "ویرایش‌شده: {date}",
+    "no_comments": "هنوز نظری ثبت نشده. شما اولین نفر باشید!",
+    "not_found": "خبر یافت نشد.",
+    "error_loading_detail": "بارگذاری این خبر ممکن نشد. لطفاً دوباره تلاش کنید.",
+    "error_loading_list": "بارگذاری اخبار ممکن نشد. لطفاً دوباره تلاش کنید.",
+    "error_loading_home": "بارگذاری اخبار ممکن نشد."
   },
   "expenses": {
     "title": "هزینه‌ها",

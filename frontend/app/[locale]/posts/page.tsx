@@ -155,11 +155,11 @@ export default function PostsPage() {
         window.location.href = `/${locale}/forbidden`;
         return;
       }
-      setError('Could not load posts. Please try again.');
+      setError(t('error_loading_list'));
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, locale]);
+  }, [page, debouncedSearch, locale, t]);
 
   useEffect(() => {
     fetchPosts();

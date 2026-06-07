@@ -62,7 +62,7 @@ class SystemLogListView(APIView):
     permission_classes = [IsAuthenticated, IsSuperuser]
 
     def get(self, request):
-        qs = SystemLog.objects.order_by('-created_at')
+        qs = SystemLog.objects.select_related('related_member').order_by('-created_at')
 
         level = request.query_params.get('level')
         if level:

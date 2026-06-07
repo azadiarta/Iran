@@ -1,6 +1,10 @@
+import logging
+
 from core.models import DefaultSetting
 from fund.models import Contribution
 from payments.base import BasePaymentProvider
+
+logger = logging.getLogger(__name__)
 
 
 class PayPalPaymentProvider(BasePaymentProvider):
@@ -22,6 +26,7 @@ class PayPalPaymentProvider(BasePaymentProvider):
             return bool(self._get_setting('payment_paypal_email')) and \
                    bool(self._get_setting('payment_paypal_me_link'))
         except Exception:
+            logger.exception('Failed to determine whether the PayPal payment provider is configured')
             return False
 
     def get_unavailable_message(self) -> str:

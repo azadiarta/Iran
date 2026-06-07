@@ -42,6 +42,10 @@ export default function AdminConfirmDialog({
           <motion.div
             className="relative w-full max-w-sm rounded-2xl admin-glass-card p-6 text-center"
             style={{ borderColor: 'rgba(239,68,68,0.25)' }}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="admin-confirm-dialog-title"
+            aria-describedby="admin-confirm-dialog-message"
             initial={{ opacity: 0, scale: 0.95, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 12 }}
@@ -54,13 +58,14 @@ export default function AdminConfirmDialog({
               <AlertTriangle className="w-7 h-7" style={{ color: '#ef4444' }} />
             </div>
 
-            <h3 className="text-base font-bold text-white mb-2">{title}</h3>
-            <p className="text-sm text-white/60 mb-6">{message}</p>
+            <h3 id="admin-confirm-dialog-title" className="text-base font-bold text-white mb-2">{title}</h3>
+            <p id="admin-confirm-dialog-message" className="text-sm text-white/60 mb-6">{message}</p>
 
             <div className="flex items-center gap-3">
               <button
                 onClick={onClose}
                 disabled={loading}
+                aria-label={cancelLabel}
                 className="flex-1 py-2.5 rounded-xl font-medium text-sm text-white/70 transition-all disabled:opacity-50"
                 style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
               >
@@ -69,6 +74,7 @@ export default function AdminConfirmDialog({
               <button
                 onClick={onConfirm}
                 disabled={loading}
+                aria-label={confirmLabel}
                 className="flex-1 py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-50"
                 style={{
                   backgroundColor: '#ef4444',

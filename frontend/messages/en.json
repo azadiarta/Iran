@@ -56,7 +56,18 @@
     "comment_text": "Write your comment...",
     "comment_rating": "Rating (optional)",
     "comment_submit": "Submit Comment",
-    "comment_pending": "Your comment has been submitted and is pending approval."
+    "comment_pending": "Your comment has been submitted and is pending approval.",
+    "anonymous": "Anonymous",
+    "comment_text_required": "Comment text is required.",
+    "name_required": "Your name is required.",
+    "comment_submit_error": "Failed to submit comment. Please try again.",
+    "back_to_posts": "Back to posts",
+    "updated_label": "Updated: {date}",
+    "no_comments": "No comments yet. Be the first!",
+    "not_found": "Post not found.",
+    "error_loading_detail": "Could not load this post. Please try again.",
+    "error_loading_list": "Could not load posts. Please try again.",
+    "error_loading_home": "Could not load posts."
   },
   "expenses": {
     "title": "Expenses",

@@ -325,7 +325,7 @@ export default function LandingPage() {
             </h2>
 
             {postsError ? (
-              <p className="text-center text-white/50 py-8">Could not load posts.</p>
+              <p className="text-center text-white/50 py-8">{t('posts.error_loading_home')}</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {postsLoading

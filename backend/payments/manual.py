@@ -1,6 +1,10 @@
+import logging
+
 from core.models import DefaultSetting
 from fund.models import Contribution
 from payments.base import BasePaymentProvider
+
+logger = logging.getLogger(__name__)
 
 _REQUIRED_KEYS = [
     'payment_manual_bank_name',
@@ -31,6 +35,7 @@ class ManualPaymentProvider(BasePaymentProvider):
                 for key in _REQUIRED_KEYS
             )
         except Exception:
+            logger.exception('Failed to determine whether the manual payment provider is configured')
             return False
 
     def get_unavailable_message(self) -> str:

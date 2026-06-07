@@ -1,3 +1,4 @@
+import logging
 from decimal import Decimal
 
 from django.contrib import admin
@@ -9,6 +10,8 @@ from django.utils.translation import gettext_lazy as _
 from core.models import DefaultSetting
 from fund.models import Contribution, Expense
 from logs.models import ActivityLog
+
+logger = logging.getLogger(__name__)
 
 
 def _get_ip(request):
@@ -95,7 +98,7 @@ class ContributionAdmin(admin.ModelAdmin):
         try:
             extra_context['fund_balance'] = _fund_balance_str()
         except Exception:
-            pass
+            logger.exception('Failed to compute fund balance for the changelist view')
         return super().changelist_view(request, extra_context=extra_context)
 
 
@@ -128,5 +131,5 @@ class ExpenseAdmin(admin.ModelAdmin):
         try:
             extra_context['fund_balance'] = _fund_balance_str()
         except Exception:
-            pass
+            logger.exception('Failed to compute fund balance for the changelist view')
         return super().changelist_view(request, extra_context=extra_context)

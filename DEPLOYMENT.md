@@ -1,191 +1,191 @@
-# Group Fund — Deployment Guide
+# راهنمای دیپلوی Group Fund
 
-This is a monorepo with two independently-deployed services:
+این یک مونوریپو (monorepo) با دو سرویس است که به‌طور مستقل دیپلوی می‌شوند:
 
 ```
 .
 ├── backend/    Django + DRF API + Django admin (Jazzmin) — Python 3.12, PostgreSQL
 ├── frontend/   Next.js 14 (App Router) — Node.js
-├── Procfile    Railway/Heroku-style process file (backend release + web)
-├── runtime.txt Python version pin for the backend
+├── Procfile    فایل پردازش به سبک Railway/Heroku (release و web بک‌اند)
+├── runtime.txt تعیین نسخه Python برای بک‌اند
 └── requirements.txt
 ```
 
-The backend and frontend are **separate deployments** that talk to each other only over HTTP (REST API + JWT). They do not need to live on the same host or platform.
+بک‌اند و فرانت‌اند **دو دیپلوی کاملاً جدا** هستند که فقط از طریق HTTP (REST API + JWT) با هم صحبت می‌کنند. لازم نیست روی یک هاست یا یک پلتفرم باشند.
 
 ---
 
-## 1. Architecture & what each service needs
+## ۱. معماری و نیازمندی‌های هر سرویس
 
-| Service  | Runtime     | Needs                                            | Typical host                  |
+| سرویس    | Runtime     | نیازمندی‌ها                                            | هاست رایج                  |
 |----------|-------------|--------------------------------------------------|-------------------------------|
-| backend  | Python 3.12 | PostgreSQL database, (optional) S3-compatible bucket for media | Railway |
-| frontend | Node.js 18+ | Only needs to know the backend's public URL      | Railway, Vercel, or any Node host |
+| backend  | Python 3.12 | دیتابیس PostgreSQL، (اختیاری) باکت سازگار با S3 برای فایل‌های رسانه‌ای | Railway |
+| frontend | Node.js 18+ | فقط نیاز به دانستن آدرس عمومی بک‌اند دارد      | Railway، Vercel یا هر هاست Node |
 
-> The repo's `Procfile` / `runtime.txt` are written for **Railway** deploying the `backend/` Django app (the `meta.deploy: railway` in `all.yaml`). The frontend has no Procfile — see [§4](#4-deploying-the-frontend) for how to deploy it.
-
----
-
-## 2. Required accounts / provisioning before you start
-
-1. **PostgreSQL database** — Railway's "PostgreSQL" plugin works out of the box (gives you `DATABASE_URL` style vars; map them to `DB_*` below, or add a `DATABASE_URL` parser if you prefer — the current `settings.py` reads discrete `DB_*` vars).
-2. **(Strongly recommended) S3-compatible object storage bucket** for uploaded media (post images, contribution/expense receipts) — e.g. AWS S3, Cloudflare R2, or Backblaze B2. Railway's filesystem is **ephemeral**: anything written to local disk is wiped on every redeploy/restart. See [§5.4](#54-media-storage-s3) for why this matters and how to configure it.
-3. A way to generate a strong `SECRET_KEY` (see [§3](#3-environment-variables)).
+> فایل‌های `Procfile`/`runtime.txt` این مخزن برای دیپلوی اپلیکیشن Django داخل پوشه `backend/` روی **Railway** نوشته شده‌اند (مطابق `meta.deploy: railway` در `all.yaml`). فرانت‌اند `Procfile` ندارد — برای نحوه دیپلوی آن به [بخش ۴](#۴-مراحل-دیپلوی-فرانت‌اند) مراجعه کنید.
 
 ---
 
-## 3. Environment variables
+## ۲. حساب‌ها/زیرساخت‌های لازم پیش از شروع
 
-### 3.1 Backend (`backend/.env` locally, or Railway service variables)
+۱. **دیتابیس PostgreSQL** — افزونه «PostgreSQL» در Railway به‌صورت آماده کار می‌کند (متغیرهایی به سبک `DATABASE_URL` به شما می‌دهد؛ آن‌ها را به متغیرهای `DB_*` زیر نگاشت کنید، یا اگر ترجیح می‌دهید یک پارسر برای `DATABASE_URL` اضافه کنید — `settings.py` فعلی متغیرهای جداگانه `DB_*` را می‌خواند).
+۲. **(به‌شدت توصیه‌شده) فضای ذخیره‌سازی شیء سازگار با S3** برای فایل‌های آپلودی (تصاویر پست، رسیدهای کمک مالی/هزینه) — مثلاً AWS S3، Cloudflare R2 یا Backblaze B2. فایل‌سیستم Railway **ناپایدار (ephemeral)** است: هر چیزی که روی دیسک محلی نوشته شود، با هر بازدیپلوی/ری‌استارت پاک می‌شود. برای اهمیت این موضوع و نحوه پیکربندی آن به [بخش ۵.۴](#۵۴-ذخیره‌سازی-رسانه-s3) مراجعه کنید.
+۳. روشی برای تولید یک `SECRET_KEY` قوی (به [بخش ۳](#۳-متغیرهای-محیطی) مراجعه کنید).
 
-Copy `.env.example` as a starting point. **Every variable below is read via `os.environ.get(...)` in `backend/groupfund/settings.py`** — nothing is hardcoded.
+---
 
-| Variable | Required in prod? | Example | Notes |
+## ۳. متغیرهای محیطی
+
+### ۳.۱ بک‌اند (`backend/.env` به‌صورت محلی، یا متغیرهای سرویس در Railway)
+
+فایل `.env.example` را به‌عنوان نقطه شروع کپی کنید. **هر متغیر زیر از طریق `os.environ.get(...)` در `backend/groupfund/settings.py` خوانده می‌شود** — هیچ مقداری هاردکد نشده است.
+
+| متغیر | الزامی در پروداکشن؟ | مثال | توضیحات |
 |---|---|---|---|
-| `SECRET_KEY` | **Yes** | output of `python -c "import secrets; print(secrets.token_urlsafe(64))"` | Falls back to an insecure dev key (`insecure-dev-key-replace-in-production`) if unset — **never deploy with the default**. |
-| `DEBUG` | **Yes** | `False` | Defaults to `True`. Must be `False` in production — enables HSTS/secure cookies/SSL redirect (see `settings.py:237`). |
-| `ALLOWED_HOSTS` | **Yes** | `myapp.up.railway.app,mydomain.com` | Comma-separated, no scheme, no trailing slash. |
-| `CSRF_TRUSTED_ORIGINS` | Usually no (auto-derived) | `https://myapp.up.railway.app` | Auto-derived as `https://` + each non-local `ALLOWED_HOSTS` entry. Only set explicitly if you need a different scheme/port/subdomain combination than that derivation produces. |
-| `DB_ENGINE` | No | `django.db.backends.postgresql` | Defaults to Postgres. Override to `django.db.backends.sqlite3` only for local testing. |
-| `DB_NAME` / `DB_USER` / `DB_PASSWORD` / `DB_HOST` / `DB_PORT` | **Yes** | from your Postgres plugin | |
-| `CORS_ALLOWED_ORIGINS` | **Yes** | `https://myapp-frontend.up.railway.app` | Comma-separated **full origins with scheme**, no trailing slash. Must include the deployed frontend's origin or browser requests will be blocked by CORS. |
-| `SECURE_SSL_REDIRECT` | No | `True` | Defaults to `True` when `DEBUG=False`. Set to `False` only if your platform already forces HTTPS upstream and redirect loops occur. |
-| `AWS_STORAGE_BUCKET_NAME` | Recommended | `my-fund-media` | Setting this switches media storage from local disk to S3-compatible storage. Leave **unset** to use local disk (functional but ephemeral — see §5.4). |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | If bucket set | | Bucket credentials. |
-| `AWS_S3_REGION_NAME` | If bucket set | `auto` / `eu-west-2` | |
-| `AWS_S3_ENDPOINT_URL` | Non-AWS providers only | `https://<account-id>.r2.cloudflarestorage.com` | Required for Cloudflare R2 / Backblaze B2 / MinIO etc. Leave empty for AWS S3. |
-| `AWS_S3_CUSTOM_DOMAIN` | Optional | `media.yourdomain.com` | If you front the bucket with a CDN/custom domain. |
+| `SECRET_KEY` | **بله** | خروجی `python -c "import secrets; print(secrets.token_urlsafe(64))"` | اگر تنظیم نشود، به یک کلید توسعه ناامن (`insecure-dev-key-replace-in-production`) برمی‌گردد — **هرگز با مقدار پیش‌فرض دیپلوی نکنید**. |
+| `DEBUG` | **بله** | `False` | مقدار پیش‌فرض `True` است. در پروداکشن باید `False` باشد — این کار HSTS/کوکی‌های امن/ریدایرکت SSL را فعال می‌کند (`settings.py:237`). |
+| `ALLOWED_HOSTS` | **بله** | `myapp.up.railway.app,mydomain.com` | جدا‌شده با کاما، بدون پروتکل، بدون اسلش انتهایی. |
+| `CSRF_TRUSTED_ORIGINS` | معمولاً خیر (به‌صورت خودکار استخراج می‌شود) | `https://myapp.up.railway.app` | به‌صورت خودکار به شکل `https://` + هر مدخل غیرمحلی `ALLOWED_HOSTS` ساخته می‌شود. فقط در صورتی که به ترکیب پروتکل/پورت/زیردامنه متفاوتی نسبت به این استخراج خودکار نیاز دارید، آن را صریحاً تنظیم کنید. |
+| `DB_ENGINE` | خیر | `django.db.backends.postgresql` | مقدار پیش‌فرض Postgres است. فقط برای تست محلی به `django.db.backends.sqlite3` تغییر دهید. |
+| `DB_NAME` / `DB_USER` / `DB_PASSWORD` / `DB_HOST` / `DB_PORT` | **بله** | از افزونه Postgres شما | |
+| `CORS_ALLOWED_ORIGINS` | **بله** | `https://myapp-frontend.up.railway.app` | **مبداهای کامل همراه با پروتکل**، جدا‌شده با کاما، بدون اسلش انتهایی. باید شامل مبدا فرانت‌اند دیپلوی‌شده باشد، در غیر این صورت درخواست‌های مرورگر توسط CORS مسدود می‌شوند. |
+| `SECURE_SSL_REDIRECT` | خیر | `True` | وقتی `DEBUG=False` باشد، پیش‌فرض آن `True` است. فقط در صورتی آن را `False` کنید که پلتفرم شما از قبل HTTPS را در لایه بالادستی اعمال می‌کند و حلقه ریدایرکت رخ می‌دهد. |
+| `AWS_STORAGE_BUCKET_NAME` | توصیه‌شده | `my-fund-media` | تنظیم این متغیر، ذخیره‌سازی رسانه را از دیسک محلی به ذخیره‌سازی سازگار با S3 تغییر می‌دهد. برای استفاده از دیسک محلی (کاربردی اما ناپایدار — به بخش ۵.۴ مراجعه کنید) آن را **تنظیم نکنید**. |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | اگر باکت تنظیم شده باشد | | اطلاعات اعتباری باکت. |
+| `AWS_S3_REGION_NAME` | اگر باکت تنظیم شده باشد | `auto` / `eu-west-2` | |
+| `AWS_S3_ENDPOINT_URL` | فقط برای ارائه‌دهندگان غیر AWS | `https://<account-id>.r2.cloudflarestorage.com` | برای Cloudflare R2 / Backblaze B2 / MinIO و... الزامی است. برای AWS S3 خالی بگذارید. |
+| `AWS_S3_CUSTOM_DOMAIN` | اختیاری | `media.yourdomain.com` | اگر جلوی باکت یک CDN/دامنه اختصاصی قرار داده‌اید. |
 
-### 3.2 Frontend (`frontend/.env` locally, or Railway/Vercel service variables)
+### ۳.۲ فرانت‌اند (`frontend/.env` به‌صورت محلی، یا متغیرهای سرویس در Railway/Vercel)
 
-| Variable | Required in prod? | Example | Notes |
+| متغیر | الزامی در پروداکشن؟ | مثال | توضیحات |
 |---|---|---|---|
-| `NEXT_PUBLIC_API_URL` | **Yes** | `https://myapp-backend.up.railway.app` | No trailing slash. Baked into the client bundle at build time — **the frontend must be rebuilt whenever this changes**. |
-| `NEXT_PUBLIC_SITE_NAME` | No | `Group Fund` | Cosmetic — shown in titles/branding. |
-| `NEXT_PUBLIC_MEDIA_URL` | Only if `AWS_STORAGE_BUCKET_NAME` is set on the backend | `https://my-fund-media.s3.amazonaws.com` or `https://media.yourdomain.com` | Tells `next/image` which extra origin is allowed to serve images (the S3 bucket/CDN). Without it, S3-hosted images will fail to render with "hostname is not configured under images". |
+| `NEXT_PUBLIC_API_URL` | **بله** | `https://myapp-backend.up.railway.app` | بدون اسلش انتهایی. در زمان build داخل باندل کلاینت جاسازی می‌شود — **هر بار که این مقدار تغییر کند باید فرانت‌اند دوباره build شود**. |
+| `NEXT_PUBLIC_SITE_NAME` | خیر | `Group Fund` | فقط جنبه ظاهری دارد — در عنوان‌ها/برندینگ نمایش داده می‌شود. |
+| `NEXT_PUBLIC_MEDIA_URL` | فقط در صورتی که `AWS_STORAGE_BUCKET_NAME` در بک‌اند تنظیم شده باشد | `https://my-fund-media.s3.amazonaws.com` یا `https://media.yourdomain.com` | به `next/image` می‌گوید چه مبدا اضافه‌ای مجاز به سرویس‌دهی تصاویر است (باکت S3/CDN). بدون آن، تصاویر میزبانی‌شده روی S3 با خطای «hostname is not configured under images» نمایش داده نمی‌شوند. |
 
 ---
 
-## 4. Step-by-step: deploying the backend (Railway)
+## ۴. مراحل دیپلوی بک‌اند (Railway)
 
-1. **Create a new Railway project**, add a **PostgreSQL** plugin, and a service pointing at this repo (root directory = repo root, since the `Procfile` does `cd backend && ...`).
-2. **Set environment variables** per §3.1. At minimum: `SECRET_KEY`, `DEBUG=False`, `ALLOWED_HOSTS`, `DB_*` (or wire up Railway's Postgres reference variables to these names), `CORS_ALLOWED_ORIGINS`.
-3. Railway auto-detects `runtime.txt` (Python 3.12) and `requirements.txt`, then runs the `Procfile`:
+۱. **یک پروژه جدید در Railway بسازید**، یک افزونه **PostgreSQL** اضافه کنید، و یک سرویس که به این مخزن اشاره می‌کند بسازید (پوشه ریشه = ریشه مخزن، چون `Procfile` دستور `cd backend && ...` را اجرا می‌کند).
+۲. **متغیرهای محیطی را طبق بخش ۳.۱ تنظیم کنید.** حداقل‌ها: `SECRET_KEY`، `DEBUG=False`، `ALLOWED_HOSTS`، `DB_*` (یا متغیرهای مرجع Postgres در Railway را به این نام‌ها وصل کنید)، `CORS_ALLOWED_ORIGINS`.
+۳. Railway به‌طور خودکار `runtime.txt` (Python 3.12) و `requirements.txt` را تشخیص می‌دهد، سپس `Procfile` را اجرا می‌کند:
    - **`release`**: `python manage.py migrate --noinput && python manage.py seed_initial_data && python manage.py collectstatic --noinput`
-     - `migrate` creates all tables.
-     - `seed_initial_data` (see §5.1) populates the `Permission` rows, a default `AccessGroup`, and `DefaultSetting` rows the app depends on — **idempotent**, safe to run on every deploy.
-     - `collectstatic` gathers static files for WhiteNoise to serve.
+     - `migrate` همه جدول‌ها را می‌سازد.
+     - `seed_initial_data` (به بخش ۵.۱ مراجعه کنید) ردیف‌های `Permission`، یک `AccessGroup` پیش‌فرض و ردیف‌های `DefaultSetting` که اپلیکیشن به آن‌ها وابسته است را پر می‌کند — **ایدمپوتنت** است و اجرای آن در هر دیپلوی بی‌خطر است.
+     - `collectstatic` فایل‌های استاتیک را برای سرویس‌دهی توسط WhiteNoise جمع‌آوری می‌کند.
    - **`web`**: `gunicorn groupfund.wsgi --bind 0.0.0.0:$PORT --log-file -`
-4. **Create your superuser** (one-time, after the first successful deploy) via Railway's shell/CLI:
+۴. **سوپریوزر خود را بسازید** (یک‌بار، بعد از اولین دیپلوی موفق) از طریق شل/CLI ریلوی:
    ```bash
    railway run python backend/manage.py createsuperuser
    ```
-   (Or `railway shell` then `cd backend && python manage.py createsuperuser`.) This is the **only** way to create a superuser — there is no API endpoint for it (by design, see `accounts/permissions.py`).
-5. Visit `https://<your-backend-domain>/admin/`, log in as the superuser, and configure real values for the `DefaultSetting` rows that were seeded with placeholders (bank details, PayPal email, contact info, visibility settings, etc.) — see §5.2.
+   (یا `railway shell` و سپس `cd backend && python manage.py createsuperuser`.) این **تنها** راه برای ساخت سوپریوزر است — هیچ Endpoint ای برای آن وجود ندارد (به‌صورت عمدی، به `accounts/permissions.py` نگاه کنید).
+۵. به آدرس `https://<your-backend-domain>/admin/` بروید، با حساب سوپریوزر وارد شوید و مقادیر واقعی را برای ردیف‌های `DefaultSetting` که با مقادیر جای‌گزین (placeholder) seed شده‌اند تنظیم کنید (اطلاعات بانکی، ایمیل PayPal، اطلاعات تماس، تنظیمات نمایش و غیره) — به بخش ۵.۲ مراجعه کنید.
 
 ---
 
-## 5. Post-deploy configuration & known first-run gaps (now fixed)
+## ۵. تنظیمات پس از دیپلوی و نواقص شناخته‌شده اولین اجرا (که اکنون رفع شده‌اند)
 
-During this audit, three **critical first-deploy gaps** were found and fixed — they're listed here so you understand what now happens automatically vs. what still needs a human.
+طی این بررسی، سه **نقص حیاتی در اولین دیپلوی** پیدا و رفع شدند — در ادامه فهرست شده‌اند تا بدانید چه چیزهایی اکنون به‌صورت خودکار انجام می‌شوند و چه چیزهایی همچنان نیاز به دخالت انسانی دارند.
 
-### 5.1 Permission / AccessGroup / DefaultSetting seed data — `seed_initial_data`
+### ۵.۱ داده‌های seed برای Permission / AccessGroup / DefaultSetting — `seed_initial_data`
 
-**The gap:** nothing in the codebase ever created the `Permission` rows, the default `AccessGroup`, or the `DefaultSetting` rows that the application logic depends on (`core/models.py` only documented them in comments as "set via Django admin by superuser"). On a freshly-migrated production database, the **entire group-permission system would be empty** — no group could ever be granted `can_post`/`can_contribute`/etc., new member registration's default group would resolve to `NULL`, and every payment method would appear "unconfigured".
+**نقص:** هیچ‌چیز در کدبیس، ردیف‌های `Permission`، `AccessGroup` پیش‌فرض یا ردیف‌های `DefaultSetting` که منطق اپلیکیشن به آن‌ها وابسته است را نمی‌ساخت (`core/models.py` فقط در کامنت‌ها به آن‌ها به‌عنوان «تنظیم‌شده از طریق Django admin توسط سوپریوزر» اشاره کرده بود). در یک دیتابیس پروداکشن تازه‌migrate‌شده، **کل سیستم گروه/مجوز خالی می‌بود** — هیچ گروهی نمی‌توانست `can_post`/`can_contribute`/و غیره دریافت کند، گروه پیش‌فرض ثبت‌نام عضو جدید به `NULL` می‌رسید، و هر روش پرداختی «پیکربندی‌نشده» نمایش داده می‌شد.
 
-**The fix:** `python manage.py seed_initial_data` (wired into the `Procfile` release phase, runs automatically on every deploy) idempotently creates:
-- All 11 `Permission` codenames referenced anywhere in the code (`can_contribute`, `can_comment`, `can_post`, `can_expense`, `can_view_balance`, `can_view_posts`, `can_view_dashboard`, `can_approve_comments`, `can_delete_member`, `can_change_any_password`, `can_manage_permissions`) with human-readable labels/descriptions.
-- A default `AccessGroup` named **"Members"** (`is_default=True`), granted `can_contribute` + `can_comment` (the two permissions every group must carry per the contract documented in `accounts/models.py`).
-- Every `DefaultSetting` key the codebase reads, with sensible defaults (see the command source for the full list — currency, visibility, payment-method toggles, etc.). Existing values are **never overwritten** — your changes via the admin persist across redeploys.
+**رفع:** دستور `python manage.py seed_initial_data` (که در فاز release پروسفایل سیم‌کشی شده و در هر دیپلوی به‌طور خودکار اجرا می‌شود) به‌صورت ایدمپوتنت موارد زیر را می‌سازد:
+- تمام ۱۱ کدنیم `Permission` که در هر جای کد به آن‌ها ارجاع داده شده (`can_contribute`، `can_comment`، `can_post`، `can_expense`، `can_view_balance`، `can_view_posts`، `can_view_dashboard`، `can_approve_comments`، `can_delete_member`، `can_change_any_password`، `can_manage_permissions`) به همراه برچسب/توضیح قابل‌خواندن.
+- یک `AccessGroup` پیش‌فرض با نام **«Members»** (`is_default=True`)، که `can_contribute` + `can_comment` به آن داده شده (دو مجوزی که طبق قراردادی که در `accounts/models.py` مستند شده، هر گروهی باید داشته باشد).
+- هر کلید `DefaultSetting` که کدبیس می‌خواند، با مقادیر پیش‌فرض معقول (برای فهرست کامل به سورس دستور مراجعه کنید — ارز، تنظیمات نمایش، روشن/خاموش‌کردن روش‌های پرداخت و غیره). مقادیر موجود **هرگز بازنویسی نمی‌شوند** — تغییراتی که از طریق پنل ادمین می‌دهید، در دیپلوی‌های بعدی باقی می‌مانند.
 
-You can re-run it any time (`python manage.py seed_initial_data`) — it only fills in what's missing.
+می‌توانید هر زمان که خواستید آن را دوباره اجرا کنید (`python manage.py seed_initial_data`) — فقط چیزهایی که کم هستند را پر می‌کند.
 
-### 5.2 Things only a human can/should do after first deploy
+### ۵.۲ کارهایی که فقط یک انسان می‌تواند/باید بعد از اولین دیپلوی انجام دهد
 
-- **Create the superuser** (§4 step 4) — required to access `/admin/` at all.
-- **Review and fill in real values** for the seeded `DefaultSetting` rows via `/admin/core/defaultsetting/`:
-  - `payment_manual_*` (bank name, account name/number, sort code) and set `payment_manual_enabled = true` once filled in, if you want to offer manual bank transfers.
-  - `payment_paypal_*` (email, paypal.me link) and `payment_paypal_enabled = true`, if offering PayPal.
-  - `default_currency`, `require_comment_approval`, `*_visibility` settings — adjust to taste.
-  - `payment_stripe_*` / `payment_google_pay_*` are **placeholders reserved for Phase 10** — leave `enabled = false`; there is no working integration behind them yet (see §7).
-- **Create your first `AccessGroup`s** (e.g. "Admins" with `can_manage_permissions`) and assign members to them via `/admin/accounts/accessgroup/` or the in-app admin panel (`/{locale}/admin/groups`).
+- **ساخت سوپریوزر** (مرحله ۴ در بخش ۴) — برای دسترسی به `/admin/` لازم است.
+- **بازبینی و پر کردن مقادیر واقعی** برای ردیف‌های `DefaultSetting` که seed شده‌اند، از طریق `/admin/core/defaultsetting/`:
+  - `payment_manual_*` (نام بانک، نام/شماره حساب، کد مرتب‌سازی) و تنظیم `payment_manual_enabled = true` پس از پر کردن این موارد، در صورتی که می‌خواهید واریز بانکی دستی را ارائه دهید.
+  - `payment_paypal_*` (ایمیل، لینک paypal.me) و `payment_paypal_enabled = true`، در صورتی که PayPal را ارائه می‌دهید.
+  - `default_currency`، `require_comment_approval`، تنظیمات `*_visibility` — بنا به سلیقه تنظیم کنید.
+  - `payment_stripe_*` / `payment_google_pay_*` صرفاً **مقادیر جای‌گزین رزرو‌شده برای فاز ۱۰** هستند — `enabled = false` را تغییر ندهید؛ هنوز هیچ یکپارچه‌سازی واقعی پشت آن‌ها وجود ندارد (به بخش ۷ مراجعه کنید).
+- **ساخت اولین `AccessGroup`های خود** (مثلاً «Admins» با `can_manage_permissions`) و تخصیص اعضا به آن‌ها از طریق `/admin/accounts/accessgroup/` یا پنل ادمین داخل اپلیکیشن (`/{locale}/admin/groups`).
 
-### 5.3 CSRF / admin-panel POST-PATCH-DELETE requests — `CSRF_TRUSTED_ORIGINS`
+### ۵.۳ درخواست‌های POST/PATCH/DELETE پنل ادمین و CSRF — `CSRF_TRUSTED_ORIGINS`
 
-**The gap:** Railway (and most PaaS) terminate TLS at a reverse proxy and forward requests over plain HTTP; `SECURE_PROXY_SSL_HEADER` (already configured) makes Django treat these as secure requests. Once `DEBUG=False` sets `CSRF_COOKIE_SECURE = True`, Django additionally validates the `Origin`/`Referer` header of every unsafe request (`POST`/`PUT`/`PATCH`/`DELETE`) against `CSRF_TRUSTED_ORIGINS` — which was previously **unset**. Without it, every Django-admin login and form submission in production would fail with `403 Forbidden (CSRF verification failed. Request aborted.)`.
+**نقص:** Railway (و بیشتر PaaSها) لایه TLS را در یک پراکسی معکوس خاتمه می‌دهند و درخواست‌ها را روی HTTP ساده فوروارد می‌کنند؛ `SECURE_PROXY_SSL_HEADER` (که از قبل پیکربندی شده) باعث می‌شود Django این‌ها را به‌عنوان درخواست‌های امن در نظر بگیرد. به‌محض اینکه `DEBUG=False` مقدار `CSRF_COOKIE_SECURE = True` را تنظیم می‌کند، Django علاوه‌بر آن هدر `Origin`/`Referer` هر درخواست ناامن (`POST`/`PUT`/`PATCH`/`DELETE`) را در برابر `CSRF_TRUSTED_ORIGINS` اعتبارسنجی می‌کند — متغیری که پیش‌تر **تنظیم نشده بود**. بدون آن، هر ورود به Django-admin و هر ارسال فرم در پروداکشن با خطای `403 Forbidden (CSRF verification failed. Request aborted.)` مواجه می‌شد.
 
-**The fix:** `CSRF_TRUSTED_ORIGINS` now defaults to `https://` + each non-local entry in `ALLOWED_HOSTS` (see `settings.py:16-20`). You generally don't need to set it explicitly — just make sure `ALLOWED_HOSTS` lists your real production domain(s). Override via the `CSRF_TRUSTED_ORIGINS` env var (comma-separated, full origins **with scheme**) only if your setup needs something the auto-derivation doesn't produce (e.g. a different subdomain serving the admin).
+**رفع:** اکنون `CSRF_TRUSTED_ORIGINS` به‌صورت پیش‌فرض از `https://` + هر مدخل غیرمحلی در `ALLOWED_HOSTS` ساخته می‌شود (به `settings.py:16-20` مراجعه کنید). معمولاً نیازی نیست آن را صریحاً تنظیم کنید — فقط مطمئن شوید `ALLOWED_HOSTS` شامل دامنه(های) واقعی پروداکشن شماست. فقط در صورتی که تنظیمات شما به چیزی نیاز دارد که این استخراج خودکار تولید نمی‌کند (مثلاً زیردامنه متفاوتی که ادمین را سرویس‌دهی می‌کند)، آن را از طریق متغیر محیطی `CSRF_TRUSTED_ORIGINS` بازنویسی کنید (جدا‌شده با کاما، مبداهای کامل **همراه با پروتکل**).
 
-### 5.4 Media storage (S3)
+### ۵.۴ ذخیره‌سازی رسانه (S3)
 
-**The gap:** Railway's container filesystem is **ephemeral** — anything written to `MEDIA_ROOT` (uploaded post images, contribution/expense receipt images) is wiped on every redeploy or restart. Additionally, **nothing in the URLconf ever served `MEDIA_URL` → `MEDIA_ROOT`** — so even within a single running instance, uploaded images would 404 both locally (`runserver`) and in any production deploy that didn't configure S3.
+**نقص:** فایل‌سیستم کانتینر در Railway **ناپایدار (ephemeral)** است — هر چیزی که در `MEDIA_ROOT` نوشته شود (تصاویر آپلودی پست، تصاویر رسید کمک مالی/هزینه) با هر بازدیپلوی یا ری‌استارت پاک می‌شود. علاوه‌بر این، **هیچ‌چیز در URLconf هیچ‌وقت `MEDIA_URL` → `MEDIA_ROOT` را سرویس‌دهی نمی‌کرد** — بنابراین حتی در یک نمونه در حال اجرا هم، تصاویر آپلودی هم به‌صورت محلی (`runserver`) و هم در هر دیپلوی پروداکشنی که S3 را پیکربندی نکرده بود، با خطای 404 مواجه می‌شدند.
 
-**The fix (two parts):**
-1. `groupfund/urls.py` now serves media:
-   - In `DEBUG` mode (and no bucket configured): via Django's `static()` helper, like any standard Django project.
-   - In production **without** a configured bucket: via a `django.views.static.serve` fallback, so uploads remain viewable out of the box (acceptable for low-traffic/testing, but **still ephemeral** — see below).
-   - When `AWS_STORAGE_BUCKET_NAME` is set: media is served directly from the bucket/CDN; Django doesn't serve it at all.
-2. **S3-compatible storage is wired up** (`django-storages` + `boto3`, `DEFAULT_FILE_STORAGE = storages.backends.s3.S3Storage`), activated by setting `AWS_STORAGE_BUCKET_NAME`. Supports AWS S3, Cloudflare R2, Backblaze B2, or any S3-compatible provider via `AWS_S3_ENDPOINT_URL`.
+**رفع (دو بخشی):**
+۱. اکنون `groupfund/urls.py` رسانه را سرویس‌دهی می‌کند:
+   - در حالت `DEBUG` (و وقتی باکتی پیکربندی نشده): از طریق تابع کمکی `static()` جنگو، مانند هر پروژه استاندارد Django.
+   - در پروداکشن **بدون** باکت پیکربندی‌شده: از طریق fallback با `django.views.static.serve`، تا فایل‌های آپلودی به‌صورت پیش‌فرض قابل‌مشاهده باقی بمانند (برای ترافیک کم/تست قابل قبول است، اما **همچنان ناپایدار** است — ادامه را ببینید).
+   - وقتی `AWS_STORAGE_BUCKET_NAME` تنظیم شده باشد: رسانه مستقیماً از باکت/CDN سرویس‌دهی می‌شود؛ Django اصلاً آن را سرویس نمی‌دهد.
+۲. **ذخیره‌سازی سازگار با S3 سیم‌کشی شده** (`django-storages` + `boto3`، با `DEFAULT_FILE_STORAGE = storages.backends.s3.S3Storage`)، که با تنظیم `AWS_STORAGE_BUCKET_NAME` فعال می‌شود. از AWS S3، Cloudflare R2، Backblaze B2 یا هر ارائه‌دهنده سازگار با S3 از طریق `AWS_S3_ENDPOINT_URL` پشتیبانی می‌کند.
 
-**What you should do:** for any real production launch with actual users uploading receipts/images, **set `AWS_STORAGE_BUCKET_NAME`** (+ credentials). If you skip this, the app still works, but uploaded files will be **lost on every redeploy** — acceptable only for a demo/testing environment.
+**کاری که باید انجام دهید:** برای هر راه‌اندازی واقعی پروداکشن با کاربران واقعی که رسید/تصویر آپلود می‌کنند، **`AWS_STORAGE_BUCKET_NAME`** (+ اطلاعات اعتباری) را تنظیم کنید. اگر این کار را نکنید، اپلیکیشن همچنان کار می‌کند، اما فایل‌های آپلودی با هر بازدیپلوی **از بین می‌روند** — این فقط برای محیط دمو/تست قابل قبول است.
 
-> Remember to also set `NEXT_PUBLIC_MEDIA_URL` on the **frontend** to the bucket/CDN origin once you enable S3 — see §3.2 and §6 ("Image hostname not configured").
-
----
-
-## 6. Step-by-step: deploying the frontend
-
-The frontend has no Procfile because Next.js deploys differently per platform. Two common options:
-
-### Option A — Railway (separate service, same repo)
-1. Add a second service to the same Railway project, with **root directory = `frontend/`**.
-2. Set build command: `npm install && npm run build`, start command: `npm run start`.
-3. Set environment variables per §3.2 — at minimum `NEXT_PUBLIC_API_URL` pointing at your deployed backend's public URL.
-4. **Important:** `NEXT_PUBLIC_*` variables are inlined into the JS bundle at **build time**. If you change `NEXT_PUBLIC_API_URL` (or any `NEXT_PUBLIC_*` var) after deploying, you must trigger a **rebuild**, not just a restart.
-
-### Option B — Vercel (recommended for Next.js)
-1. Import the repo into Vercel, set the project root to `frontend/`.
-2. Set the same `NEXT_PUBLIC_*` environment variables (§3.2) in the Vercel project settings.
-3. Deploy — Vercel handles build/start automatically.
-
-Either way: **after the frontend is deployed, go back to the backend** and add the frontend's real public origin to `CORS_ALLOWED_ORIGINS` (and redeploy/restart the backend) — otherwise the browser will block all API calls with CORS errors.
+> فراموش نکنید بعد از فعال‌سازی S3، متغیر `NEXT_PUBLIC_MEDIA_URL` را هم در **فرانت‌اند** روی مبدا باکت/CDN تنظیم کنید — به بخش‌های ۳.۲ و ۶ («Image hostname not configured») مراجعه کنید.
 
 ---
 
-## 7. What is *not* ready / explicitly deferred
+## ۶. مراحل دیپلوی فرانت‌اند
 
-- **Phase 10 — Stripe / Google Pay integration is NOT implemented.** `payments/factory.py` has `'stripe': None` (a placeholder), and `DefaultSetting` rows like `payment_stripe_*` / `payment_google_pay_enabled` are reserved placeholders, seeded with `enabled = false`. Do not enable them — there is no provider behind them; doing so would surface a broken payment option to users. This was a deliberate scope decision, not an oversight.
-- **Local-disk media storage is ephemeral on Railway.** It now *works* (images render, both via Django's `static()` in dev and the `serve` fallback in prod), but uploads will be lost on every redeploy unless you configure S3 (§5.4).
-- **The `/contact` page's "load contact email/phone from settings" path can never succeed for ordinary visitors** — it calls `GET /api/settings/`, which is gated to superusers only (`IsSuperuser`), and the `contact_email`/`contact_phone` keys it looks for aren't part of the seeded `DefaultSetting` set either (they were never part of the documented settings contract in `core/models.py`). In practice the page **always** falls back to its `mailto:` form — which still works fine, just isn't dynamically configurable from the admin. If you want this to be configurable, you'd need a small public (unauthenticated) settings endpoint exposing just those two keys, plus seeding them.
+فرانت‌اند `Procfile` ندارد چون Next.js در هر پلتفرم به‌شکل متفاوتی دیپلوی می‌شود. دو گزینه رایج:
+
+### گزینه الف — Railway (سرویس جداگانه، همان مخزن)
+۱. یک سرویس دوم به همان پروژه Railway اضافه کنید، با **پوشه ریشه = `frontend/`**.
+۲. دستور build را روی `npm install && npm run build` و دستور start را روی `npm run start` تنظیم کنید.
+۳. متغیرهای محیطی را طبق بخش ۳.۲ تنظیم کنید — حداقل `NEXT_PUBLIC_API_URL` که به آدرس عمومی بک‌اند دیپلوی‌شده اشاره می‌کند.
+۴. **مهم:** متغیرهای `NEXT_PUBLIC_*` در **زمان build** داخل باندل JS جاسازی می‌شوند. اگر `NEXT_PUBLIC_API_URL` (یا هر متغیر `NEXT_PUBLIC_*` دیگری) را بعد از دیپلوی تغییر دهید، باید یک **rebuild** انجام دهید، نه صرفاً ری‌استارت.
+
+### گزینه ب — Vercel (توصیه‌شده برای Next.js)
+۱. مخزن را به Vercel وارد کنید و ریشه پروژه را روی `frontend/` تنظیم کنید.
+۲. همان متغیرهای محیطی `NEXT_PUBLIC_*` (بخش ۳.۲) را در تنظیمات پروژه Vercel وارد کنید.
+۳. دیپلوی کنید — Vercel به‌صورت خودکار build/start را مدیریت می‌کند.
+
+در هر دو حالت: **بعد از اینکه فرانت‌اند دیپلوی شد، به بک‌اند برگردید** و مبدا عمومی واقعی فرانت‌اند را به `CORS_ALLOWED_ORIGINS` اضافه کنید (و بک‌اند را دوباره دیپلوی/ری‌استارت کنید) — در غیر این صورت مرورگر همه فراخوانی‌های API را با خطای CORS مسدود می‌کند.
 
 ---
 
-## 8. Common errors & how to fix them
+## ۷. چه چیزهایی *آماده نیستند* / به‌صراحت کنار گذاشته شده‌اند
 
-| Symptom | Cause | Fix |
+- **فاز ۱۰ — یکپارچه‌سازی Stripe / Google Pay پیاده‌سازی نشده است.** در `payments/factory.py` مقدار `'stripe': None` (یک جای‌گزین/placeholder) قرار دارد، و ردیف‌های `DefaultSetting` مانند `payment_stripe_*` / `payment_google_pay_enabled` صرفاً جای‌گزین‌های رزرو‌شده‌ای هستند که با `enabled = false` seed شده‌اند. آن‌ها را فعال نکنید — هیچ ارائه‌دهنده‌ای پشت آن‌ها نیست؛ فعال‌کردن آن‌ها یک گزینه پرداخت خراب را به کاربران نشان می‌دهد. این یک تصمیم آگاهانه در محدوده پروژه بوده، نه یک سهل‌انگاری.
+- **ذخیره‌سازی رسانه روی دیسک محلی در Railway ناپایدار است.** اکنون این بخش *کار می‌کند* (تصاویر هم از طریق `static()` جنگو در حالت توسعه و هم از طریق fallback با `serve` در پروداکشن نمایش داده می‌شوند)، اما تا زمانی که S3 را پیکربندی نکنید (بخش ۵.۴)، فایل‌های آپلودی با هر بازدیپلوی از بین می‌روند.
+- **مسیر «بارگذاری ایمیل/تلفن تماس از تنظیمات» در صفحه `/contact` هرگز برای بازدیدکنندگان عادی موفق نمی‌شود** — این صفحه `GET /api/settings/` را فراخوانی می‌کند که فقط به سوپریوزرها محدود شده (`IsSuperuser`)، و کلیدهای `contact_email`/`contact_phone` که این صفحه دنبالشان است هم اصلاً جزو مجموعه `DefaultSetting` که seed می‌شود نیستند (هرگز بخشی از قرارداد مستندشده تنظیمات در `core/models.py` نبوده‌اند). در عمل این صفحه **همیشه** به فرم `mailto:` خود برمی‌گردد — که همچنان به‌خوبی کار می‌کند، فقط از طریق پنل ادمین قابل پیکربندی نیست. اگر می‌خواهید این بخش قابل پیکربندی باشد، به یک Endpoint عمومی (بدون نیاز به احراز هویت) و کوچک نیاز دارید که فقط همین دو کلید را نشان دهد، به‌علاوه seed کردن آن‌ها.
+
+---
+
+## ۸. خطاهای رایج و نحوه رفع آن‌ها
+
+| علامت | علت | راه‌حل |
 |---|---|---|
-| `CommandError: You must set settings.ALLOWED_HOSTS if DEBUG is False` | `ALLOWED_HOSTS` not set in prod | Set `ALLOWED_HOSTS` to your real domain(s), comma-separated, no scheme. |
-| Admin login / any admin form submit returns `403 Forbidden — CSRF verification failed. Request aborted.` | `CSRF_TRUSTED_ORIGINS` doesn't include your domain | Make sure `ALLOWED_HOSTS` lists the real domain (auto-derives the trusted origin), or set `CSRF_TRUSTED_ORIGINS=https://yourdomain.com` explicitly. |
-| Browser console: `Access to fetch at '...' from origin '...' has been blocked by CORS policy` | Frontend origin missing from `CORS_ALLOWED_ORIGINS` | Add the frontend's exact origin (with scheme, no trailing slash) to `CORS_ALLOWED_ORIGINS` on the backend and redeploy. |
-| Uploaded post images / receipts return `404 Not Found` at `/media/...` | Media not served (pre-fix bug) or wrong `MEDIA_ROOT`/storage config | Already fixed in `groupfund/urls.py` — confirm you're running the latest code. If using S3, confirm `AWS_STORAGE_BUCKET_NAME` + credentials are correct and the bucket is reachable. |
-| `next/image` throws: `Invalid src prop ... hostname "..." is not configured under images in next.config.js` | Image is served from a domain not in `images.remotePatterns` (typically the S3 bucket/CDN domain when `AWS_STORAGE_BUCKET_NAME` is set on the backend) | Set `NEXT_PUBLIC_MEDIA_URL` on the **frontend** to that bucket/CDN's origin and **rebuild** the frontend. |
-| New member registration succeeds but the member can't contribute/comment/do anything a "normal member" should be able to | `seed_initial_data` never ran, or the default `AccessGroup` isn't marked `is_default=True` | Run `python manage.py seed_initial_data` manually; check `/admin/accounts/accessgroup/` that exactly one group has "Is default" checked. |
-| Admin panel shows payment method as "not configured" even though you filled in bank details | Forgot to flip `payment_manual_enabled` / `payment_paypal_enabled` to `true` after filling in the other fields | Edit the `*_enabled` `DefaultSetting` row to `true` via `/admin/core/defaultsetting/`. |
-| `django.core.exceptions.ImproperlyConfigured: Set the AWS_STORAGE_BUCKET_NAME environment variable` (or similar from `boto3`) | Misconfigured/missing S3 credentials while `AWS_STORAGE_BUCKET_NAME` is set | Double check `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_S3_REGION_NAME` / `AWS_S3_ENDPOINT_URL` (only for non-AWS providers) are all correct for your bucket. |
-| `relation "..." does not exist` after deploy | `migrate` didn't run, or the release phase failed before reaching it | Check the Railway "release" logs; re-run `python manage.py migrate --noinput` manually if needed. |
-| `SECRET_KEY` warning in `manage.py check --deploy` (`security.W009`) | Using the default/weak `SECRET_KEY` | Generate and set a long random `SECRET_KEY`: `python -c "import secrets; print(secrets.token_urlsafe(64))"`. |
-| Static files (admin CSS/JS, Jazzmin theme) missing/unstyled in production | `collectstatic` didn't run, or `STATIC_ROOT` not picked up by WhiteNoise | Confirm the release phase ran `collectstatic --noinput` successfully; WhiteNoise serves from `STATIC_ROOT` automatically once `STATICFILES_STORAGE` is set (already configured). |
-| Frontend shows stale API URL / wrong backend after changing `NEXT_PUBLIC_API_URL` | `NEXT_PUBLIC_*` vars are baked in at **build time** | Trigger a full rebuild (not just a restart) of the frontend service after changing any `NEXT_PUBLIC_*` variable. |
-| `psycopg2` / database connection errors on deploy | Wrong/missing `DB_*` vars, or DB not yet provisioned | Verify `DB_NAME`/`DB_USER`/`DB_PASSWORD`/`DB_HOST`/`DB_PORT` match your Postgres plugin's connection details exactly. |
+| `CommandError: You must set settings.ALLOWED_HOSTS if DEBUG is False` | `ALLOWED_HOSTS` در پروداکشن تنظیم نشده | `ALLOWED_HOSTS` را روی دامنه(های) واقعی خود، جدا‌شده با کاما و بدون پروتکل، تنظیم کنید. |
+| ورود به ادمین / هر ارسال فرم ادمینی با خطای `403 Forbidden — CSRF verification failed. Request aborted.` مواجه می‌شود | `CSRF_TRUSTED_ORIGINS` شامل دامنه شما نیست | مطمئن شوید `ALLOWED_HOSTS` دامنه واقعی را دارد (مبدا مورد اعتماد به‌صورت خودکار استخراج می‌شود)، یا صریحاً `CSRF_TRUSTED_ORIGINS=https://yourdomain.com` را تنظیم کنید. |
+| در کنسول مرورگر: `Access to fetch at '...' from origin '...' has been blocked by CORS policy` | مبدا فرانت‌اند در `CORS_ALLOWED_ORIGINS` نیست | مبدا دقیق فرانت‌اند (همراه با پروتکل، بدون اسلش انتهایی) را به `CORS_ALLOWED_ORIGINS` در بک‌اند اضافه کرده و دوباره دیپلوی کنید. |
+| تصاویر پست/رسیدهای آپلودی در `/media/...` با خطای `404 Not Found` مواجه می‌شوند | رسانه سرویس‌دهی نمی‌شد (باگ پیش از رفع) یا `MEDIA_ROOT`/تنظیمات storage نادرست است | این مورد در `groupfund/urls.py` رفع شده — مطمئن شوید آخرین نسخه کد را اجرا می‌کنید. اگر از S3 استفاده می‌کنید، صحت `AWS_STORAGE_BUCKET_NAME` + اطلاعات اعتباری و در دسترس بودن باکت را بررسی کنید. |
+| `next/image` خطای زیر را نمایش می‌دهد: `Invalid src prop ... hostname "..." is not configured under images in next.config.js` | تصویر از دامنه‌ای سرویس‌دهی می‌شود که در `images.remotePatterns` نیست (معمولاً دامنه باکت S3/CDN، وقتی `AWS_STORAGE_BUCKET_NAME` در بک‌اند تنظیم شده) | `NEXT_PUBLIC_MEDIA_URL` را در **فرانت‌اند** روی مبدا همان باکت/CDN تنظیم کرده و فرانت‌اند را **rebuild** کنید. |
+| ثبت‌نام عضو جدید موفق است، اما عضو نمی‌تواند کمک مالی/کامنت کند یا کاری که یک «عضو عادی» باید بتواند انجام دهد را انجام دهد | `seed_initial_data` هرگز اجرا نشده، یا `AccessGroup` پیش‌فرض با `is_default=True` علامت‌گذاری نشده | دستور `python manage.py seed_initial_data` را به‌صورت دستی اجرا کنید؛ در `/admin/accounts/accessgroup/` بررسی کنید که دقیقاً یک گروه گزینه «Is default» را علامت زده باشد. |
+| پنل ادمین روش پرداخت را «پیکربندی‌نشده» نشان می‌دهد، با وجود اینکه اطلاعات بانکی را پر کرده‌اید | فراموش کرده‌اید `payment_manual_enabled` / `payment_paypal_enabled` را بعد از پر کردن سایر فیلدها به `true` تغییر دهید | ردیف `DefaultSetting` مربوط به `*_enabled` را از طریق `/admin/core/defaultsetting/` به `true` ویرایش کنید. |
+| `django.core.exceptions.ImproperlyConfigured: Set the AWS_STORAGE_BUCKET_NAME environment variable` (یا پیغام مشابهی از `boto3`) | اطلاعات اعتباری/پیکربندی S3 ناقص یا نادرست است در حالی که `AWS_STORAGE_BUCKET_NAME` تنظیم شده | درستی `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_S3_REGION_NAME` / `AWS_S3_ENDPOINT_URL` (فقط برای ارائه‌دهندگان غیر AWS) را برای باکت خود بررسی کنید. |
+| بعد از دیپلوی خطای `relation "..." does not exist` رخ می‌دهد | `migrate` اجرا نشده، یا فاز release پیش از رسیدن به آن شکست خورده | لاگ‌های فاز «release» در Railway را بررسی کنید؛ در صورت نیاز `python manage.py migrate --noinput` را به‌صورت دستی دوباره اجرا کنید. |
+| هشدار `SECRET_KEY` در `manage.py check --deploy` (`security.W009`) | استفاده از `SECRET_KEY` پیش‌فرض/ضعیف | یک `SECRET_KEY` طولانی و تصادفی تولید و تنظیم کنید: `python -c "import secrets; print(secrets.token_urlsafe(64))"`. |
+| فایل‌های استاتیک (CSS/JS ادمین، قالب Jazzmin) در پروداکشن نمایش داده نمی‌شوند یا بدون استایل هستند | `collectstatic` اجرا نشده، یا `STATIC_ROOT` توسط WhiteNoise شناسایی نشده | مطمئن شوید فاز release با موفقیت `collectstatic --noinput` را اجرا کرده است؛ WhiteNoise به‌محض تنظیم `STATICFILES_STORAGE` (که از قبل پیکربندی شده) به‌صورت خودکار از `STATIC_ROOT` سرویس می‌دهد. |
+| فرانت‌اند آدرس API قدیمی/اشتباه را بعد از تغییر `NEXT_PUBLIC_API_URL` نشان می‌دهد | متغیرهای `NEXT_PUBLIC_*` در **زمان build** جاسازی می‌شوند | بعد از تغییر هر متغیر `NEXT_PUBLIC_*`، یک rebuild کامل (نه فقط ری‌استارت) از سرویس فرانت‌اند انجام دهید. |
+| خطاهای اتصال `psycopg2`/دیتابیس هنگام دیپلوی | متغیرهای `DB_*` نادرست/ناقص هستند، یا دیتابیس هنوز راه‌اندازی نشده | مطمئن شوید `DB_NAME`/`DB_USER`/`DB_PASSWORD`/`DB_HOST`/`DB_PORT` دقیقاً با اطلاعات اتصال افزونه Postgres شما مطابقت دارند. |
 
 ---
 
-## 9. Post-deploy smoke-test checklist
+## ۹. چک‌لیست تست نهایی پس از دیپلوی
 
-1. `GET https://<backend>/api/auth/...` returns JSON (not a CORS or 500 error) when called from the deployed frontend.
-2. `/admin/` login works for the superuser, with no CSRF errors.
-3. `/admin/core/permission/` lists all 11 seeded permissions; `/admin/accounts/accessgroup/` shows exactly one group with "Is default" checked.
-4. Register a brand-new member from the frontend → confirm they land in the default group and can contribute/comment per its granted permissions.
-5. Upload a post image (as a member with `can_post`) and confirm it renders on the frontend (tests both the backend media-serving fix and, if S3 is enabled, the `NEXT_PUBLIC_MEDIA_URL` `next/image` config).
-6. Submit a contribution via each enabled payment method and confirm the instructions/receipt-upload flow completes.
-7. Check `/admin/logs/activitylog/` and `/admin/logs/systemlog/` are populating as expected.
+۱. هنگام فراخوانی از فرانت‌اند دیپلوی‌شده، `GET https://<backend>/api/auth/...` یک پاسخ JSON برمی‌گرداند (نه خطای CORS یا 500).
+۲. ورود به `/admin/` برای سوپریوزر بدون خطای CSRF کار می‌کند.
+۳. `/admin/core/permission/` تمام ۱۱ مجوز seed‌شده را فهرست می‌کند؛ `/admin/accounts/accessgroup/` دقیقاً یک گروه با گزینه «Is default» علامت‌خورده را نشان می‌دهد.
+۴. یک عضو کاملاً جدید را از طریق فرانت‌اند ثبت‌نام کنید → بررسی کنید در گروه پیش‌فرض قرار می‌گیرد و می‌تواند بر اساس مجوزهای آن گروه کمک مالی/کامنت کند.
+۵. یک تصویر پست را (به‌عنوان عضوی با `can_post`) آپلود کنید و بررسی کنید در فرانت‌اند نمایش داده می‌شود (هم رفع باگ سرویس‌دهی رسانه در بک‌اند و هم — در صورت فعال بودن S3 — تنظیمات `NEXT_PUBLIC_MEDIA_URL`/`next/image` را تست می‌کند).
+۶. یک کمک مالی را از طریق هر روش پرداخت فعال ارسال کنید و بررسی کنید جریان دستورالعمل/آپلود رسید کامل می‌شود.
+۷. بررسی کنید `/admin/logs/activitylog/` و `/admin/logs/systemlog/` به‌درستی پر می‌شوند.

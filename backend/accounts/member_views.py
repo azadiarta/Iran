@@ -1,4 +1,5 @@
 from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
@@ -154,6 +155,7 @@ class MemberUpdateView(APIView):
 class MemberChangeGroupView(APIView):
     permission_classes = [IsAuthenticated, HasGroupPermission('can_manage_permissions')]
 
+    @transaction.atomic
     def patch(self, request, pk):
         try:
             member = Member.objects.get(pk=pk)
