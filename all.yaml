@@ -58,7 +58,7 @@ progress:
     11:
       name: deploy
       status: done
-      done: [requirements.txt (gunicorn, whitenoise, django-storages, boto3), backend/groupfund/wsgi.py, whitenoise middleware + STATICFILES_STORAGE, "S3-compatible media storage (DEFAULT_FILE_STORAGE=storages.backends.s3.S3Storage) — conditional on AWS_STORAGE_BUCKET_NAME env var, falls back to local MEDIA_ROOT for dev; supports AWS S3 / Cloudflare R2 / Backblaze B2 via AWS_S3_ENDPOINT_URL + AWS_S3_CUSTOM_DOMAIN", production security settings (SECURE_SSL_REDIRECT/HSTS/SESSION_COOKIE_SECURE/CSRF_COOKIE_SECURE/SECURE_PROXY_SSL_HEADER, conditional on DEBUG), LOGGING config, Procfile (release: migrate+collectstatic, web: gunicorn), runtime.txt, .env.example documented for production + S3 bucket env vars, frontend/next.config.mjs dynamic remotePatterns from NEXT_PUBLIC_API_URL]
+      done: [requirements.txt (gunicorn, whitenoise, django-storages, boto3), backend/groupfund/wsgi.py, whitenoise middleware + STATICFILES_STORAGE, "S3-compatible media storage (DEFAULT_FILE_STORAGE=storages.backends.s3.S3Storage) — conditional on AWS_STORAGE_BUCKET_NAME env var, falls back to local MEDIA_ROOT for dev; supports AWS S3 / Cloudflare R2 / Backblaze B2 via AWS_S3_ENDPOINT_URL + AWS_S3_CUSTOM_DOMAIN", "MEDIA_URL→MEDIA_ROOT URL serving added to groupfund/urls.py (FIXED real gap — nothing served uploaded media before in dev OR prod-without-S3)", "CSRF_TRUSTED_ORIGINS derived from ALLOWED_HOSTS (FIXED real gap — admin POST/PATCH/DELETE would 403 in production without it)", "seed_initial_data management command (FIXED CRITICAL gap — Permission/AccessGroup/DefaultSetting rows were never seeded anywhere; fresh prod DB had a completely empty, non-functional permission system)", production security settings (SECURE_SSL_REDIRECT/HSTS/SESSION_COOKIE_SECURE/CSRF_COOKIE_SECURE/SECURE_PROXY_SSL_HEADER, conditional on DEBUG), LOGGING config, "Procfile (release: migrate + seed_initial_data + collectstatic, web: gunicorn)", runtime.txt, .env.example documented for production + S3 bucket env vars, "frontend/next.config.mjs dynamic remotePatterns from NEXT_PUBLIC_API_URL + optional NEXT_PUBLIC_MEDIA_URL (FIXED real gap — S3/CDN-hosted images would be blocked by next/image without this)"]
 
 files:
 
@@ -79,6 +79,7 @@ files:
       storages_app: "'storages' (django-storages) added to INSTALLED_APPS"
       cors: CORS_ALLOWED_ORIGINS from env
       auth_env_vars: [SECRET_KEY, DEBUG, ALLOWED_HOSTS]
+      csrf_trusted_origins: "derived from ALLOWED_HOSTS (https:// + each non-local host) unless CSRF_TRUSTED_ORIGINS env override is set — required for Django admin POST/PATCH/DELETE to pass CSRF checks behind Railway's proxy (fixes a real gap: was previously unset, which 403s all unsafe admin requests once DEBUG=False)"
       simple_jwt: ACCESS=1day, REFRESH=7days, ROTATE=true, BLACKLIST=true
       drf_default_auth: JWTAuthentication
       drf_default_permission: IsAuthenticated
@@ -103,8 +104,9 @@ files:
 
   "backend/groupfund/urls.py":
     status: done
+    note: "added MEDIA_URL→MEDIA_ROOT serving (fixes a real gap: nothing served uploaded media before): static() helper when DEBUG and no S3 bucket; django.views.static.serve fallback when DEBUG=False and AWS_STORAGE_BUCKET_NAME is unset (ephemeral but functional out of the box); no-op (S3/CDN serves directly) when AWS_STORAGE_BUCKET_NAME is set"
     imports:
-      external: [{from: django.contrib, items: [admin]}, {from: django.urls, items: [path, include]}]
+      external: [{from: django.conf, items: [settings]}, {from: django.conf.urls.static, items: [static]}, {from: django.contrib, items: [admin]}, {from: django.urls, items: [path, include, re_path]}, {from: django.views.static, items: [serve]}]
       internal:
         - {file: "backend/accounts/urls.py",        items: [urlpatterns], status: available}
         - {file: "backend/accounts/member_urls.py", items: [urlpatterns], status: available}
@@ -122,7 +124,7 @@ files:
   "Procfile":
     status: done
     kind: config
-    note: "Railway/Heroku-style process file at repo root — release phase runs migrations + collectstatic, web phase runs gunicorn against groupfund.wsgi"
+    note: "Railway/Heroku-style process file at repo root — release phase runs migrate → seed_initial_data → collectstatic, web phase runs gunicorn against groupfund.wsgi"
     needed_by: []
 
   "runtime.txt":
@@ -270,6 +272,38 @@ files:
         - {from: "backend/core/signals.py", items: [signal handlers], status: available}
     exports: []
     needed_by: []
+
+  "backend/core/management/commands/seed_initial_data.py":
+    status: done
+    note: >
+      Closes a CRITICAL deploy gap discovered during the Phase 11 audit: nothing
+      anywhere (no data migration, no signal, no fixture) ever created the
+      Permission rows / default AccessGroup / DefaultSetting rows the codebase
+      depends on — core/models.py only documented them as comments ("set via
+      Django admin by superuser"). On a fresh production DB this left the
+      ENTIRE permission system empty (no member could ever be granted
+      can_contribute/can_post/etc., registration's default group would be NULL,
+      payment methods would show as unconfigured). `python manage.py
+      seed_initial_data` idempotently get_or_creates: all 11 Permission
+      codenames referenced in code (can_contribute, can_comment, can_post,
+      can_expense, can_view_balance, can_view_posts, can_view_dashboard,
+      can_approve_comments, can_delete_member, can_change_any_password,
+      can_manage_permissions), a default "Members" AccessGroup
+      (is_default=True, granted can_contribute+can_comment per the
+      accounts/models.py contract), and every DefaultSetting key the codebase
+      reads (general/visibility/payment_manual/payment_paypal +
+      payment_stripe/payment_google_pay placeholders reserved for Phase 10).
+      Wired into Procfile's release phase, after migrate and before
+      collectstatic — runs (harmlessly) on every deploy.
+    imports:
+      external: [{from: django.core.management.base, items: [BaseCommand]}, {from: django.db, items: [transaction]}]
+      internal:
+        - {from: "backend/accounts/models.py", items: [{name: AccessGroup, status: available}]}
+        - {from: "backend/core/models.py",     items: [{name: DefaultSetting, status: available}, {name: Permission, status: available}]}
+    exports:
+      - {name: Command, kind: class, type: Django BaseCommand, invocation: "python manage.py seed_initial_data"}
+    needed_by:
+      - {file: "Procfile", items: [release command], status: available}
 
   "backend/core/signals.py":
     status: done
@@ -1114,7 +1148,7 @@ files:
   "frontend/next.config.mjs":
     status: done
     kind: config
-    note: "renamed from next.config.ts — Next.js 14.2.5 does not support TS config files (added in Next 15); wraps config with createNextIntlPlugin"
+    note: "renamed from next.config.ts — Next.js 14.2.5 does not support TS config files (added in Next 15); wraps config with createNextIntlPlugin. images.remotePatterns built dynamically: always allows NEXT_PUBLIC_API_URL host (path /media/**) for locally-served media; additionally allows NEXT_PUBLIC_MEDIA_URL host (path /**) when set, for S3-bucket/CDN-hosted media (FIXED real gap — without this, next/image throws 'hostname is not configured' for any S3-hosted image once AWS_STORAGE_BUCKET_NAME is enabled on the backend)"
 
   "frontend/middleware.ts":
     status: done
