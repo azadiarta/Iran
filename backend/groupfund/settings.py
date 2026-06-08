@@ -9,10 +9,11 @@ DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 # Required for the Django admin (and any cross-origin POST/PUT/PATCH/DELETE) to
-# work behind Railway's TLS-terminating proxy: with SECURE_PROXY_SSL_HEADER set,
-# Django treats the request as secure and validates the Origin/Referer header
-# against this list, which must include the scheme. Defaults to "https://" +
-# each non-local ALLOWED_HOSTS entry; override explicitly via env if needed.
+# work behind a TLS-terminating reverse proxy (e.g. Caddy): with
+# SECURE_PROXY_SSL_HEADER set, Django treats the request as secure and validates
+# the Origin/Referer header against this list, which must include the scheme.
+# Defaults to "https://" + each non-local ALLOWED_HOSTS entry; override
+# explicitly via env if needed (the Docker setup always sets this explicitly).
 CSRF_TRUSTED_ORIGINS = [
     origin.strip() for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if origin.strip()
 ] or [

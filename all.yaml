@@ -3,7 +3,7 @@ meta:
   backend: django/python
   frontend: react/javascript
   db: postgresql
-  deploy: railway
+  deploy: docker-compose
   payment: stripe (gbp primary, expandable: paypal, google_pay, multi-currency)
 
 rules:
@@ -58,7 +58,7 @@ progress:
     11:
       name: deploy
       status: done
-      done: [requirements.txt (gunicorn, whitenoise, django-storages, boto3), backend/groupfund/wsgi.py, whitenoise middleware + STATICFILES_STORAGE, "S3-compatible media storage (DEFAULT_FILE_STORAGE=storages.backends.s3.S3Storage) — conditional on AWS_STORAGE_BUCKET_NAME env var, falls back to local MEDIA_ROOT for dev; supports AWS S3 / Cloudflare R2 / Backblaze B2 via AWS_S3_ENDPOINT_URL + AWS_S3_CUSTOM_DOMAIN", "MEDIA_URL→MEDIA_ROOT URL serving added to groupfund/urls.py (FIXED real gap — nothing served uploaded media before in dev OR prod-without-S3)", "CSRF_TRUSTED_ORIGINS derived from ALLOWED_HOSTS (FIXED real gap — admin POST/PATCH/DELETE would 403 in production without it)", "seed_initial_data management command (FIXED CRITICAL gap — Permission/AccessGroup/DefaultSetting rows were never seeded anywhere; fresh prod DB had a completely empty, non-functional permission system)", production security settings (SECURE_SSL_REDIRECT/HSTS/SESSION_COOKIE_SECURE/CSRF_COOKIE_SECURE/SECURE_PROXY_SSL_HEADER, conditional on DEBUG), LOGGING config, "Procfile (release: migrate + seed_initial_data + collectstatic, web: gunicorn)", runtime.txt, .env.example documented for production + S3 bucket env vars, "frontend/next.config.mjs dynamic remotePatterns from NEXT_PUBLIC_API_URL + optional NEXT_PUBLIC_MEDIA_URL (FIXED real gap — S3/CDN-hosted images would be blocked by next/image without this)", "DEPLOYMENT.md fully translated to Persian/Farsi", "second-pass hardening audit fixes: logging added to 6 previously-silent except blocks (posts/admin.py, fund/admin.py, accounts/models.py, payments/views.py, payments/manual.py, payments/paypal.py), select_related() added to fix N+1 queries in posts/views.py (Comment.author) and logs/views.py (SystemLog.related_member), @transaction.atomic added to PaymentInitiateView/ReceiptUploadView/MemberChangeGroupView, DRF DEFAULT_THROTTLE_CLASSES/DEFAULT_THROTTLE_RATES added to settings.py REST_FRAMEWORK (anon 100/hour, user 1000/hour) to mitigate brute-force on auth endpoints, ~13 hardcoded English strings in posts pages moved into the i18n posts namespace (en.json/fa.json), accessibility improvements to AdminConfirmDialog (role=alertdialog, aria-label) and post image gallery (descriptive alt text)"]
+      done: [requirements.txt (gunicorn, whitenoise, django-storages, boto3), backend/groupfund/wsgi.py, whitenoise middleware + STATICFILES_STORAGE, "S3-compatible media storage (DEFAULT_FILE_STORAGE=storages.backends.s3.S3Storage) — conditional on AWS_STORAGE_BUCKET_NAME env var, falls back to local MEDIA_ROOT for dev; supports AWS S3 / Cloudflare R2 / Backblaze B2 via AWS_S3_ENDPOINT_URL + AWS_S3_CUSTOM_DOMAIN", "MEDIA_URL→MEDIA_ROOT URL serving added to groupfund/urls.py (FIXED real gap — nothing served uploaded media before in dev OR prod-without-S3)", "CSRF_TRUSTED_ORIGINS derived from ALLOWED_HOSTS (FIXED real gap — admin POST/PATCH/DELETE would 403 in production without it)", "seed_initial_data management command (FIXED CRITICAL gap — Permission/AccessGroup/DefaultSetting rows were never seeded anywhere; fresh prod DB had a completely empty, non-functional permission system)", production security settings (SECURE_SSL_REDIRECT/HSTS/SESSION_COOKIE_SECURE/CSRF_COOKIE_SECURE/SECURE_PROXY_SSL_HEADER, conditional on DEBUG), LOGGING config, full Docker Compose deployment (docker-compose.yml, backend/Dockerfile + docker-entrypoint.sh, frontend/Dockerfile, Caddyfile reverse-proxy, .env.docker.example — see dedicated entries below; replaces the old Procfile/runtime.txt PaaS-style deploy, now removed), .env.example documented for production + S3 bucket env vars, "frontend/next.config.mjs dynamic remotePatterns from NEXT_PUBLIC_API_URL + optional NEXT_PUBLIC_MEDIA_URL (FIXED real gap — S3/CDN-hosted images would be blocked by next/image without this)", "DEPLOYMENT.md fully translated to Persian/Farsi", "second-pass hardening audit fixes: logging added to 6 previously-silent except blocks (posts/admin.py, fund/admin.py, accounts/models.py, payments/views.py, payments/manual.py, payments/paypal.py), select_related() added to fix N+1 queries in posts/views.py (Comment.author) and logs/views.py (SystemLog.related_member), @transaction.atomic added to PaymentInitiateView/ReceiptUploadView/MemberChangeGroupView, DRF DEFAULT_THROTTLE_CLASSES/DEFAULT_THROTTLE_RATES added to settings.py REST_FRAMEWORK (anon 100/hour, user 1000/hour) to mitigate brute-force on auth endpoints, ~13 hardcoded English strings in posts pages moved into the i18n posts namespace (en.json/fa.json), accessibility improvements to AdminConfirmDialog (role=alertdialog, aria-label) and post image gallery (descriptive alt text)"]
 
 files:
 
@@ -79,11 +79,11 @@ files:
       storages_app: "'storages' (django-storages) added to INSTALLED_APPS"
       cors: CORS_ALLOWED_ORIGINS from env
       auth_env_vars: [SECRET_KEY, DEBUG, ALLOWED_HOSTS]
-      csrf_trusted_origins: "derived from ALLOWED_HOSTS (https:// + each non-local host) unless CSRF_TRUSTED_ORIGINS env override is set — required for Django admin POST/PATCH/DELETE to pass CSRF checks behind Railway's proxy (fixes a real gap: was previously unset, which 403s all unsafe admin requests once DEBUG=False)"
+      csrf_trusted_origins: "derived from ALLOWED_HOSTS (https:// + each non-local host) unless CSRF_TRUSTED_ORIGINS env override is set — required for Django admin POST/PATCH/DELETE to pass CSRF checks behind a TLS-terminating reverse proxy (e.g. Caddy in the Docker setup, which sets it explicitly to PUBLIC_URL); fixes a real gap: was previously unset, which 403s all unsafe admin requests once DEBUG=False"
       simple_jwt: ACCESS=1day, REFRESH=7days, ROTATE=true, BLACKLIST=true
       drf_default_auth: JWTAuthentication
       drf_default_permission: IsAuthenticated
-      production_security: "SECURE_PROXY_SSL_HEADER always set (Railway TLS-terminating proxy); when DEBUG=False also sets SECURE_SSL_REDIRECT/SECURE_HSTS_SECONDS/SECURE_HSTS_INCLUDE_SUBDOMAINS/SECURE_HSTS_PRELOAD/SESSION_COOKIE_SECURE/CSRF_COOKIE_SECURE/X_FRAME_OPTIONS"
+      production_security: "SECURE_PROXY_SSL_HEADER always set (works behind any TLS-terminating reverse proxy, e.g. Caddy in the Docker setup); when DEBUG=False also sets SECURE_SSL_REDIRECT/SECURE_HSTS_SECONDS/SECURE_HSTS_INCLUDE_SUBDOMAINS/SECURE_HSTS_PRELOAD/SESSION_COOKIE_SECURE/CSRF_COOKIE_SECURE/X_FRAME_OPTIONS — note docker-compose.yml hardcodes SECURE_SSL_REDIRECT=False since Caddy↔backend traffic is plain HTTP (TLS already terminated at the edge), avoiding an infinite redirect loop"
       logging: "console handler; INFO in DEBUG, WARNING in production"
     imports:
       external: [{from: os, items: [environ]}, {from: pathlib, items: [Path]}, {from: datetime, items: [timedelta]}]
@@ -94,7 +94,7 @@ files:
   "backend/groupfund/wsgi.py":
     status: done
     kind: config
-    note: "standard Django WSGI entry-point — required by gunicorn for production deploys (Procfile: web: gunicorn groupfund.wsgi)"
+    note: "standard Django WSGI entry-point — required by gunicorn for production deploys (see backend/docker-entrypoint.sh: exec gunicorn groupfund.wsgi --bind 0.0.0.0:8000)"
     imports:
       external: [{from: os, items: [environ]}, {from: django.core.wsgi, items: [get_wsgi_application]}]
       internal: []
@@ -121,16 +121,52 @@ files:
     exports: []
     needed_by: []
 
-  "Procfile":
+  "docker-compose.yml":
     status: done
     kind: config
-    note: "Railway/Heroku-style process file at repo root — release phase runs migrate → seed_initial_data → collectstatic, web phase runs gunicorn against groupfund.wsgi"
+    note: "single-command orchestration of db (postgres:16-alpine) + backend + frontend + proxy (Caddy); reads root .env (5 user vars: PUBLIC_HOST/PUBLIC_URL/SECRET_KEY/POSTGRES_PASSWORD/SITE_NAME), wires CORS_ALLOWED_ORIGINS/CSRF_TRUSTED_ORIGINS/ALLOWED_HOSTS automatically from PUBLIC_HOST/PUBLIC_URL, hardcodes SECURE_SSL_REDIRECT=False (Caddy terminates TLS), declares named volumes postgres_data/media_data/static_data/caddy_data/caddy_config for full persistence across rebuilds"
     needed_by: []
 
-  "runtime.txt":
+  "backend/Dockerfile":
     status: done
     kind: config
-    note: "pins Python runtime version for the deploy platform (python-3.12)"
+    note: "python:3.12-slim image; build context is repo root (requirements.txt lives there, not in backend/); installs runtime + temporary build deps for psycopg2/Pillow then purges them; ENTRYPOINT docker-entrypoint.sh; EXPOSE 8000"
+    needed_by: []
+
+  "backend/docker-entrypoint.sh":
+    status: done
+    kind: config
+    note: "container startup script — replaces Procfile's release+web phases: waits for DB via Python socket probe, then migrate --noinput → seed_initial_data (idempotent) → collectstatic --noinput → exec gunicorn groupfund.wsgi --bind 0.0.0.0:8000"
+    needed_by: []
+
+  "backend/.dockerignore":
+    status: done
+    kind: config
+    note: "excludes __pycache__, .env*, sqlite db, media/staticfiles/logs, .git, markdown, venv from the backend build context"
+    needed_by: []
+
+  "frontend/Dockerfile":
+    status: done
+    kind: config
+    note: "3-stage build (deps → builder → runner) on node:20-alpine; bakes NEXT_PUBLIC_API_URL/NEXT_PUBLIC_SITE_NAME/NEXT_PUBLIC_MEDIA_URL as build ARGs/ENV before npm run build (required — these are embedded into the client bundle at build time, see lib/api.ts); runner stage copies .next/standalone + .next/static + public, sets HOSTNAME=0.0.0.0, runs node server.js — requires output: 'standalone' in next.config.mjs"
+    needed_by: []
+
+  "frontend/.dockerignore":
+    status: done
+    kind: config
+    note: "excludes node_modules, .next, out, .env*, .git, markdown from the frontend build context"
+    needed_by: []
+
+  "Caddyfile":
+    status: done
+    kind: config
+    note: "reverse proxy config keyed on {$PUBLIC_HOST} — routes /api/*, /admin/*, /media/*, /static/* to backend:8000 and everything else to frontend:3000; auto-provisions/renews free Let's Encrypt HTTPS for real domains and gracefully serves plain HTTP for bare IPs/localhost, eliminating CORS by serving frontend+backend from one origin"
+    needed_by: []
+
+  ".env.docker.example":
+    status: done
+    kind: config
+    note: "template users copy to .env — exactly 5 beginner-friendly documented vars (PUBLIC_HOST, PUBLIC_URL, SECRET_KEY, POSTGRES_PASSWORD, SITE_NAME); everything else (db name/user, DB_HOST=db, ports) is fixed in docker-compose.yml"
     needed_by: []
 
   # ─── ADMIN ────────────────────────────────────────────────────────────────
@@ -293,8 +329,8 @@ files:
       accounts/models.py contract), and every DefaultSetting key the codebase
       reads (general/visibility/payment_manual/payment_paypal +
       payment_stripe/payment_google_pay placeholders reserved for Phase 10).
-      Wired into Procfile's release phase, after migrate and before
-      collectstatic — runs (harmlessly) on every deploy.
+      Wired into backend/docker-entrypoint.sh, after migrate and before
+      collectstatic — runs (harmlessly) on every container start.
     imports:
       external: [{from: django.core.management.base, items: [BaseCommand]}, {from: django.db, items: [transaction]}]
       internal:
@@ -303,7 +339,7 @@ files:
     exports:
       - {name: Command, kind: class, type: Django BaseCommand, invocation: "python manage.py seed_initial_data"}
     needed_by:
-      - {file: "Procfile", items: [release command], status: available}
+      - {file: "backend/docker-entrypoint.sh", items: [release/startup sequence], status: available}
 
   "backend/core/signals.py":
     status: done

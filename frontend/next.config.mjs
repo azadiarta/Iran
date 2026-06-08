@@ -30,6 +30,7 @@ if (process.env.NEXT_PUBLIC_MEDIA_URL) {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   images: {
     remotePatterns,
   },
