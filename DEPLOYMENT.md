@@ -8,11 +8,17 @@
 
 > ⏱ **زمان تقریبی:** اگر برای اولین بار است، حدود ۳۰ تا ۶۰ دقیقه زمان بگذارید (شامل دانلود و ساخت تصاویر Docker که خودش حدود ۵ تا ۱۵ دقیقه طول می‌کشد و کاملاً خودکار است).
 
-> ☁️ **استفاده از Railway به‌جای سرور شخصی؟** پروژه طوری تنظیم شده که Railway هم از **همان فایل‌های Docker** که برای VPS ساخته شده‌اند استفاده می‌کند — یعنی همان ایمیجی که روی سرور شخصی اجرا می‌شود، روی Railway هم اجرا می‌شود (دیگر دو روش جدا برای نگهداری وجود ندارد). فایل‌های `railway.json` و `frontend/railway.json` به Railway می‌گویند به‌جای حدس زدن، مستقیماً از `backend/Dockerfile` و `frontend/Dockerfile` بسازد و اجرا کند. علاوه بر این، بک‌اند به‌صورت خودکار:
-> - متغیر `DATABASE_URL` که Railway هنگام افزودن پلاگین Postgres می‌سازد را می‌خواند (دیگر نیازی به پر کردن جداگانهٔ `DB_HOST`/`DB_USER`/`DB_PASSWORD`/... نیست)
-> - دامنهٔ عمومی Railway (`RAILWAY_PUBLIC_DOMAIN`) را خودش به `ALLOWED_HOSTS`/`CORS_ALLOWED_ORIGINS`/`CSRF_TRUSTED_ORIGINS` اضافه می‌کند
+> ☁️ **استفاده از Railway به‌جای سرور شخصی؟** پروژه طوری تنظیم شده که Railway هم دقیقاً از **همان ایمیج‌های Docker** که برای VPS ساخته شده‌اند استفاده کند (`railway.json` و `frontend/railway.json` به Railway می‌گویند مستقیماً از `backend/Dockerfile`/`frontend/Dockerfile` بسازد) — یک نسخه واحد، هیچ تفاوتی بین دو محیط نیست. علاوه بر این، بک‌اند هنگام اجرا خودش محیط Railway را تشخیص می‌دهد و این موارد را **بدون نیاز به هیچ تنظیمی** به‌صورت خودکار انجام می‌دهد: خاموش‌کردن `DEBUG`، خواندن `DATABASE_URL`، افزودن دامنهٔ عمومی سرویس به `ALLOWED_HOSTS`/`CSRF_TRUSTED_ORIGINS`، و باز‌کردن CORS برای کل زیردامنه‌های `*.up.railway.app` (تا فرانت‌اند بدون هیچ تنظیم دستی بتواند با بک‌اند صحبت کند).
 >
-> در نتیجه، روی Railway تنها کارهایی که باید دستی انجام دهید: ساخت دو سرویس (بک‌اند با Root Directory خالی، فرانت‌اند با Root Directory برابر `frontend`)، افزودن پلاگین Postgres و **رفرنس‌کردن** `DATABASE_URL` آن به سرویس بک‌اند، و تنظیم `SECRET_KEY` + متغیرهای `NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_SITE_NAME` برای سرویس فرانت‌اند (که هنگام build به‌صورت Docker build-arg به ایمیج پاس داده می‌شوند).
+> در نتیجه، روی Railway **فقط ۳ متغیر** باید دستی تنظیم شوند (هر سهٔ آن‌ها فقط یک‌بار، در همان صفحهٔ Variables هر سرویس):
+>
+> | کجا | متغیر | مقدار |
+> |---|---|---|
+> | سرویس بک‌اند | `SECRET_KEY` | یک رشتهٔ تصادفی طولانی (مثل آنچه در مرحلهٔ `SECRET_KEY` فایل `.env.docker.example` توضیح داده شده) |
+> | سرویس بک‌اند | `DATABASE_URL` | با کلیک روی «Add a Reference» مقدار `${{Postgres.DATABASE_URL}}` را از پلاگین Postgres همان پروژه انتخاب کنید |
+> | سرویس فرانت‌اند | `NEXT_PUBLIC_API_URL` | با کلیک روی «Add a Reference» مقدار `RAILWAY_PUBLIC_DOMAIN` سرویس بک‌اند را انتخاب کنید و `https://` را جلوی آن اضافه کنید — یعنی چیزی شبیه `https://${{<نام‌سرویس‌بک‌اند>.RAILWAY_PUBLIC_DOMAIN}}` |
+>
+> همین! بقیهٔ همه‌چیز — اتصال دیتابیس، migrate، seed، collectstatic، CORS، CSRF، ALLOWED_HOSTS، SSL — کاملاً خودکار است.
 
 ---
 

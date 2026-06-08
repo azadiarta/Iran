@@ -4,8 +4,16 @@ from datetime import timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Railway always injects RAILWAY_ENVIRONMENT for every deployment — use its
+# presence as a reliable "are we running on Railway" signal so the handful of
+# settings below can auto-configure themselves with zero user input.
+_on_railway = bool(os.environ.get('RAILWAY_ENVIRONMENT'))
+
 SECRET_KEY = os.environ.get('SECRET_KEY', 'insecure-dev-key-replace-in-production')
-DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+# Default to secure (DEBUG=False) when we know we're deployed on Railway, and to
+# the convenient dev default (DEBUG=True) everywhere else; either can still be
+# overridden explicitly via the DEBUG env var.
+DEBUG = os.environ.get('DEBUG', 'False' if _on_railway else 'True') == 'True'
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 # Railway injects RAILWAY_PUBLIC_DOMAIN with the service's *.up.railway.app (or
@@ -26,6 +34,10 @@ CSRF_TRUSTED_ORIGINS = [
 ] or [
     f'https://{host}' for host in ALLOWED_HOSTS if host not in ('localhost', '127.0.0.1', '*')
 ]
+if _railway_public_domain:
+    _railway_origin = f'https://{_railway_public_domain}'
+    if _railway_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_railway_origin)
 
 INSTALLED_APPS = [
     'jazzmin',
@@ -150,15 +162,20 @@ else:
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CORS_ALLOWED_ORIGINS = os.environ.get(
-    'CORS_ALLOWED_ORIGINS', 'http://localhost:3000'
-).split(',')
-if _railway_public_domain:
-    _railway_origin = f'https://{_railway_public_domain}'
-    if _railway_origin not in CORS_ALLOWED_ORIGINS:
-        CORS_ALLOWED_ORIGINS.append(_railway_origin)
-    if _railway_origin not in CSRF_TRUSTED_ORIGINS:
-        CSRF_TRUSTED_ORIGINS.append(_railway_origin)
+CORS_ALLOWED_ORIGINS = [
+    origin.strip() for origin in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if origin.strip()
+] or (['http://localhost:3000'] if not _on_railway else [])
+
+# On Railway the frontend and backend are two separate services on different
+# *.up.railway.app subdomains, so the frontend's exact origin isn't known to the
+# backend in advance. Trust the whole *.up.railway.app suffix for CORS instead
+# of requiring the user to wire CORS_ALLOWED_ORIGINS by hand — safe to do here
+# because the API is JWT-bearer-token authenticated (CORS_ALLOW_CREDENTIALS is
+# never enabled, so no cookies/sessions ever cross origins; CSRF_TRUSTED_ORIGINS
+# above stays a strict allowlist for the session-authenticated /admin/ panel).
+CORS_ALLOWED_ORIGIN_REGEXES = (
+    [r'^https://[a-zA-Z0-9-]+\.up\.railway\.app$'] if _on_railway else []
+)
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
