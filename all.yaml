@@ -3,7 +3,7 @@ meta:
   backend: django/python
   frontend: react/javascript
   db: postgresql
-  deploy: docker-compose
+  deploy: "docker-compose (primary, any VPS); also Railway-compatible via railway.json"
   payment: stripe (gbp primary, expandable: paypal, google_pay, multi-currency)
 
 rules:
@@ -167,6 +167,24 @@ files:
     status: done
     kind: config
     note: "template users copy to .env — exactly 5 beginner-friendly documented vars (PUBLIC_HOST, PUBLIC_URL, SECRET_KEY, POSTGRES_PASSWORD, SITE_NAME); everything else (db name/user, DB_HOST=db, ports) is fixed in docker-compose.yml"
+    needed_by: []
+
+  "railway.json":
+    status: done
+    kind: config
+    note: "Railway's modern native config (official Procfile replacement) for the backend service (root directory = repo root): forces the RAILPACK builder and supplies the explicit startCommand 'cd backend && migrate && seed_initial_data && collectstatic && gunicorn' that Railpack cannot auto-derive since manage.py lives in backend/ rather than the repo root — without it Railpack fails at deploy with 'No start command detected'. Coexists with docker-compose; does not affect VPS/Docker deploys."
+    needed_by: []
+
+  "frontend/railway.json":
+    status: done
+    kind: config
+    note: "forces the RAILPACK builder for the frontend service on Railway, overriding Railway's automatic Dockerfile-detection (which would otherwise pick up frontend/Dockerfile and switch to a Docker build that doesn't receive NEXT_PUBLIC_* as build ARGs on Railway, baking empty values into the client bundle). Keeps the existing working Railpack/Node build where these vars are supplied as plain Railway environment variables at build time."
+    needed_by: []
+
+  ".python-version":
+    status: done
+    kind: config
+    note: "pins Python to 3.12 for Railpack/pyenv/uv (modern PEP-style replacement for the removed Heroku-specific runtime.txt); also keeps backend/Dockerfile's python:3.12-slim base in sync with the version Railway provisions"
     needed_by: []
 
   # ─── ADMIN ────────────────────────────────────────────────────────────────
