@@ -72,7 +72,8 @@ files:
       auth_user_model: accounts.Member
       authentication_backends: [accounts.backends.MemberAuthBackend]
       db_engine: postgresql (override: DB_ENGINE env for local sqlite testing)
-      db_env_vars: [DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT]
+      db_env_vars: "DATABASE_URL (preferred — parsed via urlparse; auto-provided by Railway's Postgres plugin and most PaaS) with fallback to discrete DB_NAME/DB_USER/DB_PASSWORD/DB_HOST/DB_PORT (used by docker-compose, which sets these explicitly)"
+      railway_auto_detection: "RAILWAY_PUBLIC_DOMAIN (auto-injected by Railway for any service with a public domain) is appended to ALLOWED_HOSTS, CORS_ALLOWED_ORIGINS and CSRF_TRUSTED_ORIGINS automatically when present — combined with DATABASE_URL parsing, the only Railway-specific step left is linking the Postgres plugin's DATABASE_URL variable to the backend service"
       media: "conditional on AWS_STORAGE_BUCKET_NAME env var: if set → DEFAULT_FILE_STORAGE=storages.backends.s3.S3Storage (django-storages), MEDIA_URL derived from AWS_S3_CUSTOM_DOMAIN / AWS_S3_ENDPOINT_URL / default S3 URL (supports AWS S3, Cloudflare R2, Backblaze B2, ...); if unset → local MEDIA_ROOT=backend/media, MEDIA_URL=/media/ for dev. DEFAULT_FILE_STORAGE used (not STORAGES dict) — Django raises ImproperlyConfigured if both STORAGES and STATICFILES_STORAGE are set"
       static: "STATIC_ROOT=backend/staticfiles, STATIC_URL=/static/, STATICFILES_STORAGE=whitenoise.storage.CompressedManifestStaticFilesStorage"
       middleware: "whitenoise.middleware.WhiteNoiseMiddleware added directly after SecurityMiddleware"
@@ -172,19 +173,19 @@ files:
   "railway.json":
     status: done
     kind: config
-    note: "Railway's modern native config (official Procfile replacement) for the backend service (root directory = repo root): forces the RAILPACK builder and supplies the explicit startCommand 'cd backend && migrate && seed_initial_data && collectstatic && gunicorn' that Railpack cannot auto-derive since manage.py lives in backend/ rather than the repo root — without it Railpack fails at deploy with 'No start command detected'. Coexists with docker-compose; does not affect VPS/Docker deploys."
+    note: "tells Railway's backend service (root directory = repo root) to build with the SAME backend/Dockerfile used for docker-compose (builder: DOCKERFILE, dockerfilePath: backend/Dockerfile, build context = repo root) instead of auto-detecting via Railpack — so Railway runs the exact same container (docker-entrypoint.sh: wait-for-db → migrate → seed_initial_data → collectstatic → gunicorn) as any other Docker host. No startCommand needed; the image's ENTRYPOINT handles it. Pairs with settings.py's DATABASE_URL/RAILWAY_PUBLIC_DOMAIN auto-detection and docker-entrypoint.sh's $PORT-aware gunicorn bind so the only Railway-specific step left is linking the Postgres plugin's DATABASE_URL variable."
     needed_by: []
 
   "frontend/railway.json":
     status: done
     kind: config
-    note: "forces the RAILPACK builder for the frontend service on Railway, overriding Railway's automatic Dockerfile-detection (which would otherwise pick up frontend/Dockerfile and switch to a Docker build that doesn't receive NEXT_PUBLIC_* as build ARGs on Railway, baking empty values into the client bundle). Keeps the existing working Railpack/Node build where these vars are supplied as plain Railway environment variables at build time."
+    note: "tells Railway's frontend service (root directory = frontend) to build with the SAME frontend/Dockerfile used for docker-compose (builder: DOCKERFILE, dockerfilePath: Dockerfile relative to root directory, build context = frontend/) — Railway passes service variables matching the Dockerfile's declared ARGs (NEXT_PUBLIC_API_URL/NEXT_PUBLIC_SITE_NAME/NEXT_PUBLIC_MEDIA_URL) as Docker build args automatically, so the same standalone-output image and bundle-baking behavior is reused everywhere."
     needed_by: []
 
   ".python-version":
     status: done
     kind: config
-    note: "pins Python to 3.12 for Railpack/pyenv/uv (modern PEP-style replacement for the removed Heroku-specific runtime.txt); also keeps backend/Dockerfile's python:3.12-slim base in sync with the version Railway provisions"
+    note: "pins Python to 3.12 for any tooling that still reads it (pyenv/uv/local dev); also documents the version backend/Dockerfile's python:3.12-slim base matches. No longer load-bearing for Railway since the backend now builds via Dockerfile rather than Railpack's Python auto-detection."
     needed_by: []
 
   # ─── ADMIN ────────────────────────────────────────────────────────────────

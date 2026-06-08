@@ -8,7 +8,11 @@
 
 > ⏱ **زمان تقریبی:** اگر برای اولین بار است، حدود ۳۰ تا ۶۰ دقیقه زمان بگذارید (شامل دانلود و ساخت تصاویر Docker که خودش حدود ۵ تا ۱۵ دقیقه طول می‌کشد و کاملاً خودکار است).
 
-> ☁️ **استفاده از Railway به‌جای سرور شخصی؟** اگر ترجیح می‌دهید به‌جای یک VPS از Railway استفاده کنید، نیازی به هیچ تنظیم دستی نیست — پروژه به‌طور خودکار با Railway هم سازگار است: فایل `railway.json` (در ریشهٔ پروژه) دستور اجرای بک‌اند را به Railway می‌گوید و فایل `frontend/railway.json` مطمئن می‌شود فرانت‌اند با همان روش قبلی (و نه از طریق `Dockerfile`) ساخته شود — چون متغیرهای `NEXT_PUBLIC_*` روی Railway باید هنگام ساخت به‌صورت متغیر محیطی سرویس فرانت‌اند تنظیم شوند، نه به‌صورت آرگومان Docker. کافی است مثل قبل دو سرویس (بک‌اند با Root Directory خالی، فرانت‌اند با Root Directory برابر `frontend`) در Railway بسازید و متغیرهای محیطی لازم (`SECRET_KEY`, `DATABASE_URL`/`DB_*`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `NEXT_PUBLIC_API_URL` و غیره) را در پنل Railway تنظیم کنید.
+> ☁️ **استفاده از Railway به‌جای سرور شخصی؟** پروژه طوری تنظیم شده که Railway هم از **همان فایل‌های Docker** که برای VPS ساخته شده‌اند استفاده می‌کند — یعنی همان ایمیجی که روی سرور شخصی اجرا می‌شود، روی Railway هم اجرا می‌شود (دیگر دو روش جدا برای نگهداری وجود ندارد). فایل‌های `railway.json` و `frontend/railway.json` به Railway می‌گویند به‌جای حدس زدن، مستقیماً از `backend/Dockerfile` و `frontend/Dockerfile` بسازد و اجرا کند. علاوه بر این، بک‌اند به‌صورت خودکار:
+> - متغیر `DATABASE_URL` که Railway هنگام افزودن پلاگین Postgres می‌سازد را می‌خواند (دیگر نیازی به پر کردن جداگانهٔ `DB_HOST`/`DB_USER`/`DB_PASSWORD`/... نیست)
+> - دامنهٔ عمومی Railway (`RAILWAY_PUBLIC_DOMAIN`) را خودش به `ALLOWED_HOSTS`/`CORS_ALLOWED_ORIGINS`/`CSRF_TRUSTED_ORIGINS` اضافه می‌کند
+>
+> در نتیجه، روی Railway تنها کارهایی که باید دستی انجام دهید: ساخت دو سرویس (بک‌اند با Root Directory خالی، فرانت‌اند با Root Directory برابر `frontend`)، افزودن پلاگین Postgres و **رفرنس‌کردن** `DATABASE_URL` آن به سرویس بک‌اند، و تنظیم `SECRET_KEY` + متغیرهای `NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_SITE_NAME` برای سرویس فرانت‌اند (که هنگام build به‌صورت Docker build-arg به ایمیج پاس داده می‌شوند).
 
 ---
 

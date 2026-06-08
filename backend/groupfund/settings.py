@@ -8,6 +8,13 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'insecure-dev-key-replace-in-productio
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
+# Railway injects RAILWAY_PUBLIC_DOMAIN with the service's *.up.railway.app (or
+# custom) domain — append it automatically so ALLOWED_HOSTS/CORS/CSRF need no
+# manual wiring on Railway. Has no effect for docker-compose (var is unset there).
+_railway_public_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
+if _railway_public_domain and _railway_public_domain not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_railway_public_domain)
+
 # Required for the Django admin (and any cross-origin POST/PUT/PATCH/DELETE) to
 # work behind a TLS-terminating reverse proxy (e.g. Caddy): with
 # SECURE_PROXY_SSL_HEADER set, Django treats the request as secure and validates
@@ -75,16 +82,35 @@ AUTHENTICATION_BACKENDS = [
     'accounts.backends.MemberAuthBackend',
 ]
 
-DATABASES = {
-    'default': {
-        'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.postgresql'),
-        'NAME': os.environ.get('DB_NAME', ''),
-        'USER': os.environ.get('DB_USER', ''),
-        'PASSWORD': os.environ.get('DB_PASSWORD', ''),
-        'HOST': os.environ.get('DB_HOST', 'localhost'),
-        'PORT': os.environ.get('DB_PORT', '5432'),
+# Railway's managed Postgres plugin (and many other PaaS providers) expose a
+# single DATABASE_URL connection string instead of separate host/user/password
+# variables. Prefer it when present so Railway deploys need zero DB wiring;
+# docker-compose (which sets the discrete DB_* vars) keeps working unchanged.
+_database_url = os.environ.get('DATABASE_URL')
+if _database_url:
+    from urllib.parse import urlparse
+    _parsed_db_url = urlparse(_database_url)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': _parsed_db_url.path.lstrip('/'),
+            'USER': _parsed_db_url.username or '',
+            'PASSWORD': _parsed_db_url.password or '',
+            'HOST': _parsed_db_url.hostname or 'localhost',
+            'PORT': _parsed_db_url.port or 5432,
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.postgresql'),
+            'NAME': os.environ.get('DB_NAME', ''),
+            'USER': os.environ.get('DB_USER', ''),
+            'PASSWORD': os.environ.get('DB_PASSWORD', ''),
+            'HOST': os.environ.get('DB_HOST', 'localhost'),
+            'PORT': os.environ.get('DB_PORT', '5432'),
+        }
+    }
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
@@ -127,6 +153,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOWED_ORIGINS = os.environ.get(
     'CORS_ALLOWED_ORIGINS', 'http://localhost:3000'
 ).split(',')
+if _railway_public_domain:
+    _railway_origin = f'https://{_railway_public_domain}'
+    if _railway_origin not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(_railway_origin)
+    if _railway_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_railway_origin)
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
