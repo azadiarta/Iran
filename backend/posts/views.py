@@ -133,9 +133,15 @@ class PostCreateView(APIView):
         serializer = PostCreateSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid():
             return api_error('Validation failed.', errors=serializer.errors)
-        post = serializer.save()
 
+        setting = DefaultSetting.objects.filter(key='max_receipt_image_size_mb').first()
+        max_mb = float(setting.value) if setting else 5.0
         images = request.FILES.getlist('images')
+        for img in images:
+            if img.size > max_mb * 1024 * 1024:
+                return api_error(f'Image "{img.name}" exceeds {max_mb}MB limit.')
+
+        post = serializer.save()
         for img in images:
             PostImage.objects.create(post=post, image=img)
 
@@ -202,10 +208,13 @@ class PostImageUploadView(APIView):
         setting = DefaultSetting.objects.filter(key='max_receipt_image_size_mb').first()
         max_mb = float(setting.value) if setting else 5.0
 
-        created = []
-        for img in request.FILES.getlist('images'):
+        images = request.FILES.getlist('images')
+        for img in images:
             if img.size > max_mb * 1024 * 1024:
                 return api_error(f'Image "{img.name}" exceeds {max_mb}MB limit.')
+
+        created = []
+        for img in images:
             pi = PostImage.objects.create(post=post, image=img)
             created.append(pi)
 

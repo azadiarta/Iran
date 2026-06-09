@@ -457,7 +457,7 @@ export default function ProfilePage() {
               {/* Confirm new password */}
               <div>
                 <label className="block text-xs text-white/50 mb-1.5">
-                  {t('confirm_password')}
+                  {t('confirm_new_password')}
                 </label>
                 <div className="relative">
                   <input

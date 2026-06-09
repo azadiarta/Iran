@@ -1,7 +1,7 @@
 meta:
   project: groupfund
   backend: django/python
-  frontend: react/javascript
+  frontend: next.js/react/typescript
   db: postgresql
   deploy: "docker-compose (primary, any VPS — one command: docker compose up -d --build)"
   payment: stripe (gbp primary, expandable: paypal, google_pay, multi-currency)
