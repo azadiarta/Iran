@@ -74,7 +74,7 @@ class MemberProfileSerializer(serializers.ModelSerializer):
         model = Member
         fields = [
             'id', 'full_name', 'display_name', 'email', 'phone',
-            'group_name', 'group_permissions', 'is_active', 'created_at',
+            'group_name', 'group_permissions', 'is_active', 'is_superuser', 'created_at',
         ]
         read_only_fields = fields
 

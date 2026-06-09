@@ -10,7 +10,7 @@ export interface Member {
   group_name: string | null;
   group_permissions: string[];
   is_active: boolean;
-  is_superuser?: boolean;
+  is_superuser: boolean;
   created_at: string;
 }
 
@@ -70,7 +70,7 @@ const useAuthStore = create<AuthState>()(
       hasPermission: (codename) => {
         const { member, permissions } = get();
         if (member?.is_superuser) return true;
-        return permissions.includes(codename);
+        return permissions.includes('*') || permissions.includes(codename);
       },
     }),
     {
