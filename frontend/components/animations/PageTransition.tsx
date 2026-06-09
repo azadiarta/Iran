@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LionAndSun } from './IranianSymbols';
 
@@ -10,6 +11,7 @@ interface PageTransitionProps {
 
 export default function PageTransition({ children, locale }: PageTransitionProps) {
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const pathname = usePathname();
   const label = locale === 'fa' ? 'پاینده ایران' : 'Long Live Iran';
 
   return (
@@ -65,7 +67,7 @@ export default function PageTransition({ children, locale }: PageTransitionProps
         onExitComplete={() => setIsTransitioning(false)}
       >
         <motion.div
-          key={typeof window !== 'undefined' ? window.location.pathname : undefined}
+          key={pathname}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}

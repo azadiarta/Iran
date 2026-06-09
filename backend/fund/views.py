@@ -57,7 +57,7 @@ def _paginate(queryset, request, serializer_class):
 # ─── Contribution ──────────────────────────────────────────────────────────────
 
 class ContributionListView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasGroupPermission('can_view_balance')]
 
     def get(self, request):
         qs = Contribution.objects.select_related('contributor').order_by('-created_at')

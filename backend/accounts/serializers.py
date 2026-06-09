@@ -45,14 +45,19 @@ class RegisterSerializer(serializers.ModelSerializer):
         return member
 
     def _get_default_group(self):
-        # Find the group that has exactly: can_contribute and can_comment (and nothing else)
-        target_codenames = {'can_contribute', 'can_comment'}
-        for group in AccessGroup.objects.prefetch_related('permissions'):
-            group_codenames = set(group.permissions.values_list('codename', flat=True))
-            if group_codenames == target_codenames:
+        from core.models import DefaultSetting
+        setting = DefaultSetting.objects.filter(key='default_group').first()
+        if setting and setting.value:
+            try:
+                group = AccessGroup.objects.get(pk=setting.value)
                 return group
+            except (AccessGroup.DoesNotExist, Exception):
+                pass
 
-        # Fallback: any group with the fewest permissions
+        group = AccessGroup.objects.filter(is_default=True).first()
+        if group:
+            return group
+
         group = AccessGroup.objects.order_by('name').first()
         if not group:
             raise serializers.ValidationError(
@@ -178,7 +183,7 @@ class AccessGroupSerializer(serializers.ModelSerializer):
 
 class AccessGroupCreateSerializer(serializers.ModelSerializer):
     permission_ids = serializers.ListField(
-        child=serializers.UUIDField(), write_only=True, required=False, default=list,
+        child=serializers.CharField(), write_only=True, required=False, default=list,
     )
 
     class Meta:
@@ -186,20 +191,19 @@ class AccessGroupCreateSerializer(serializers.ModelSerializer):
         fields = ['name', 'description', 'permission_ids']
 
     def create(self, validated_data):
-        from core.models import Permission
         permission_ids = validated_data.pop('permission_ids', [])
         group = AccessGroup.objects.create(**validated_data)
         required = Permission.objects.filter(codename__in=['can_contribute', 'can_comment'])
         group.permissions.set(required)
         if permission_ids:
-            extra = Permission.objects.filter(id__in=permission_ids)
+            extra = Permission.objects.filter(codename__in=permission_ids)
             group.permissions.add(*extra)
         return group
 
 
 class AccessGroupUpdateSerializer(serializers.ModelSerializer):
     permission_ids = serializers.ListField(
-        child=serializers.UUIDField(), write_only=True, required=False,
+        child=serializers.CharField(), write_only=True, required=False,
     )
 
     class Meta:
@@ -211,16 +215,12 @@ class AccessGroupUpdateSerializer(serializers.ModelSerializer):
         }
 
     def update(self, instance, validated_data):
-        from core.models import Permission
         permission_ids = validated_data.pop('permission_ids', None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
         if permission_ids is not None:
-            required = set(
-                Permission.objects.filter(codename__in=['can_contribute', 'can_comment'])
-                .values_list('id', flat=True)
-            )
-            new_ids = set(permission_ids) | required
-            instance.permissions.set(Permission.objects.filter(id__in=new_ids))
+            required_codenames = {'can_contribute', 'can_comment'}
+            all_codenames = set(permission_ids) | required_codenames
+            instance.permissions.set(Permission.objects.filter(codename__in=all_codenames))
         return instance

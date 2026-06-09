@@ -41,11 +41,6 @@ export default function LoginPage() {
         tokens: { access: string; refresh: string };
         member: Parameters<typeof login>[0];
       };
-      // Persist tokens in localStorage for the API interceptor
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('access_token', tokens.access);
-        localStorage.setItem('refresh_token', tokens.refresh);
-      }
       login(member, { access: tokens.access, refresh: tokens.refresh });
       router.push(`/${locale}`);
     } catch (err: unknown) {

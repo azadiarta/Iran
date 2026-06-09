@@ -5,23 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { DollarSign, User, Calendar, ChevronLeft, ChevronRight, X, Wallet, Receipt } from 'lucide-react';
 import { fundAPI } from '@/lib/api';
-import type { FundBalance } from '@/lib/api';
+import type { FundBalance, Expense } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
-
-interface ExpenseAuthor {
-  display_name: string;
-}
-
-interface Expense {
-  id: number;
-  withdrawn_by: ExpenseAuthor;
-  amount: number;
-  currency: string;
-  short_reason: string;
-  description?: string;
-  expense_date: string;
-  receipt_image?: string | null;
-}
 
 interface ExpensesResponse {
   count: number;
@@ -225,7 +210,7 @@ export default function ExpensesPage() {
                         className="font-bold text-lg flex-shrink-0"
                         style={{ color: '#10b981', textShadow: '0 0 10px rgba(16,185,129,0.4)' }}
                       >
-                        {formatAmount(expense.amount, expense.currency)}
+                        {formatAmount(expense.amount, balance?.currency ?? '')}
                       </p>
                     </div>
 

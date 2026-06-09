@@ -199,6 +199,7 @@ REST_FRAMEWORK = {
         'anon': '100/hour',
         'user': '1000/hour',
     },
+    'COERCE_DECIMAL_TO_STRING': False,
 }
 
 # ─── i18n ─────────────────────────────────────────────────────────────────────

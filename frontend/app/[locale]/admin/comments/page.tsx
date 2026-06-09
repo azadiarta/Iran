@@ -153,7 +153,8 @@ export default function AdminCommentsPage() {
           {!c.is_approved && (
             <button
               onClick={() => setConfirmAction({ type: 'approve', comment: c })}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all"
+              disabled={actionLoading}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ border: '1px solid rgba(16,185,129,0.35)', color: '#10b981', backgroundColor: 'rgba(16,185,129,0.06)' }}
             >
               <Check className="w-3.5 h-3.5" />
@@ -163,7 +164,8 @@ export default function AdminCommentsPage() {
           {canDelete && (
             <button
               onClick={() => setConfirmAction({ type: 'delete', comment: c })}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all"
+              disabled={actionLoading}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.06)' }}
             >
               <Trash2 className="w-3.5 h-3.5" />

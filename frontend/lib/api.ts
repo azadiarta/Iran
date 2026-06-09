@@ -48,10 +48,15 @@ api.interceptors.request.use(
 
 // ─── Track whether a token refresh is already in flight ───────────────────────
 let isRefreshing = false;
-let pendingRequests: Array<(token: string) => void> = [];
+let pendingRequests: Array<{ resolve: (token: string) => void; reject: (err: unknown) => void }> = [];
 
 function onRefreshed(token: string) {
-  pendingRequests.forEach((cb) => cb(token));
+  pendingRequests.forEach(({ resolve }) => resolve(token));
+  pendingRequests = [];
+}
+
+function onRefreshFailed(err: unknown) {
+  pendingRequests.forEach(({ reject }) => reject(err));
   pendingRequests = [];
 }
 
@@ -103,17 +108,20 @@ api.interceptors.response.use(
       }
 
       if (isRefreshing) {
-        // Queue this request until the refresh resolves
-        return new Promise((resolve) => {
-          pendingRequests.push((newToken: string) => {
-            if (originalRequest.headers) {
-              (originalRequest.headers as Record<string, string>)[
-                'Authorization'
-              ] = `Bearer ${newToken}`;
-            } else {
-              originalRequest.headers = { Authorization: `Bearer ${newToken}` };
-            }
-            resolve(api(originalRequest));
+        // Queue this request until the refresh resolves or fails
+        return new Promise((resolve, reject) => {
+          pendingRequests.push({
+            resolve: (newToken: string) => {
+              if (originalRequest.headers) {
+                (originalRequest.headers as Record<string, string>)[
+                  'Authorization'
+                ] = `Bearer ${newToken}`;
+              } else {
+                originalRequest.headers = { Authorization: `Bearer ${newToken}` };
+              }
+              resolve(api(originalRequest));
+            },
+            reject,
           });
         });
       }
@@ -144,9 +152,9 @@ api.interceptors.response.use(
         }
 
         return api(originalRequest);
-      } catch {
+      } catch (refreshErr) {
         isRefreshing = false;
-        pendingRequests = [];
+        onRefreshFailed(refreshErr);
         const store2 = getAuthStore();
         store2.getState().logout();
         if (typeof window !== 'undefined') {
@@ -222,9 +230,9 @@ export interface PostAuthor {
 }
 
 export interface PostImage {
-  id: number;
+  id: string;
   image: string;
-  thumbnail?: string;
+  uploaded_at: string;
 }
 
 export interface PostSummary {
@@ -241,10 +249,17 @@ export interface PostDetail extends PostSummary {
   images: PostImage[];
 }
 
+export interface CommentAuthor {
+  id: string;
+  display_name: string | null;
+  full_name: string;
+}
+
 export interface Comment {
   id: string;
-  author_label?: string;
-  guest_name?: string | null;
+  author: CommentAuthor | null;
+  author_label: string;
+  guest_name: string | null;
   text: string;
   rating: number | null;
   is_approved: boolean;
@@ -303,7 +318,7 @@ export const postsAPI = {
     });
   },
 
-  deleteImage: (id: string, imageId: number) =>
+  deleteImage: (id: string, imageId: string) =>
     api.delete<ApiResponse>(`/api/posts/${id}/images/${imageId}/delete/`),
 };
 

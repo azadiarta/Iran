@@ -403,7 +403,7 @@ export default function PostDetailPage() {
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={img.thumbnail || img.image}
+                      src={img.image}
                       alt={`${post.title} — ${idx + 1}`}
                       className="w-full h-full object-cover"
                     />

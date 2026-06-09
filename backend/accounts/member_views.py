@@ -241,14 +241,14 @@ class ChangePasswordView(APIView):
         except Member.DoesNotExist:
             return api_error('Member not found.', status_code=404)
 
-        if member.is_superuser:
-            return api_error('Cannot change superuser password via API.', status_code=403)
-
         is_owner = request.user.pk == member.pk
         is_password_admin = request.user.is_superuser or (
             request.user.group and
             request.user.group.permissions.filter(codename='can_change_any_password').exists()
         )
+
+        if member.is_superuser and not is_owner:
+            return api_error('Cannot change superuser password.', status_code=403)
 
         if not is_owner and not is_password_admin:
             return api_error('Permission denied.', status_code=403)

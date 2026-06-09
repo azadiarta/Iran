@@ -3,7 +3,7 @@ meta:
   backend: django/python
   frontend: react/javascript
   db: postgresql
-  deploy: "docker-compose (primary, any VPS); also Railway-compatible via railway.json"
+  deploy: "docker-compose (primary, any VPS — one command: docker compose up -d --build)"
   payment: stripe (gbp primary, expandable: paypal, google_pay, multi-currency)
 
 rules:

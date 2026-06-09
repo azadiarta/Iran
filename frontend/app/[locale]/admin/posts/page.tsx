@@ -34,7 +34,7 @@ export default function AdminPostsPage() {
   const [saving, setSaving] = useState(false);
 
   const [confirmDelete, setConfirmDelete] = useState<PostSummary | null>(null);
-  const [confirmDeleteImage, setConfirmDeleteImage] = useState<{ id: number } | null>(null);
+  const [confirmDeleteImage, setConfirmDeleteImage] = useState<{ id: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   function load() {
@@ -220,7 +220,7 @@ export default function AdminPostsPage() {
                 {editing.images.map((img) => (
                   <div key={img.id} className="relative group">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={img.thumbnail || img.image} alt="" className="w-16 h-16 rounded-lg object-cover" style={{ border: '1px solid rgba(255,255,255,0.1)' }} />
+                    <img src={img.image} alt="" className="w-16 h-16 rounded-lg object-cover" style={{ border: '1px solid rgba(255,255,255,0.1)' }} />
                     <button
                       type="button"
                       onClick={() => setConfirmDeleteImage({ id: img.id })}

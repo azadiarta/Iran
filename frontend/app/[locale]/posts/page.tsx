@@ -56,7 +56,7 @@ function PostCard({ post, locale, index }: { post: PostSummary; locale: string; 
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={post.images[0].thumbnail || post.images[0].image}
+            src={post.images[0].image}
             alt=""
             className="w-full h-full object-cover"
           />

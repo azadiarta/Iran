@@ -20,6 +20,7 @@ export default function AdminContributionsPage() {
   const showToast = useToastStore((s) => s.show);
 
   const canView = !!currentMember?.is_superuser || hasPermission('can_view_balance');
+  const canManage = !!currentMember?.is_superuser || hasPermission('can_manage_permissions');
   const isSuperuser = !!currentMember?.is_superuser;
 
   const [items, setItems] = useState<Contribution[]>([]);
@@ -108,7 +109,7 @@ export default function AdminContributionsPage() {
       header: '',
       render: (c) => (
         <div className="flex items-center gap-1.5">
-          {c.status === 'pending' || c.status === 'pending_review' ? (
+          {canManage && (c.status === 'pending' || c.status === 'pending_review') ? (
             <>
               <button
                 onClick={() => setConfirmAction({ type: 'approve', contribution: c })}
