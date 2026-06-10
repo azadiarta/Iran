@@ -51,7 +51,7 @@ def _paginate(queryset, request, serializer_class):
     paginator = PageNumberPagination()
     paginator.page_size = 10
     page = paginator.paginate_queryset(queryset, request)
-    serializer = serializer_class(page, many=True)
+    serializer = serializer_class(page, many=True, context={'request': request})
     return paginator.get_paginated_response(serializer.data)
 
 
@@ -120,7 +120,7 @@ class PostDetailView(APIView):
         ).order_by('created_at')
 
         return api_success({
-            'post': PostSerializer(post).data,
+            'post': PostSerializer(post, context={'request': request}).data,
             'comments': CommentSerializer(comments, many=True).data,
         })
 
@@ -146,7 +146,7 @@ class PostCreateView(APIView):
             PostImage.objects.create(post=post, image=img)
 
         _log(request.user, 'post_created', target=post, ip=_get_ip(request))
-        return api_success(PostSerializer(post).data, message='Post created.', status_code=201)
+        return api_success(PostSerializer(post, context={'request': request}).data, message='Post created.', status_code=201)
 
 
 class PostUpdateView(APIView):
@@ -170,7 +170,7 @@ class PostUpdateView(APIView):
 
         _log(request.user, 'post_updated', target=post,
              extra_data={'before': before, 'after': after}, ip=_get_ip(request))
-        return api_success(PostSerializer(post).data, message='Post updated.')
+        return api_success(PostSerializer(post, context={'request': request}).data, message='Post updated.')
 
 
 class PostDeleteView(APIView):
@@ -219,7 +219,7 @@ class PostImageUploadView(APIView):
             created.append(pi)
 
         _log(request.user, 'post_image_uploaded', target=post, ip=_get_ip(request))
-        return api_success(PostImageSerializer(created, many=True).data, status_code=201)
+        return api_success(PostImageSerializer(created, many=True, context={'request': request}).data, status_code=201)
 
 
 class PostImageDeleteView(APIView):

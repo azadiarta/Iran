@@ -50,7 +50,7 @@ def _paginate(queryset, request, serializer_class):
     paginator = PageNumberPagination()
     paginator.page_size = 10
     page = paginator.paginate_queryset(queryset, request)
-    serializer = serializer_class(page, many=True)
+    serializer = serializer_class(page, many=True, context={'request': request})
     return paginator.get_paginated_response(serializer.data)
 
 
@@ -179,7 +179,7 @@ class ExpenseCreateView(APIView):
             return api_error('Validation failed.', errors=serializer.errors)
         expense = serializer.save()
         _log(request.user, 'expense_created', target=expense, ip=_get_ip(request))
-        return api_success(ExpenseSerializer(expense).data, message='Expense recorded.', status_code=201)
+        return api_success(ExpenseSerializer(expense, context={'request': request}).data, message='Expense recorded.', status_code=201)
 
 
 class ExpenseDeleteView(APIView):
