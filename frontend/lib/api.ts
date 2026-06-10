@@ -26,7 +26,7 @@ function getLocalePrefix(): string {
 
 // ─── Axios instance ───────────────────────────────────────────────────────────
 const api: AxiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
+  baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -132,7 +132,7 @@ api.interceptors.response.use(
 
       try {
         const { data } = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/auth/token/refresh/`,
+          `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'}/api/auth/token/refresh/`,
           { refresh: refreshToken }
         );
 
@@ -676,7 +676,7 @@ export const settingsAPI = {
   getPublicSettings: async () => {
     try {
       const response = await axios.get<ApiResponse>(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/settings/`,
+        `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'}/api/settings/`,
         { headers: { 'Content-Type': 'application/json' } }
       );
       return unwrapApiResponse(response);

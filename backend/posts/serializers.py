@@ -1,9 +1,12 @@
 from rest_framework import serializers
 
+from core.serializers import RelativeImageField
 from posts.models import Comment, Post, PostImage
 
 
 class PostImageSerializer(serializers.ModelSerializer):
+    image = RelativeImageField()
+
     class Meta:
         model = PostImage
         fields = ['id', 'image', 'uploaded_at']

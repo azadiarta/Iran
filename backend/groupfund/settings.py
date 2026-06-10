@@ -9,7 +9,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # settings below can auto-configure themselves with zero user input.
 _on_railway = bool(os.environ.get('RAILWAY_ENVIRONMENT'))
 
-SECRET_KEY = os.environ.get('SECRET_KEY', 'insecure-dev-key-replace-in-production')
+SECRET_KEY = os.environ.get('SECRET_KEY')
+if not SECRET_KEY:
+    if _on_railway:
+        # Derive a stable per-service secret from Railway's auto-injected
+        # project/service IDs (stable UUIDs, never exposed to the frontend) so
+        # a working deployment needs zero typed/generated secrets.
+        import hashlib
+        _seed = os.environ.get('RAILWAY_PROJECT_ID', '') + os.environ.get('RAILWAY_SERVICE_ID', '')
+        SECRET_KEY = hashlib.sha256(_seed.encode()).hexdigest()
+    else:
+        SECRET_KEY = 'insecure-dev-key-replace-in-production'
+
 # Default to secure (DEBUG=False) when we know we're deployed on Railway, and to
 # the convenient dev default (DEBUG=True) everywhere else; either can still be
 # overridden explicitly via the DEBUG env var.
@@ -17,11 +28,22 @@ DEBUG = os.environ.get('DEBUG', 'False' if _on_railway else 'True') == 'True'
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 # Railway injects RAILWAY_PUBLIC_DOMAIN with the service's *.up.railway.app (or
-# custom) domain — append it automatically so ALLOWED_HOSTS/CORS/CSRF need no
-# manual wiring on Railway. Has no effect for docker-compose (var is unset there).
+# custom) domain when a public domain is generated for it — append it
+# automatically so ALLOWED_HOSTS/CSRF need no manual wiring if you do generate
+# one for this service. Has no effect for docker-compose (var is unset there).
 _railway_public_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
 if _railway_public_domain and _railway_public_domain not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(_railway_public_domain)
+
+# Railway also injects RAILWAY_PRIVATE_DOMAIN (a *.railway.internal address)
+# for every service, used for service-to-service traffic on the private
+# network. In the recommended single-origin setup, the frontend service proxies
+# /api/, /admin/, /static/ and /media/ requests here (see
+# frontend/next.config.mjs rewrites() + BACKEND_INTERNAL_URL), and those
+# requests arrive with this private domain as their Host header.
+_railway_private_domain = os.environ.get('RAILWAY_PRIVATE_DOMAIN')
+if _railway_private_domain and _railway_private_domain not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_railway_private_domain)
 
 # Required for the Django admin (and any cross-origin POST/PUT/PATCH/DELETE) to
 # work behind a TLS-terminating reverse proxy (e.g. Caddy): with
@@ -38,6 +60,15 @@ if _railway_public_domain:
     _railway_origin = f'https://{_railway_public_domain}'
     if _railway_origin not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(_railway_origin)
+if _on_railway:
+    # The frontend service (the public entry point in the single-origin setup)
+    # gets a random *.up.railway.app subdomain that this service doesn't know in
+    # advance — trust the whole suffix instead of requiring it to be wired up by
+    # hand. Django 4.0+ supports leading-wildcard CSRF_TRUSTED_ORIGINS entries.
+    # Using a custom domain instead? Set CSRF_TRUSTED_ORIGINS explicitly.
+    _railway_wildcard_origin = 'https://*.up.railway.app'
+    if _railway_wildcard_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_railway_wildcard_origin)
 
 INSTALLED_APPS = [
     'jazzmin',
@@ -99,6 +130,7 @@ AUTHENTICATION_BACKENDS = [
 # variables. Prefer it when present so Railway deploys need zero DB wiring;
 # docker-compose (which sets the discrete DB_* vars) keeps working unchanged.
 _database_url = os.environ.get('DATABASE_URL')
+_db_name = os.environ.get('DB_NAME')
 if _database_url:
     from urllib.parse import urlparse
     _parsed_db_url = urlparse(_database_url)
@@ -112,15 +144,30 @@ if _database_url:
             'PORT': _parsed_db_url.port or 5432,
         }
     }
-else:
+elif _db_name:
     DATABASES = {
         'default': {
             'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.postgresql'),
-            'NAME': os.environ.get('DB_NAME', ''),
+            'NAME': _db_name,
             'USER': os.environ.get('DB_USER', ''),
             'PASSWORD': os.environ.get('DB_PASSWORD', ''),
             'HOST': os.environ.get('DB_HOST', 'localhost'),
             'PORT': os.environ.get('DB_PORT', '5432'),
+        }
+    }
+else:
+    # Neither DATABASE_URL nor DB_NAME is set — e.g. a Railway backend service
+    # with no Postgres plugin attached. Fall back to a local SQLite database so
+    # the project runs with zero DB configuration (useful for quick testing
+    # within Railway's service-count limits). Note: on Railway the container
+    # filesystem is ephemeral, so this database is wiped on every
+    # redeploy/restart — fine for testing, not for real data. To switch to
+    # Postgres later, add a Postgres plugin and set DATABASE_URL to reference
+    # it (see DEPLOYMENT.md); no further code changes are needed.
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
 
@@ -294,7 +341,15 @@ SIMPLE_JWT = {
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 if not DEBUG:
-    SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True') == 'True'
+    # Default to False: this backend is always reached over plain HTTP from a
+    # reverse proxy on the same host/network — Caddy in docker-compose, or the
+    # frontend service's rewrite-proxy on Railway (see
+    # frontend/next.config.mjs) — which already terminates HTTPS for the
+    # public-facing connection. Redirecting here would either be a no-op or
+    # (for the Railway proxy, which talks to this private/internal service over
+    # plain HTTP) cause an infinite redirect loop. Set to 'True' explicitly only
+    # if this service is itself reachable directly over HTTPS.
+    SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False') == 'True'
     SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30  # 30 days
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True

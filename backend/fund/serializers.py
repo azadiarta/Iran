@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from core.models import DefaultSetting
+from core.serializers import RelativeImageField
 from fund.models import Contribution, Expense
 
 
@@ -71,6 +72,7 @@ class ContributionStatusSerializer(serializers.ModelSerializer):
 
 class ExpenseSerializer(serializers.ModelSerializer):
     withdrawn_by = MemberMinimalSerializer(read_only=True)
+    receipt_image = RelativeImageField()
 
     class Meta:
         model = Expense
