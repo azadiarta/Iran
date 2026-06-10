@@ -30,6 +30,12 @@ export default function Navbar({ locale }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userDropOpen, setUserDropOpen] = useState(false);
   const dropRef = useRef<HTMLDivElement>(null);
+  // Auth state comes from localStorage, which the server can't see; only
+  // render auth-dependent UI after mount so SSR and first client render match.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Close user dropdown on outside click
   useEffect(() => {
@@ -201,7 +207,7 @@ export default function Navbar({ locale }: NavbarProps) {
             </button>
 
             {/* Auth section — desktop */}
-            {isAuthenticated && member ? (
+            {mounted && isAuthenticated && member ? (
               <div className="hidden md:block relative" ref={dropRef}>
                 <button
                   onClick={() => setUserDropOpen((v) => !v)}
@@ -453,7 +459,7 @@ export default function Navbar({ locale }: NavbarProps) {
                   {locale === 'en' ? 'فارسی' : 'English'}
                 </button>
 
-                {isAuthenticated && member ? (
+                {mounted && isAuthenticated && member ? (
                   <>
                     <div className="flex items-center gap-3 px-1">
                       <span

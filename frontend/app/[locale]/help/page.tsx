@@ -1,4 +1,5 @@
 'use client';
+import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { useParams } from 'next/navigation';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
@@ -46,8 +47,14 @@ export default function HelpPage() {
   const locale = (params?.locale as 'en' | 'fa') || 'en';
   const isRTL = locale === 'fa';
   const { member, hasPermission } = useAuthStore();
-  const isSuperuser = !!member?.is_superuser;
-  const isAuthenticated = !!member;
+  // Auth state lives in localStorage; gate on mount so SSR and the first
+  // client render agree (avoids React hydration mismatch).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  const isSuperuser = mounted && !!member?.is_superuser;
+  const isAuthenticated = mounted && !!member;
 
   function isVisible(section: HelpSection): boolean {
     if (section.group === 'guest') return true;
@@ -59,7 +66,7 @@ export default function HelpPage() {
     // Admin sections
     if (isSuperuser) return true;
     if (section.superuserOnly) return false;
-    if (section.permission) return hasPermission(section.permission);
+    if (section.permission) return mounted && hasPermission(section.permission);
     return false;
   }
 

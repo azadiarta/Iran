@@ -147,7 +147,13 @@ export default function LandingPage() {
       .finally(() => setPostsLoading(false));
   }, []);
 
-  const canViewBalance = hasPermission('can_view_balance');
+  // Permissions live in localStorage; gate on mount so SSR and the first
+  // client render agree (avoids React hydration mismatch).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  const canViewBalance = mounted && hasPermission('can_view_balance');
 
   function formatDate(iso: string) {
     try {

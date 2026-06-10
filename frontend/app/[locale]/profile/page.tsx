@@ -31,7 +31,7 @@ export default function ProfilePage() {
   const params = useParams();
   const router = useRouter();
   const locale = (params?.locale as string) || 'en';
-  const { member, isAuthenticated, setMember } = useAuthStore();
+  const { member, isAuthenticated, setMember, hasHydrated } = useAuthStore();
 
   // ── Edit profile state ───────────────────────────────────────────────────
   const [showEditForm, setShowEditForm] = useState(false);
@@ -62,10 +62,13 @@ export default function ProfilePage() {
 
   // ── Auth guard ───────────────────────────────────────────────────────────
   useEffect(() => {
+    // Only redirect once the persisted auth state has been restored,
+    // otherwise refreshing this page bounces logged-in users to /login.
+    if (!hasHydrated) return;
     if (!isAuthenticated) {
       router.push(`/${locale}/login`);
     }
-  }, [isAuthenticated, locale, router]);
+  }, [hasHydrated, isAuthenticated, locale, router]);
 
   // Pre-fill edit form when member loads
   useEffect(() => {

@@ -18,10 +18,14 @@ export default function AdminRootLayout({ children }: { children: React.ReactNod
   const params = useParams();
   const router = useRouter();
   const locale = (params?.locale as 'en' | 'fa') || 'en';
-  const { member, isAuthenticated } = useAuthStore();
+  const { member, isAuthenticated, hasHydrated } = useAuthStore();
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
+    // Wait until the persisted auth state is restored from localStorage,
+    // otherwise a hard refresh would always start from the logged-out
+    // default state and bounce authenticated users to /login.
+    if (!hasHydrated) return;
     if (!isAuthenticated || !member) {
       router.replace(`/${locale}/login`);
       return;
@@ -32,7 +36,7 @@ export default function AdminRootLayout({ children }: { children: React.ReactNod
       return;
     }
     setChecked(true);
-  }, [isAuthenticated, member, locale, router]);
+  }, [hasHydrated, isAuthenticated, member, locale, router]);
 
   if (!checked) {
     return (
