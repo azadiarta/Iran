@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { DollarSign, User, Calendar, ChevronLeft, ChevronRight, X, Wallet, Receipt } from 'lucide-react';
@@ -23,6 +24,7 @@ export default function ExpensesPage() {
   const { hasPermission } = useAuthStore();
 
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loginRequired, setLoginRequired] = useState(false);
   const [balance, setBalance] = useState<FundBalance | null>(null);
   const [loadingExpenses, setLoadingExpenses] = useState(true);
   const [loadingBalance, setLoadingBalance] = useState(true);
@@ -38,6 +40,7 @@ export default function ExpensesPage() {
   const fetchExpenses = useCallback(
     async (pageNum: number) => {
       setLoadingExpenses(true);
+      setLoginRequired(false);
       try {
         const res = await fundAPI.getExpenses(pageNum);
         const raw = res.data as unknown as ExpensesResponse;
@@ -46,10 +49,13 @@ export default function ExpensesPage() {
         setHasNext(!!raw.next);
         setHasPrev(!!raw.previous);
       } catch (err: unknown) {
-        const axiosErr = err as { response?: { status?: number } };
-        if (axiosErr?.response?.status === 403) {
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 403) {
           router.push(`/${locale}/forbidden`);
           return;
+        }
+        if (status === 401) {
+          setLoginRequired(true);
         }
         setExpenses([]);
       } finally {
@@ -163,6 +169,22 @@ export default function ExpensesPage() {
                 </div>
               </div>
             ))}
+          </div>
+        ) : loginRequired ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <Receipt className="w-12 h-12 text-white/20" />
+            <p className="text-white/40 text-lg">{t('login_required')}</p>
+            <Link
+              href={`/${locale}/login`}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all"
+              style={{
+                backgroundColor: '#00ffff',
+                color: '#0a0a0f',
+                boxShadow: '0 0 24px rgba(0,255,255,0.3)',
+              }}
+            >
+              {t('login_cta')}
+            </Link>
           </div>
         ) : expenses.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">

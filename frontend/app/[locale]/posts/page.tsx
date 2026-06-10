@@ -120,6 +120,7 @@ export default function PostsPage() {
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loginRequired, setLoginRequired] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -138,6 +139,7 @@ export default function PostsPage() {
   const fetchPosts = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setLoginRequired(false);
     try {
       const res = await postsAPI.getList(page, debouncedSearch);
       const data = res.data as unknown as Paginated<PostSummary>;
@@ -145,14 +147,13 @@ export default function PostsPage() {
       setHasNext(!!data.next);
       setHasPrev(!!data.previous);
     } catch (err: unknown) {
-      // Check for 403
-      if (
-        err &&
-        typeof err === 'object' &&
-        'response' in err &&
-        (err as { response?: { status?: number } }).response?.status === 403
-      ) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 403) {
         window.location.href = `/${locale}/forbidden`;
+        return;
+      }
+      if (status === 401) {
+        setLoginRequired(true);
         return;
       }
       setError(t('error_loading_list'));
@@ -237,8 +238,27 @@ export default function PostsPage() {
           </div>
         )}
 
+        {/* Login required */}
+        {loginRequired && (
+          <div className="text-center py-20">
+            <MessageSquare size={48} className="mx-auto mb-4 text-white/20" />
+            <p className="text-white/40 text-lg mb-4">{t('login_required_list')}</p>
+            <Link
+              href={`/${locale}/login`}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all"
+              style={{
+                backgroundColor: '#00ffff',
+                color: '#0a0a0f',
+                boxShadow: '0 0 24px rgba(0,255,255,0.3)',
+              }}
+            >
+              {t('login_cta')}
+            </Link>
+          </div>
+        )}
+
         {/* Posts grid */}
-        {!error && (
+        {!error && !loginRequired && (
           <>
             {loading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

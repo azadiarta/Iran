@@ -93,6 +93,11 @@ api.interceptors.response.use(
     const prefix = getLocalePrefix();
 
     // ── 401: attempt token refresh ──────────────────────────────────────────
+    // Many pages (home, posts, expenses) are reachable by guests and make
+    // requests that legitimately 401 when a feature is members-only. Forcing
+    // a hard redirect here would bounce guests off otherwise-public pages, so
+    // we only clear stale auth state and let each page's own error handling
+    // (or its auth guard, e.g. profile/admin layouts) decide what to do.
     if (status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
@@ -101,9 +106,6 @@ api.interceptors.response.use(
 
       if (!refreshToken) {
         logout();
-        if (typeof window !== 'undefined') {
-          window.location.href = `${prefix}/login`;
-        }
         return Promise.reject(error);
       }
 
@@ -157,20 +159,16 @@ api.interceptors.response.use(
         onRefreshFailed(refreshErr);
         const store2 = getAuthStore();
         store2.getState().logout();
-        if (typeof window !== 'undefined') {
-          window.location.href = `${prefix}/login`;
-        }
         return Promise.reject(error);
       }
     }
 
     // ── 403: forbidden ──────────────────────────────────────────────────────
-    if (status === 403) {
-      if (typeof window !== 'undefined') {
-        window.location.href = `${prefix}/forbidden`;
-      }
-      return Promise.reject(error);
-    }
+    // Left for callers to handle (e.g. posts/expenses list pages redirect to
+    // /forbidden themselves for their primary fetch); a global redirect here
+    // would bounce users off pages that merely have one restricted widget
+    // (e.g. the balance card on the home page for members without
+    // can_view_balance).
 
     // ── 404: not found ──────────────────────────────────────────────────────
     if (status === 404) {

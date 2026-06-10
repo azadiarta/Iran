@@ -169,9 +169,7 @@ export default function ContributePage() {
   const paypalInstructions = instructions as PaypalInstructions | null;
   const isManual = selectedMethod === 'manual';
 
-  const referenceCode = contributionId
-    ? `FUND-${contributionId.toString().padStart(8, '0').toUpperCase()}`
-    : '';
+  const referenceCode = instructions?.reference || '';
 
   // ── Step Indicator ────────────────────────────────────────────────────────
   const StepIndicator = () => (

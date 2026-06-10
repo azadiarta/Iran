@@ -116,6 +116,7 @@ export default function LandingPage() {
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [postsLoading, setPostsLoading] = useState(true);
   const [postsError, setPostsError] = useState(false);
+  const [postsLoginRequired, setPostsLoginRequired] = useState(false);
 
   // Floating geometric patterns positions (stable — computed once)
   const floatingPatterns = useRef([
@@ -135,7 +136,14 @@ export default function LandingPage() {
 
     postsAPI.getList(1, '')
       .then((res) => setPosts((res.data as unknown as { results: PostSummary[] }).results.slice(0, 3)))
-      .catch(() => setPostsError(true))
+      .catch((err: unknown) => {
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 401) {
+          setPostsLoginRequired(true);
+        } else {
+          setPostsError(true);
+        }
+      })
       .finally(() => setPostsLoading(false));
   }, []);
 
@@ -324,7 +332,22 @@ export default function LandingPage() {
               {t('landing.posts_title')}
             </h2>
 
-            {postsError ? (
+            {postsLoginRequired ? (
+              <div className="text-center py-8 space-y-4">
+                <p className="text-white/50">{t('posts.login_required_home')}</p>
+                <Link
+                  href={`/${locale}/login`}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all"
+                  style={{
+                    backgroundColor: '#00ffff',
+                    color: '#0a0a0f',
+                    boxShadow: '0 0 24px rgba(0,255,255,0.3)',
+                  }}
+                >
+                  {t('posts.login_cta')}
+                </Link>
+              </div>
+            ) : postsError ? (
               <p className="text-center text-white/50 py-8">{t('posts.error_loading_home')}</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

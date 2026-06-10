@@ -67,7 +67,11 @@
     "not_found": "Post not found.",
     "error_loading_detail": "Could not load this post. Please try again.",
     "error_loading_list": "Could not load posts. Please try again.",
-    "error_loading_home": "Could not load posts."
+    "error_loading_home": "Could not load posts.",
+    "login_required_list": "Sign in to view posts.",
+    "login_required_detail": "Sign in to view this post.",
+    "login_required_home": "Sign in to see recent updates.",
+    "login_cta": "Login"
   },
   "expenses": {
     "title": "Expenses",
@@ -78,6 +82,8 @@
     "date": "Date",
     "by": "By",
     "no_expenses": "No expenses recorded",
+    "login_required": "Sign in to view expenses.",
+    "login_cta": "Login",
     "prev": "Previous",
     "next": "Next",
     "page_info": "Page {page} of {total}"

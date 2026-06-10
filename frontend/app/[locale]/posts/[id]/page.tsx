@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { User, Calendar, Star, Send, ChevronLeft } from 'lucide-react';
@@ -173,6 +174,7 @@ export default function PostDetailPage() {
   const [post, setPost] = useState<PostDetail | null>(null);
   const [postLoading, setPostLoading] = useState(true);
   const [postError, setPostError] = useState<string | null>(null);
+  const [postLoginRequired, setPostLoginRequired] = useState(false);
 
   // Comments
   const [comments, setComments] = useState<Comment[]>([]);
@@ -207,13 +209,11 @@ export default function PostDetailPage() {
         setPost(data.post);
       })
       .catch((err: unknown) => {
-        if (
-          err &&
-          typeof err === 'object' &&
-          'response' in err &&
-          (err as { response?: { status?: number } }).response?.status === 404
-        ) {
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 404) {
           setPostError(t('not_found'));
+        } else if (status === 401) {
+          setPostLoginRequired(true);
         } else {
           setPostError(t('error_loading_detail'));
         }
@@ -310,6 +310,28 @@ export default function PostDetailPage() {
               ))}
             </div>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Login required state
+  if (postLoginRequired) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: '#0a0a0f' }}>
+        <div className="text-center space-y-4">
+          <p className="text-white/40 text-xl">{t('login_required_detail')}</p>
+          <Link
+            href={`/${locale}/login`}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all"
+            style={{
+              backgroundColor: '#00ffff',
+              color: '#0a0a0f',
+              boxShadow: '0 0 24px rgba(0,255,255,0.3)',
+            }}
+          >
+            {t('login_cta')}
+          </Link>
         </div>
       </div>
     );
