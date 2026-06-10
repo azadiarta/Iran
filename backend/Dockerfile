@@ -8,17 +8,12 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Build-time-only dependencies are purged afterwards to keep the final image small;
-# libpq5/libjpeg62-turbo/zlib1g remain because Pillow/psycopg2 need them at runtime.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        libpq5 libjpeg62-turbo zlib1g \
-        build-essential libpq-dev libjpeg-dev zlib1g-dev \
-    && rm -rf /var/lib/apt/lists/*
-
+# No apt packages needed: every compiled dependency (psycopg2-binary, Pillow)
+# ships manylinux wheels that bundle their native libraries (libpq, libjpeg,
+# zlib), so installing straight from PyPI keeps the image small and the build
+# independent of Debian mirrors.
 COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt \
-    && apt-get purge -y --auto-remove build-essential libpq-dev libjpeg-dev zlib1g-dev
+RUN pip install --no-cache-dir --only-binary :all: -r requirements.txt
 
 COPY backend/ /app/
 

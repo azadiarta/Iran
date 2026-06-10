@@ -1,4 +1,10 @@
-{$PUBLIC_HOST} {
+# The site address must carry an explicit scheme (PUBLIC_URL, not PUBLIC_HOST):
+# with a bare hostname Caddy enables automatic HTTPS even for localhost/raw IPs
+# (self-signed internal cert + a 308 redirect off port 80), which breaks the
+# documented plain-HTTP behaviour for IP/localhost deployments. An http://
+# address disables that; an https://domain address still gets Let's Encrypt
+# certificates and the port-80 redirect automatically.
+{$PUBLIC_URL} {
     encode gzip zstd
 
     @backend path /api/* /admin/* /media/* /static/*

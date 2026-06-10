@@ -131,7 +131,7 @@ files:
   "backend/Dockerfile":
     status: done
     kind: config
-    note: "python:3.12-slim image; build context is repo root (requirements.txt lives there, not in backend/); installs runtime + temporary build deps for psycopg2/Pillow then purges them; ENTRYPOINT docker-entrypoint.sh; EXPOSE 8000"
+    note: "python:3.12-slim image; build context is repo root (requirements.txt lives there, not in backend/); no apt packages — psycopg2-binary/Pillow manylinux wheels bundle their native libs (pip install --only-binary :all:), keeping the image small and the build independent of Debian mirrors; ENTRYPOINT docker-entrypoint.sh; EXPOSE 8000"
     needed_by: []
 
   "backend/docker-entrypoint.sh":
@@ -161,7 +161,7 @@ files:
   "Caddyfile":
     status: done
     kind: config
-    note: "reverse proxy config keyed on {$PUBLIC_HOST} — routes /api/*, /admin/*, /media/*, /static/* to backend:8000 and everything else to frontend:3000; auto-provisions/renews free Let's Encrypt HTTPS for real domains and gracefully serves plain HTTP for bare IPs/localhost, eliminating CORS by serving frontend+backend from one origin"
+    note: "reverse proxy config keyed on {$PUBLIC_URL} (must carry an explicit scheme — a bare {$PUBLIC_HOST} made Caddy enable internal-cert auto-HTTPS even for localhost/raw IPs, 308-redirecting port 80 to an untrusted https; verified by a real compose-up test) — routes /api/*, /admin/*, /media/*, /static/* to backend:8000 and everything else to frontend:3000; auto-provisions/renews free Let's Encrypt HTTPS for https:// domain URLs and serves plain HTTP for http:// IP/localhost URLs, eliminating CORS by serving frontend+backend from one origin"
     needed_by: []
 
   ".env.docker.example":
