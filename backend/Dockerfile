@@ -17,7 +17,7 @@ RUN pip install --no-cache-dir --only-binary :all: -r requirements.txt
 
 COPY backend/ /app/
 
-RUN chmod +x /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh /app/scripts/prepare.sh
 
 EXPOSE 8000
 

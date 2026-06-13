@@ -96,5 +96,22 @@ class Member(AbstractBaseUser):
     def has_module_perms(self, app_label):
         return self.is_superuser
 
+    # Member doesn't use PermissionsMixin/auth.Permission for app permissions
+    # (see has_perm/has_module_perms above), but django-jazzmin's admin menu
+    # calls get_all_permissions() to decide what to show. Superusers see
+    # everything (matching has_module_perms); everyone else sees nothing
+    # extra (the admin site itself remains staff-only via has_module_perms).
+    def get_user_permissions(self, obj=None):
+        return set()
+
+    def get_group_permissions(self, obj=None):
+        return set()
+
+    def get_all_permissions(self, obj=None):
+        if not self.is_superuser:
+            return set()
+        from django.contrib.auth.models import Permission
+        return {f'{p.content_type.app_label}.{p.codename}' for p in Permission.objects.all()}
+
     def __str__(self):
         return self.display_name or self.full_name

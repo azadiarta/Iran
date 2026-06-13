@@ -1,0 +1,73 @@
+# Combined image for Railway: runs the Django backend (gunicorn, internal
+# only) and the Next.js frontend (standalone server, public) in ONE
+# container/service. This avoids the multi-service "Root Directory" /
+# per-service Dockerfile detection issues on Railway entirely — only this
+# root-level railway.json/Dockerfile.railway is ever used.
+#
+# Build context is the repository root (see railway.json).
+
+# ---- Stage 1: frontend dependencies -----------------------------------
+FROM node:20-bookworm-slim AS frontend-deps
+WORKDIR /frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+
+# ---- Stage 2: frontend build -------------------------------------------
+FROM node:20-bookworm-slim AS frontend-builder
+WORKDIR /frontend
+COPY --from=frontend-deps /frontend/node_modules ./node_modules
+COPY frontend/ .
+
+# NEXT_PUBLIC_* values are baked into the client bundle at build time (see
+# lib/api.ts). NEXT_PUBLIC_API_URL must be an explicit empty string (not
+# unset) so `process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'`
+# evaluates to "" (same-origin/relative requests), which is what we want
+# since the frontend proxies /api to the backend in the same container.
+ARG NEXT_PUBLIC_API_URL=""
+ARG NEXT_PUBLIC_SITE_NAME="Group Fund"
+ARG NEXT_PUBLIC_MEDIA_URL=""
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
+    NEXT_PUBLIC_SITE_NAME=$NEXT_PUBLIC_SITE_NAME \
+    NEXT_PUBLIC_MEDIA_URL=$NEXT_PUBLIC_MEDIA_URL \
+    NEXT_TELEMETRY_DISABLED=1
+
+RUN npm run build
+
+# ---- Stage 3: final image (Python + Node) -------------------------------
+FROM python:3.12-slim
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Both base images are Debian "bookworm" (slim) builds, so the Node binary
+# from the frontend-builder stage is glibc-compatible here without
+# installing Node via apt/nodesource.
+COPY --from=frontend-builder /usr/local/bin/node /usr/local/bin/node
+
+# Python deps (same approach as backend/Dockerfile: manylinux wheels only,
+# no compiler/apt packages needed).
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir --only-binary :all: -r requirements.txt
+
+# Backend app (Django project root becomes /app/backend).
+COPY backend/ /app/backend/
+
+# Frontend standalone build output.
+COPY --from=frontend-builder /frontend/public ./frontend/public
+COPY --from=frontend-builder /frontend/.next/standalone ./frontend/
+COPY --from=frontend-builder /frontend/.next/static ./frontend/.next/static
+
+# Both processes share this container, so the frontend's rewrites() proxy
+# (frontend/next.config.mjs) talks to the backend over loopback — no
+# Railway variables needed for this.
+ENV BACKEND_INTERNAL_URL=http://127.0.0.1:8000
+
+COPY docker-entrypoint.railway.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh /app/backend/scripts/prepare.sh
+
+# Railway provides $PORT for the public-facing process (the frontend); the
+# backend always listens on 127.0.0.1:8000 inside this container.
+EXPOSE 3000
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

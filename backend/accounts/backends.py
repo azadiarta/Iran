@@ -9,7 +9,12 @@ class MemberAuthBackend(BaseBackend):
     Superuser bypasses all permission checks.
     """
 
-    def authenticate(self, request, credential=None, password=None, **kwargs):
+    def authenticate(self, request, credential=None, password=None, username=None, **kwargs):
+        # Django's built-in AuthenticationForm (used by the admin login page)
+        # calls authenticate(username=..., password=...); the app's own
+        # /api/auth/login/ calls authenticate(credential=..., password=...).
+        # Accept either so both flows work with this single backend.
+        credential = credential or username
         if not credential or not password:
             return None
 

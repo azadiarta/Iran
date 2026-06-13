@@ -24,6 +24,7 @@ const nextConfig = {
   images: {
     remotePatterns,
   },
+  skipTrailingSlashRedirect: true,
   async rewrites() {
     // Proxy API/admin/static/media requests to the Django backend so the
     // browser only ever talks to this app's own origin — no CORS/CSRF wiring
@@ -37,8 +38,19 @@ const nextConfig = {
     // `npm run dev` works without any extra setup.
     const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://localhost:8000';
     return [
-      { source: '/api/:path*', destination: `${backendUrl}/api/:path*` },
-      { source: '/admin/:path*', destination: `${backendUrl}/admin/:path*` },
+      // Django/DRF URLs always end with a trailing slash (APPEND_SLASH).
+      // skipTrailingSlashRedirect (above) stops Next from stripping it
+      // before rewrites run; :path*/:path+ patterns below preserve it on
+      // the way to the backend so Django never has to issue its own
+      // redirect (which this proxy can't follow), avoiding redirect loops.
+      { source: '/api/', destination: `${backendUrl}/api/` },
+      { source: '/api/:path+/', destination: `${backendUrl}/api/:path+/` },
+      { source: '/admin/', destination: `${backendUrl}/admin/` },
+      { source: '/admin/:path+/', destination: `${backendUrl}/admin/:path+/` },
+      // django.conf.urls.i18n's set_language view (POST /i18n/setlang/),
+      // used by the admin theme's language switcher.
+      { source: '/i18n/:path+/', destination: `${backendUrl}/i18n/:path+/` },
+      // Static/media are plain file paths (no trailing slash convention).
       { source: '/static/:path*', destination: `${backendUrl}/static/:path*` },
       { source: '/media/:path*', destination: `${backendUrl}/media/:path*` },
     ];

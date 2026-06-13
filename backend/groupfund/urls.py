@@ -5,6 +5,9 @@ from django.urls import include, path, re_path
 from django.views.static import serve
 
 urlpatterns = [
+    # Required for {% url 'set_language' %}, used by the admin theme's
+    # language switcher (USE_I18N=True, LANGUAGES has 2 entries).
+    path('i18n/', include('django.conf.urls.i18n')),
     path('admin/', admin.site.urls),
     path('api/auth/', include('accounts.urls')),
     path('api/members/', include('accounts.member_urls')),
