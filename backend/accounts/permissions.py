@@ -17,6 +17,8 @@ class IsSuperuser(BasePermission):
     Passes ONLY for superuser.
     Superuser bypasses ALL permission checks.
     Superuser is created ONLY via: python manage.py createsuperuser
+    (or, on Railway, via DJANGO_SUPERUSER_EMAIL/DJANGO_SUPERUSER_PASSWORD env
+    vars — see backend/scripts/prepare.sh).
     No API endpoint exists to create or modify superuser.
     No member — regardless of permissions — can delete or modify superuser.
     """

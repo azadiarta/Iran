@@ -7,164 +7,93 @@ interface SymbolProps {
   animated?: boolean;
 }
 
-/* ─── LionAndSun ─────────────────────────────────────────────────────────── */
+/* ─── CulturalEmblem ─────────────────────────────────────────────────────── */
+// Generic "medallion" badge: a circular glow-ring frame around a large emoji
+// glyph. Emoji are professionally designed full-color icons (Apple/Google/
+// Microsoft type foundries) — used here instead of hand-drawn SVG art for
+// LionAndSun and the Iranian Cultural Heritage symbols below.
 
-export function LionAndSun({ size = 100, className = '', animated = false }: SymbolProps) {
-  // 8 sun rays at 0°, 45°, 90°, 135°, 180°, 225°, 270°, 315°
-  const rayAngles = [0, 45, 90, 135, 180, 225, 270, 315];
+interface CulturalEmblemProps {
+  emoji: string;
+  size?: number;
+  color?: string;
+  animated?: boolean;
+  className?: string;
+}
 
-  const rays = rayAngles.map((angle) => {
-    const rad = (angle * Math.PI) / 180;
-    const x1 = 100 + Math.cos(rad) * 42;
-    const y1 = 100 + Math.sin(rad) * 42;
-    const x2 = 100 + Math.cos(rad) * 58;
-    const y2 = 100 + Math.sin(rad) * 58;
-    return { x1, y1, x2, y2, angle };
-  });
-
-  // 8 mane triangles around the head circle at (140, 95) r=18
-  const maneTriangles = Array.from({ length: 8 }, (_, i) => {
-    const a = (i * 45 * Math.PI) / 180;
-    const cx = 140;
-    const cy = 95;
-    const r = 18;
-    const tipX = cx + Math.cos(a) * (r + 8);
-    const tipY = cy + Math.sin(a) * (r + 8);
-    const base1X = cx + Math.cos(a - 0.35) * r;
-    const base1Y = cy + Math.sin(a - 0.35) * r;
-    const base2X = cx + Math.cos(a + 0.35) * r;
-    const base2Y = cy + Math.sin(a + 0.35) * r;
-    return `${base1X},${base1Y} ${tipX},${tipY} ${base2X},${base2Y}`;
-  });
-
-  const svgContent = (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 200 200"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
+export function CulturalEmblem({
+  emoji,
+  size = 64,
+  color = '#fbbf24',
+  animated = false,
+  className = '',
+}: CulturalEmblemProps) {
+  const content = (
+    <div
       className={className}
       aria-hidden="true"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: `radial-gradient(circle, ${color}33 0%, ${color}0d 70%)`,
+        border: `2px solid ${color}`,
+        fontSize: size * 0.55,
+        lineHeight: 1,
+      }}
     >
-      {/* Sun circle */}
-      <circle cx="100" cy="100" r="38" stroke="currentColor" strokeWidth="2" />
+      <span>{emoji}</span>
+    </div>
+  );
 
-      {/* Sun rays */}
-      {rays.map((r, i) => (
-        <line
-          key={i}
-          x1={r.x1}
-          y1={r.y1}
-          x2={r.x2}
-          y2={r.y2}
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-      ))}
+  if (animated) {
+    return (
+      <motion.div
+        animate={{
+          filter: [
+            'drop-shadow(0 0 6px currentColor)',
+            'drop-shadow(0 0 18px currentColor)',
+            'drop-shadow(0 0 6px currentColor)',
+          ],
+        }}
+        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+        style={{ display: 'inline-flex', color }}
+      >
+        {content}
+      </motion.div>
+    );
+  }
 
-      {/* Lion body */}
-      <ellipse
-        cx="105"
-        cy="115"
-        rx="45"
-        ry="22"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      />
+  return content;
+}
 
-      {/* Mane triangles */}
-      {maneTriangles.map((pts, i) => (
-        <polygon
-          key={i}
-          points={pts}
-          fill="currentColor"
-          opacity="0.6"
-        />
-      ))}
+/* ─── LionAndSun ─────────────────────────────────────────────────────────── */
+// Iran's "Lion and Sun" emblem (شیر و خورشید): a gold medallion with the lion
+// face emoji and a small sun badge.
 
-      {/* Lion head */}
-      <circle
-        cx="140"
-        cy="95"
-        r="18"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      />
-
-      {/* Lion face — simple dot eyes and nose */}
-      <circle cx="135" cy="91" r="1.5" fill="currentColor" />
-      <circle cx="143" cy="91" r="1.5" fill="currentColor" />
-      <circle cx="139" cy="95" r="1" fill="currentColor" />
-
-      {/* Lion tail: cubic bezier curving up from left body */}
-      <path
-        d="M 62,110 C 40,100 35,75 50,65 C 55,62 60,68 55,72"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      {/* Tail tuft */}
-      <path
-        d="M 55,72 C 50,68 45,65 48,60 M 55,72 C 52,66 50,60 54,57 M 55,72 C 57,66 58,61 62,60"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-
-      {/* Sword blade */}
-      <rect
-        x="95"
-        y="70"
-        width="5"
-        height="60"
-        fill="currentColor"
-        opacity="0.9"
-      />
-      {/* Sword crossguard */}
-      <rect
-        x="88"
-        y="85"
-        width="24"
-        height="5"
-        fill="currentColor"
-        opacity="0.9"
-      />
-      {/* Sword handle */}
-      <rect
-        x="96"
-        y="130"
-        width="3"
-        height="10"
-        fill="currentColor"
-        opacity="0.7"
-      />
-
-      {/* Front legs */}
-      <line
-        x1="115"
-        y1="135"
-        x2="112"
-        y2="155"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <line
-        x1="128"
-        y1="136"
-        x2="126"
-        y2="156"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
+export function LionAndSun({ size = 100, className = '', animated = false }: SymbolProps) {
+  const content = (
+    <div
+      className={className}
+      aria-hidden="true"
+      style={{ position: 'relative', display: 'inline-flex', width: size, height: size }}
+    >
+      <CulturalEmblem emoji="🦁" color="#fbbf24" size={size} />
+      <span
+        style={{
+          position: 'absolute',
+          top: '-6%',
+          insetInlineEnd: '-6%',
+          fontSize: size * 0.32,
+          lineHeight: 1,
+        }}
+      >
+        ☀️
+      </span>
+    </div>
   );
 
   if (animated) {
@@ -180,12 +109,12 @@ export function LionAndSun({ size = 100, className = '', animated = false }: Sym
         transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
         style={{ display: 'inline-flex' }}
       >
-        {svgContent}
+        {content}
       </motion.div>
     );
   }
 
-  return svgContent;
+  return content;
 }
 
 /* ─── FaravaharSimple ────────────────────────────────────────────────────── */

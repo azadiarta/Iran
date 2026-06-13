@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
@@ -13,13 +13,20 @@ export default function LoginPage() {
   const router = useRouter();
   const params = useParams();
   const locale = params?.locale as string || 'en';
-  const { login } = useAuthStore();
+  const { login, isAuthenticated, member: authMember, hasHydrated } = useAuthStore();
 
   const [credential, setCredential] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (isAuthenticated && authMember) {
+      router.replace(`/${locale}`);
+    }
+  }, [hasHydrated, isAuthenticated, authMember, locale, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -60,6 +67,10 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!hasHydrated || (isAuthenticated && authMember)) {
+    return null;
   }
 
   return (

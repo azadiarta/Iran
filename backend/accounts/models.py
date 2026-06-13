@@ -16,6 +16,9 @@ class MemberManager(BaseUserManager):
 
     def create_superuser(self, email, password, **extra_fields):
         # Superuser created ONLY via terminal: python manage.py createsuperuser
+        # (or, on Railway, by setting DJANGO_SUPERUSER_EMAIL/DJANGO_SUPERUSER_PASSWORD
+        # env vars — see backend/scripts/prepare.sh, which calls this idempotently
+        # on every startup so no Shell access is required).
         # No API endpoint exists to create or modify superuser.
         # No member — regardless of permissions — can delete or modify superuser.
         extra_fields.setdefault('is_staff', True)

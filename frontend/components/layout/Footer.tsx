@@ -96,6 +96,18 @@ export default function Footer({ locale }: FooterProps) {
           >
             &copy; {new Date().getFullYear()} {t('copyright')}
           </p>
+
+          {/* Dedication */}
+          <p
+            style={{
+              fontFamily,
+              fontSize: '0.7rem',
+              color: 'rgba(255,255,255,0.25)',
+              textAlign: 'center',
+            }}
+          >
+            {t('dedication')}
+          </p>
         </div>
       </div>
     </footer>

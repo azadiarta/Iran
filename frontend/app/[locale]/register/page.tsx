@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
@@ -115,7 +115,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const params = useParams();
   const locale = params?.locale as string || 'en';
-  const { login } = useAuthStore();
+  const { login, isAuthenticated, member: authMember, hasHydrated } = useAuthStore();
 
   const [form, setForm] = useState<FormFields>({
     full_name: '',
@@ -131,6 +131,13 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [generalError, setGeneralError] = useState('');
+
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (isAuthenticated && authMember) {
+      router.replace(`/${locale}`);
+    }
+  }, [hasHydrated, isAuthenticated, authMember, locale, router]);
 
   function setField(key: keyof FormFields) {
     return (value: string) => {
@@ -248,6 +255,10 @@ export default function RegisterPage() {
   }
 
   const phoneOrEmailHint = t('phone_or_email_hint');
+
+  if (!hasHydrated || (isAuthenticated && authMember)) {
+    return null;
+  }
 
   return (
     <div

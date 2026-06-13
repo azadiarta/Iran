@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 from datetime import timedelta
@@ -131,16 +132,34 @@ AUTHENTICATION_BACKENDS = [
 # docker-compose (which sets the discrete DB_* vars) keeps working unchanged.
 _database_url = os.environ.get('DATABASE_URL')
 _db_name = os.environ.get('DB_NAME')
+
 if _database_url:
     from urllib.parse import urlparse
     _parsed_db_url = urlparse(_database_url)
+    if not (_parsed_db_url.hostname and _parsed_db_url.scheme.startswith('postgres')):
+        # An unresolved Railway variable reference (e.g. the literal string
+        # "${{Postgres.DATABASE_URL}}" when the reference didn't bind, or a
+        # typo'd/renamed Postgres service name) parses to a URL with no
+        # hostname. Using it as-is would point Postgres at "localhost" and
+        # crash the container on every boot, so fall back to DB_NAME/SQLite
+        # instead and log a warning that shows up in the deploy logs.
+        logging.getLogger(__name__).warning(
+            "DATABASE_URL is set but did not resolve to a valid Postgres URL "
+            "(got %r) -- falling back to DB_NAME/SQLite. Check that the "
+            "variable reference (e.g. ${{Postgres.DATABASE_URL}}) matches the "
+            "exact name of your Postgres service in Railway.",
+            _database_url,
+        )
+        _database_url = None
+
+if _database_url:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
             'NAME': _parsed_db_url.path.lstrip('/'),
             'USER': _parsed_db_url.username or '',
             'PASSWORD': _parsed_db_url.password or '',
-            'HOST': _parsed_db_url.hostname or 'localhost',
+            'HOST': _parsed_db_url.hostname,
             'PORT': _parsed_db_url.port or 5432,
         }
     }

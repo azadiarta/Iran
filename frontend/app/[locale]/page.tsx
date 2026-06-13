@@ -4,8 +4,8 @@ import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { motion, useInView } from 'framer-motion';
-import { Users, TrendingUp, Wallet, ArrowRight, CheckCircle } from 'lucide-react';
-import { LionAndSun, GeometricPattern, FaravaharSimple } from '@/components/animations/IranianSymbols';
+import { Users, TrendingUp, Wallet, ArrowRight, CheckCircle, UserCheck, User } from 'lucide-react';
+import { LionAndSun, GeometricPattern, FaravaharSimple, CulturalEmblem } from '@/components/animations/IranianSymbols';
 import { postsAPI, fundAPI } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 import type { PostSummary, FundBalance } from '@/lib/api';
@@ -108,7 +108,7 @@ export default function LandingPage() {
   const t = useTranslations();
   const params = useParams();
   const locale = params?.locale as string || 'en';
-  const { hasPermission } = useAuthStore();
+  const { hasPermission, isAuthenticated, member } = useAuthStore();
 
   const [balance, setBalance] = useState<FundBalance | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(true);
@@ -237,26 +237,49 @@ export default function LandingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.6 }}
           >
-            <Link
-              href={`/${locale}/register`}
-              className="inline-flex items-center gap-2 px-8 py-3 rounded-xl font-semibold text-lg transition-all duration-200"
-              style={{
-                border: '1.5px solid #8b5cf6',
-                background: 'rgba(139,92,246,0.15)',
-                color: '#c4b5fd',
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(139,92,246,0.3)';
-                (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 0 20px rgba(139,92,246,0.5)';
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(139,92,246,0.15)';
-                (e.currentTarget as HTMLAnchorElement).style.boxShadow = 'none';
-              }}
-            >
-              {t('landing.cta_join')}
-              <ArrowRight size={18} />
-            </Link>
+            {isAuthenticated && member ? (
+              <Link
+                href={`/${locale}/profile`}
+                className="inline-flex items-center gap-2 px-8 py-3 rounded-xl font-semibold text-lg transition-all duration-200"
+                style={{
+                  border: '1.5px solid #8b5cf6',
+                  background: 'rgba(139,92,246,0.15)',
+                  color: '#c4b5fd',
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(139,92,246,0.3)';
+                  (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 0 20px rgba(139,92,246,0.5)';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(139,92,246,0.15)';
+                  (e.currentTarget as HTMLAnchorElement).style.boxShadow = 'none';
+                }}
+              >
+                {t('landing.cta_profile')}
+                <User size={18} />
+              </Link>
+            ) : (
+              <Link
+                href={`/${locale}/register`}
+                className="inline-flex items-center gap-2 px-8 py-3 rounded-xl font-semibold text-lg transition-all duration-200"
+                style={{
+                  border: '1.5px solid #8b5cf6',
+                  background: 'rgba(139,92,246,0.15)',
+                  color: '#c4b5fd',
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(139,92,246,0.3)';
+                  (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 0 20px rgba(139,92,246,0.5)';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(139,92,246,0.15)';
+                  (e.currentTarget as HTMLAnchorElement).style.boxShadow = 'none';
+                }}
+              >
+                {t('landing.cta_join')}
+                <ArrowRight size={18} />
+              </Link>
+            )}
 
             <Link
               href={`/${locale}/contribute`}
@@ -425,10 +448,14 @@ export default function LandingPage() {
                     className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"
                     style={{ background: 'rgba(0,255,255,0.1)', color: '#00ffff' }}
                   >
-                    <CheckCircle size={28} />
+                    {isAuthenticated && member ? <UserCheck size={28} /> : <CheckCircle size={28} />}
                   </div>
-                  <h3 className="text-white font-bold text-lg mb-2">{t('landing.step1_title')}</h3>
-                  <p className="text-white/60 text-sm">{t('landing.step1_desc')}</p>
+                  <h3 className="text-white font-bold text-lg mb-2">
+                    {isAuthenticated && member ? t('landing.step1_title_member') : t('landing.step1_title')}
+                  </h3>
+                  <p className="text-white/60 text-sm">
+                    {isAuthenticated && member ? t('landing.step1_desc_member') : t('landing.step1_desc')}
+                  </p>
                 </div>
               </div>
 
@@ -474,6 +501,45 @@ export default function LandingPage() {
         </FadeInSection>
       </section>
 
+      {/* ─── Iranian Heritage ─────────────────────────────────────────────── */}
+      <section className="py-16 px-4">
+        <FadeInSection delay={0.1}>
+          <div className="max-w-5xl mx-auto text-center">
+            <h2
+              className="text-3xl font-bold mb-3"
+              style={{ color: '#00ffff', textShadow: '0 0 10px rgba(0,255,255,0.6)' }}
+            >
+              {t('heritage.title')}
+            </h2>
+            <p className="text-white/50 mb-12 max-w-2xl mx-auto">
+              {t('heritage.subtitle')}
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+              {[
+                { key: 'persepolis', emoji: '🏛️', color: '#d4a657' },
+                { key: 'pasargadae', emoji: '🪦', color: '#9ca3af' },
+                { key: 'naqshe_rostam', emoji: '🗿', color: '#b45309' },
+                { key: 'hafez', emoji: '📜', color: '#b91c1c' },
+                { key: 'saadi', emoji: '📖', color: '#10b981' },
+              ].map((item) => (
+                <div
+                  key={item.key}
+                  className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-5 flex flex-col items-center gap-3"
+                >
+                  <CulturalEmblem emoji={item.emoji} color={item.color} size={56} />
+                  <h3 className="text-white font-bold text-sm">
+                    {t(`heritage.items.${item.key}.name`)}
+                  </h3>
+                  <p className="text-white/50 text-xs">
+                    {t(`heritage.items.${item.key}.desc`)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </FadeInSection>
+      </section>
+
       {/* ─── CTA Section ──────────────────────────────────────────────────── */}
       <section className="py-16 px-4">
         <FadeInSection delay={0.1}>
@@ -488,30 +554,56 @@ export default function LandingPage() {
                 textShadow: '0 0 20px rgba(255,255,255,0.3)',
               }}
             >
-              Ready to join?
+              {isAuthenticated && member ? t('landing.cta_authed_title') : t('landing.cta_ready_title')}
             </h2>
-            <p className="text-white/60 text-lg mb-8">{t('landing.tagline')}</p>
-            <Link
-              href={`/${locale}/register`}
-              className="inline-flex items-center gap-2 px-10 py-4 rounded-xl font-bold text-xl transition-all duration-200"
-              style={{
-                border: '2px solid #10b981',
-                background: 'rgba(16,185,129,0.15)',
-                color: '#10b981',
-                textShadow: '0 0 8px rgba(16,185,129,0.5)',
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(16,185,129,0.3)';
-                (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 0 30px rgba(16,185,129,0.5)';
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(16,185,129,0.15)';
-                (e.currentTarget as HTMLAnchorElement).style.boxShadow = 'none';
-              }}
-            >
-              {t('landing.cta_join')}
-              <ArrowRight size={22} />
-            </Link>
+            <p className="text-white/60 text-lg mb-8">
+              {isAuthenticated && member ? t('landing.cta_authed_desc') : t('landing.tagline')}
+            </p>
+            {isAuthenticated && member ? (
+              <Link
+                href={`/${locale}/posts`}
+                className="inline-flex items-center gap-2 px-10 py-4 rounded-xl font-bold text-xl transition-all duration-200"
+                style={{
+                  border: '2px solid #10b981',
+                  background: 'rgba(16,185,129,0.15)',
+                  color: '#10b981',
+                  textShadow: '0 0 8px rgba(16,185,129,0.5)',
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(16,185,129,0.3)';
+                  (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 0 30px rgba(16,185,129,0.5)';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(16,185,129,0.15)';
+                  (e.currentTarget as HTMLAnchorElement).style.boxShadow = 'none';
+                }}
+              >
+                {t('landing.cta_view_posts')}
+                <ArrowRight size={22} />
+              </Link>
+            ) : (
+              <Link
+                href={`/${locale}/register`}
+                className="inline-flex items-center gap-2 px-10 py-4 rounded-xl font-bold text-xl transition-all duration-200"
+                style={{
+                  border: '2px solid #10b981',
+                  background: 'rgba(16,185,129,0.15)',
+                  color: '#10b981',
+                  textShadow: '0 0 8px rgba(16,185,129,0.5)',
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(16,185,129,0.3)';
+                  (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 0 30px rgba(16,185,129,0.5)';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(16,185,129,0.15)';
+                  (e.currentTarget as HTMLAnchorElement).style.boxShadow = 'none';
+                }}
+              >
+                {t('landing.cta_join')}
+                <ArrowRight size={22} />
+              </Link>
+            )}
           </div>
         </FadeInSection>
       </section>

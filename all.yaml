@@ -72,7 +72,7 @@ files:
       auth_user_model: accounts.Member
       authentication_backends: [accounts.backends.MemberAuthBackend]
       db_engine: postgresql (override: DB_ENGINE env for local sqlite testing); falls back to django.db.backends.sqlite3 (BASE_DIR/db.sqlite3) when neither DATABASE_URL nor DB_NAME is set
-      db_env_vars: "DATABASE_URL (preferred — parsed via urlparse; auto-provided by Railway's Postgres plugin and most PaaS) with fallback to discrete DB_NAME/DB_USER/DB_PASSWORD/DB_HOST/DB_PORT (used by docker-compose, which sets these explicitly); if NEITHER is set (e.g. a Railway backend service with no Postgres plugin attached), DATABASES falls back to a local SQLite file at BASE_DIR/db.sqlite3 — ephemeral on Railway (wiped on every redeploy/restart) but lets the whole project fit in a 2-service Railway plan (backend+frontend, no Postgres) for real testing"
+      db_env_vars: "DATABASE_URL (preferred — parsed via urlparse; auto-provided by Railway's Postgres plugin and most PaaS) with fallback to discrete DB_NAME/DB_USER/DB_PASSWORD/DB_HOST/DB_PORT (used by docker-compose, which sets these explicitly); if NEITHER is set (e.g. a Railway backend service with no Postgres plugin attached), DATABASES falls back to a local SQLite file at BASE_DIR/db.sqlite3 — ephemeral on Railway (wiped on every redeploy/restart) but lets the whole project fit in a 2-service Railway plan (backend+frontend, no Postgres) for real testing. VALIDATION (FIXED real gap): if DATABASE_URL is set but urlparse() yields no hostname or a non-postgres scheme (e.g. an unresolved Railway variable reference like the literal string '${{Postgres.DATABASE_URL}}' when the reference didn't bind to the right service name), settings.py logs a logging.getLogger(__name__).warning(...) and treats it as unset, falling through to DB_NAME/SQLite instead of configuring Postgres with HOST='localhost' (which previously caused migrate to fail and crash-looped the whole container on every boot)."
       railway_auto_detection: "_on_railway := bool(RAILWAY_ENVIRONMENT), always injected by Railway. When true: SECRET_KEY auto-derives from sha256(RAILWAY_PROJECT_ID+RAILWAY_SERVICE_ID) if not set explicitly, DEBUG defaults to False (vs True elsewhere), RAILWAY_PUBLIC_DOMAIN (if a public domain was generated) and RAILWAY_PRIVATE_DOMAIN (always present, *.railway.internal — used for service-to-service traffic) are both appended to ALLOWED_HOSTS + CSRF_TRUSTED_ORIGINS, and CORS_ALLOWED_ORIGIN_REGEXES trusts the whole *.up.railway.app suffix (kept for back-compat/custom setups — safe since the API is JWT-bearer-only and CORS_ALLOW_CREDENTIALS is never enabled). Combined with the SQLite DB fallback above, the recommended Railway layout is now a SINGLE service built from the repo-root railway.json/Dockerfile.railway (see those entries) — backend (gunicorn) and frontend (Next.js) run as two processes in one container, talking over 127.0.0.1, with the frontend's next.config.mjs rewrites() proxying /api,/admin,/i18n,/static,/media to the backend. ZERO service variables are required: PORT is Railway-injected and used by the Next.js server, BACKEND_INTERNAL_URL is hardcoded to http://127.0.0.1:8000 in Dockerfile.railway. Everything else (DEBUG, SECRET_KEY, ALLOWED_HOSTS, CSRF, DB, migrate/seed/collectstatic, HTTPS) remains automatic and overridable via the usual env vars for non-Railway hosts. The old 2-service layout (separate backend/frontend Railway services) is no longer recommended — see DEPLOYMENT.md."
       media: "conditional on AWS_STORAGE_BUCKET_NAME env var: if set → DEFAULT_FILE_STORAGE=storages.backends.s3.S3Storage (django-storages), MEDIA_URL derived from AWS_S3_CUSTOM_DOMAIN / AWS_S3_ENDPOINT_URL / default S3 URL (supports AWS S3, Cloudflare R2, Backblaze B2, ...); if unset → local MEDIA_ROOT=backend/media, MEDIA_URL=/media/ for dev. DEFAULT_FILE_STORAGE used (not STORAGES dict) — Django raises ImproperlyConfigured if both STORAGES and STATICFILES_STORAGE are set"
       static: "STATIC_ROOT=backend/staticfiles, STATIC_URL=/static/, STATICFILES_STORAGE=whitenoise.storage.CompressedManifestStaticFilesStorage"
@@ -143,7 +143,7 @@ files:
   "backend/scripts/prepare.sh":
     status: done
     kind: config
-    note: "shared pre-start sequence extracted from docker-entrypoint.sh so it can be reused by both the standalone backend image and the combined Railway image (docker-entrypoint.railway.sh): cd to the Django project root (works from either /app in backend/Dockerfile's image or /app/backend in Dockerfile.railway's), wait for DB via Python socket probe (skipped for SQLite fallback) → migrate --noinput → seed_initial_data (idempotent) → collectstatic --noinput"
+    note: "shared pre-start sequence extracted from docker-entrypoint.sh so it can be reused by both the standalone backend image and the combined Railway image (docker-entrypoint.railway.sh): cd to the Django project root (works from either /app in backend/Dockerfile's image or /app/backend in Dockerfile.railway's), wait for DB via Python socket probe (skipped for SQLite fallback, deadline raised 60s→120s) → migrate --noinput → seed_initial_data (idempotent) → optional superuser bootstrap → collectstatic --noinput. DB-WAIT VALIDATION (mirrors settings.py): if DATABASE_URL doesn't parse to a postgres scheme + non-empty hostname (unresolved Railway variable reference), prints a warning and skips the wait instead of timing out against an unreachable 'localhost'. SUPERUSER BOOTSTRAP (NEW — item F): if DJANGO_SUPERUSER_EMAIL and DJANGO_SUPERUSER_PASSWORD env vars are set, runs `python manage.py shell -c \"...\"` that reads os.environ inside the Python string (no shell-to-Python interpolation of the password — avoids quoting/injection issues) and calls Member.objects.create_superuser(...) only if no Member with that email exists yet — idempotent, safe on every redeploy/restart, lets Railway users create an admin account purely via the Variables tab (no Shell/CLI/computer needed). See accounts/models.py MemberManager.create_superuser and accounts/permissions.py IsSuperuser docstrings for the cross-reference."
     needed_by:
       - {file: "backend/docker-entrypoint.sh",  items: [pre-start sequence], status: available}
       - {file: "docker-entrypoint.railway.sh",  items: [pre-start sequence], status: available}
@@ -1247,11 +1247,13 @@ files:
   "frontend/components/layout/Footer.tsx":
     status: done
     kind: component
+    note: "added a small dedication line below the copyright notice (footer.dedication i18n key, en.json/fa.json): 'This site was made in memory of Iran's eternal heroes, by arta' / 'این سایت ساخته شده به یاد جاویدنامان ایران، توسط arta', same fontFamily/center alignment as the copyright line but dimmer (rgba(255,255,255,0.25), 0.7rem)"
 
   "frontend/components/animations/IranianSymbols.tsx":
     status: done
     kind: component
-    exports: [LionAndSun]
+    exports: [LionAndSun, CulturalEmblem, FaravaharSimple, GeometricPattern]
+    note: "LionAndSun reimplemented (replacing the previous hand-drawn SVG, which was repeatedly rejected as 'ugly/childish' with no internet/image-gen available to source real artwork) on top of a new shared CulturalEmblem({emoji, size, color, animated}) component: a circular 'medallion' div (radial-gradient background tinted by color, 2px solid border) centered on a native full-color emoji glyph (professionally designed by Apple/Google/Microsoft, not hand-drawn) — optionally wrapped in the existing motion.div drop-shadow glow-pulse. LionAndSun = CulturalEmblem(emoji='🦁', color='#fbbf24') plus a small absolutely-positioned ☀️ badge in the top-right corner (the 'Lion and Sun' pairing); same size/className/animated prop signature as before, so every call site (Navbar, Footer, login, register, landing hero/CTA) needed no changes. CulturalEmblem is reused by the new 'Iranian Heritage' section on the landing page (5 items: persepolis 🏛️, pasargadae 🪦, naqshe_rostam 🗿, hafez 📜, saadi 📖). FaravaharSimple/GeometricPattern unchanged."
 
   "frontend/components/animations/PageTransition.tsx":
     status: done
@@ -1265,19 +1267,19 @@ files:
     status: done
     kind: page
     route: "/{locale}"
-    note: "landing — fundAPI.getBalance() + postsAPI.getList(1,'') (latest 3 posts)"
+    note: "landing — fundAPI.getBalance() + postsAPI.getList(1,'') (latest 3 posts). AUTH-CONDITIONAL UI (when isAuthenticated && member from useAuthStore): hero CTA replaces the 'Join the Group' register link with a 'My Profile' link (landing.cta_profile) to /{locale}/profile (Contribute Now link unchanged for everyone); 'How It Works' Step 1 card swaps its CheckCircle icon + 'Join'-copy for UserCheck + landing.step1_title_member/step1_desc_member ('You're a Member'); bottom CTA section swaps the 'Ready to join?'/register-button block for landing.cta_authed_title/cta_authed_desc ('Welcome back!') + a 'View Posts' button to /{locale}/posts (landing.cta_view_posts) — FaravaharSimple decoration stays for both states. Also fixed a pre-existing hardcoded-English 'Ready to join?' heading → landing.cta_ready_title for the logged-out case. NEW 'Iranian Heritage' section inserted between 'How It Works' and the CTA section: heading/subtitle (heritage.title/subtitle) + a grid of 5 CulturalEmblem cards (persepolis/pasargadae/naqshe_rostam/hafez/saadi, each with heritage.items.<key>.name/desc from messages/en.json+fa.json)."
 
   "frontend/app/[locale]/login/page.tsx":
     status: done
     kind: page
     route: "/{locale}/login"
-    note: "authAPI.login → destructures {tokens, member}, persists tokens to localStorage + authStore.login()"
+    note: "authAPI.login → destructures {tokens, member}, persists tokens to localStorage + authStore.login(). REDIRECT-IF-AUTHENTICATED (FIXED real gap — an already-logged-in member could still see/use the login form): once hasHydrated, if isAuthenticated && member, router.replace(`/${locale}`); renders null until hydration completes or the redirect fires, avoiding a form flash."
 
   "frontend/app/[locale]/register/page.tsx":
     status: done
     kind: page
     route: "/{locale}/register"
-    note: "authAPI.register → same {tokens, member} pattern as login; payload includes password_confirm"
+    note: "authAPI.register → same {tokens, member} pattern as login; payload includes password_confirm. REDIRECT-IF-AUTHENTICATED (same fix as login/page.tsx, item C — covers users manually navigating to /register while already signed in): once hasHydrated, if isAuthenticated && member, router.replace(`/${locale}`); renders null until hydration completes or the redirect fires."
 
   "frontend/app/[locale]/posts/page.tsx":
     status: done

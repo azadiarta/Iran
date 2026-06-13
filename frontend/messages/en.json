@@ -14,7 +14,12 @@
     "headline": "Group Fund",
     "tagline": "Transparent crowdfunding for our community",
     "cta_join": "Join the Group",
+    "cta_profile": "My Profile",
     "cta_contribute": "Contribute Now",
+    "cta_ready_title": "Ready to join?",
+    "cta_authed_title": "Welcome back!",
+    "cta_authed_desc": "Check out the latest posts and updates from the group",
+    "cta_view_posts": "View Posts",
     "stats_members": "Members",
     "stats_contributions": "Total Contributed",
     "stats_balance": "Current Balance",
@@ -22,10 +27,23 @@
     "how_title": "How It Works",
     "step1_title": "Join",
     "step1_desc": "Register and become a member of our group",
+    "step1_title_member": "You're a Member",
+    "step1_desc_member": "You're already part of our community",
     "step2_title": "Contribute",
     "step2_desc": "Make a contribution via bank transfer or PayPal",
     "step3_title": "Track",
     "step3_desc": "See exactly how funds are collected and spent"
+  },
+  "heritage": {
+    "title": "Iranian Cultural Heritage",
+    "subtitle": "A glimpse into Iran's ancient civilization, art, and poetry",
+    "items": {
+      "persepolis": { "name": "Persepolis", "desc": "Ceremonial capital of the Achaemenid Empire" },
+      "pasargadae": { "name": "Pasargadae", "desc": "Tomb of Cyrus the Great" },
+      "naqshe_rostam": { "name": "Naqsh-e Rostam", "desc": "Ancient Achaemenid and Sassanid rock reliefs" },
+      "hafez": { "name": "Hafez", "desc": "Beloved Persian poet of the Divan" },
+      "saadi": { "name": "Saadi", "desc": "Author of the Gulistan and Bustan" }
+    }
   },
   "auth": {
     "login_title": "Sign In",
@@ -214,7 +232,8 @@
   },
   "footer": {
     "slogan": "Long Live Iran",
-    "copyright": "Group Fund. All rights reserved."
+    "copyright": "Group Fund. All rights reserved.",
+    "dedication": "This site was made in memory of Iran's eternal heroes, by arta"
   },
   "common": {
     "loading": "Loading...",
