@@ -384,14 +384,18 @@ LOGGING = {
         'console': {
             'class': 'logging.StreamHandler',
         },
+        'system_log': {
+            'class': 'core.logging_handlers.SystemLogHandler',
+            'level': 'WARNING',
+        },
     },
     'root': {
-        'handlers': ['console'],
+        'handlers': ['console', 'system_log'],
         'level': 'INFO' if DEBUG else 'WARNING',
     },
     'loggers': {
         'django': {
-            'handlers': ['console'],
+            'handlers': ['console', 'system_log'],
             'level': 'INFO' if DEBUG else 'WARNING',
             'propagate': False,
         },
