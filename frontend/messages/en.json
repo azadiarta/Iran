@@ -71,6 +71,7 @@
     "comments_title": "Comments",
     "add_comment": "Add a Comment",
     "comment_name": "Your Name",
+    "comment_name_placeholder": "Your name",
     "comment_text": "Write your comment...",
     "comment_rating": "Rating (optional)",
     "comment_submit": "Submit Comment",
@@ -104,7 +105,29 @@
     "login_cta": "Login",
     "prev": "Previous",
     "next": "Next",
-    "page_info": "Page {page} of {total}"
+    "page_info": "Page {page} of {total}",
+    "view_details": "View details",
+    "back_to_expenses": "Back to expenses",
+    "description_label": "Description",
+    "withdrawn_by_label": "Withdrawn by",
+    "receipt_label": "Receipt",
+    "admin_label": "Admin",
+    "not_found": "Expense not found.",
+    "error_loading_detail": "Could not load this expense. Please try again.",
+    "login_required_detail": "Sign in to view this expense.",
+    "comments_title": "Comments",
+    "add_comment": "Add a Comment",
+    "comment_name": "Your Name",
+    "comment_name_placeholder": "Your name",
+    "comment_text": "Write your comment...",
+    "comment_rating": "Rating (optional)",
+    "comment_submit": "Submit Comment",
+    "comment_pending": "Your comment has been submitted and is pending approval.",
+    "comment_text_required": "Comment text is required.",
+    "name_required": "Your name is required.",
+    "comment_submit_error": "Failed to submit comment. Please try again.",
+    "no_comments": "No comments yet. Be the first!",
+    "anonymous": "Anonymous"
   },
   "contribute": {
     "title": "Make a Contribution",
@@ -241,6 +264,9 @@
     "retry": "Try Again",
     "close": "Close",
     "prev": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "page_info": "Page {page} of {total}",
+    "lightbox_hint": "Click outside or press Esc to close",
+    "submitting": "Submitting…"
   }
 }

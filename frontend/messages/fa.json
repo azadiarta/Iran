@@ -71,6 +71,7 @@
     "comments_title": "نظرات",
     "add_comment": "ثبت نظر",
     "comment_name": "نام شما",
+    "comment_name_placeholder": "نام شما",
     "comment_text": "نظر خود را بنویسید...",
     "comment_rating": "امتیاز (اختیاری)",
     "comment_submit": "ارسال نظر",
@@ -104,7 +105,29 @@
     "login_cta": "ورود",
     "prev": "قبلی",
     "next": "بعدی",
-    "page_info": "صفحه {page} از {total}"
+    "page_info": "صفحه {page} از {total}",
+    "view_details": "مشاهده جزئیات",
+    "back_to_expenses": "بازگشت به هزینه‌ها",
+    "description_label": "توضیحات",
+    "withdrawn_by_label": "برداشت‌شده توسط",
+    "receipt_label": "رسید",
+    "admin_label": "مدیر",
+    "not_found": "هزینه یافت نشد.",
+    "error_loading_detail": "بارگذاری این هزینه ممکن نشد. لطفاً دوباره تلاش کنید.",
+    "login_required_detail": "برای مشاهده این هزینه وارد حساب کاربری خود شوید.",
+    "comments_title": "نظرات",
+    "add_comment": "ثبت نظر",
+    "comment_name": "نام شما",
+    "comment_name_placeholder": "نام شما",
+    "comment_text": "نظر خود را بنویسید...",
+    "comment_rating": "امتیاز (اختیاری)",
+    "comment_submit": "ارسال نظر",
+    "comment_pending": "نظر شما ثبت شد و در انتظار تأیید است.",
+    "comment_text_required": "متن نظر الزامی است.",
+    "name_required": "نام شما الزامی است.",
+    "comment_submit_error": "ارسال نظر ناموفق بود. لطفاً دوباره تلاش کنید.",
+    "no_comments": "هنوز نظری ثبت نشده. شما اولین نفر باشید!",
+    "anonymous": "ناشناس"
   },
   "contribute": {
     "title": "ثبت کمک مالی",
@@ -241,6 +264,9 @@
     "retry": "تلاش مجدد",
     "close": "بستن",
     "prev": "قبلی",
-    "next": "بعدی"
+    "next": "بعدی",
+    "page_info": "صفحه {page} از {total}",
+    "lightbox_hint": "برای بستن، خارج از تصویر کلیک کنید یا کلید Esc را بزنید",
+    "submitting": "در حال ارسال…"
   }
 }
