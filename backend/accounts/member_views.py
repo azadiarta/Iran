@@ -7,6 +7,7 @@ from accounts.models import Member
 from accounts.permissions import HasGroupPermission
 from accounts.serializers import (
     ChangePasswordSerializer,
+    MemberCreateSerializer,
     MemberDetailSerializer,
     MemberListSerializer,
     MemberUpdateSerializer,
@@ -76,6 +77,18 @@ class MemberListView(APIView):
             qs = qs.distinct()
 
         return paginate(qs, request, MemberListSerializer)
+
+
+class MemberCreateView(APIView):
+    permission_classes = [IsAuthenticated, HasGroupPermission('can_manage_permissions')]
+
+    def post(self, request):
+        serializer = MemberCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return api_error('Validation failed.', errors=serializer.errors)
+        member = serializer.save()
+        _log(request.user, 'member_created_via_admin', target=member, ip=_get_ip(request))
+        return api_success(MemberDetailSerializer(member).data, message='Member created.', status_code=201)
 
 
 class MemberDetailView(APIView):

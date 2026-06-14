@@ -3,6 +3,7 @@ from django.urls import path
 from accounts.member_views import (
     ChangePasswordView,
     MemberChangeGroupView,
+    MemberCreateView,
     MemberDeleteView,
     MemberDetailView,
     MemberListView,
@@ -12,6 +13,7 @@ from accounts.member_views import (
 
 urlpatterns = [
     path('',                              MemberListView.as_view(),         name='member-list'),
+    path('create/',                       MemberCreateView.as_view(),       name='member-create'),
     path('<uuid:pk>/',                    MemberDetailView.as_view(),       name='member-detail'),
     path('<uuid:pk>/update/',             MemberUpdateView.as_view(),       name='member-update'),
     path('<uuid:pk>/group/',              MemberChangeGroupView.as_view(),  name='member-change-group'),

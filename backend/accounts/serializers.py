@@ -66,6 +66,26 @@ class RegisterSerializer(serializers.ModelSerializer):
         return group
 
 
+class MemberCreateSerializer(RegisterSerializer):
+    group_id = serializers.PrimaryKeyRelatedField(
+        source='group', queryset=AccessGroup.objects.all(),
+        required=False, allow_null=True,
+    )
+
+    class Meta(RegisterSerializer.Meta):
+        fields = RegisterSerializer.Meta.fields + ['group_id']
+
+    def create(self, validated_data):
+        validated_data.pop('password_confirm')
+        password = validated_data.pop('password')
+        group = validated_data.pop('group', None)
+        member = Member(**validated_data)
+        member.group = group or self._get_default_group()
+        member.set_password(password)
+        member.save()
+        return member
+
+
 class LoginSerializer(serializers.Serializer):
     credential = serializers.CharField(help_text='Phone number or email address')
     password = serializers.CharField(write_only=True)
