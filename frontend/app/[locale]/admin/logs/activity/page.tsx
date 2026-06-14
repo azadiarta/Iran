@@ -22,6 +22,8 @@ export default function AdminActivityLogPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const pageSize = 25;
 
   const [actorFilter, setActorFilter] = useState('');
   const [actionFilter, setActionFilter] = useState('');
@@ -44,6 +46,7 @@ export default function AdminActivityLogPage() {
         const data = res.data as unknown as Paginated<ActivityLogEntry>;
         setItems(data.results);
         setHasNext(!!data.next);
+        setTotalCount(data.count);
       })
       .catch(() => showToast('error', isRTL ? 'بارگذاری گزارش فعالیت ناموفق بود' : 'Failed to load activity log'))
       .finally(() => setLoading(false));
@@ -122,7 +125,17 @@ export default function AdminActivityLogPage() {
         loading={loading}
         rowKey={(l) => l.id}
         emptyMessage={isRTL ? 'رکوردی یافت نشد' : 'No records found'}
-        pagination={{ page, hasNext, hasPrev: page > 1, onPageChange: setPage }}
+        pagination={{
+          page,
+          hasNext,
+          hasPrev: page > 1,
+          onPageChange: setPage,
+          prevLabel: isRTL ? 'قبلی' : 'Prev',
+          nextLabel: isRTL ? 'بعدی' : 'Next',
+          pageLabel: isRTL
+            ? `صفحه ${page} از ${Math.max(1, Math.ceil(totalCount / pageSize))}`
+            : `Page ${page} of ${Math.max(1, Math.ceil(totalCount / pageSize))}`,
+        }}
       />
 
       <AdminModal isOpen={!!detail} onClose={() => setDetail(null)} title={isRTL ? 'جزئیات فعالیت' : 'Activity Details'}>

@@ -25,6 +25,8 @@ export default function AdminMembersPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const pageSize = 5;
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [groupFilter, setGroupFilter] = useState('');
@@ -54,6 +56,7 @@ export default function AdminMembersPage() {
         const data = res.data as unknown as Paginated<MemberListItem>;
         setMembers(data.results);
         setHasNext(!!data.next);
+        setTotalCount(data.count);
       })
       .catch(() => showToast('error', isRTL ? 'بارگذاری اعضا ناموفق بود' : 'Failed to load members'))
       .finally(() => setLoading(false));
@@ -152,6 +155,11 @@ export default function AdminMembersPage() {
           hasNext,
           hasPrev: page > 1,
           onPageChange: setPage,
+          prevLabel: isRTL ? 'قبلی' : 'Prev',
+          nextLabel: isRTL ? 'بعدی' : 'Next',
+          pageLabel: isRTL
+            ? `صفحه ${page} از ${Math.max(1, Math.ceil(totalCount / pageSize))}`
+            : `Page ${page} of ${Math.max(1, Math.ceil(totalCount / pageSize))}`,
         }}
       />
     </div>

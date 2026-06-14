@@ -29,6 +29,8 @@ export default function AdminCommentsPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const pageSize = 10;
 
   const [searchInput, setSearchInput] = useState('');
   const [statusInput, setStatusInput] = useState<StatusFilter>('');
@@ -54,6 +56,7 @@ export default function AdminCommentsPage() {
         const data = res.data as unknown as Paginated<Comment>;
         setComments(data.results);
         setHasNext(!!data.next);
+        setTotalCount(data.count);
       })
       .catch(() => showToast('error', isRTL ? 'بارگذاری نظرات ناموفق بود' : 'Failed to load comments'))
       .finally(() => setLoading(false));
@@ -213,7 +216,17 @@ export default function AdminCommentsPage() {
         loading={loading}
         rowKey={(c) => c.id}
         emptyMessage={isRTL ? 'نظری یافت نشد' : 'No comments found'}
-        pagination={{ page, hasNext, hasPrev: page > 1, onPageChange: setPage }}
+        pagination={{
+          page,
+          hasNext,
+          hasPrev: page > 1,
+          onPageChange: setPage,
+          prevLabel: isRTL ? 'قبلی' : 'Prev',
+          nextLabel: isRTL ? 'بعدی' : 'Next',
+          pageLabel: isRTL
+            ? `صفحه ${page} از ${Math.max(1, Math.ceil(totalCount / pageSize))}`
+            : `Page ${page} of ${Math.max(1, Math.ceil(totalCount / pageSize))}`,
+        }}
       />
 
       <AdminConfirmDialog

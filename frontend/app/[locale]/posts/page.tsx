@@ -114,6 +114,7 @@ function PostCard({ post, locale, index }: { post: PostSummary; locale: string; 
 
 export default function PostsPage() {
   const t = useTranslations('posts');
+  const tc = useTranslations('common');
   const params = useParams();
   const locale = params?.locale as string || 'en';
 
@@ -124,8 +125,10 @@ export default function PostsPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [hasNext, setHasNext] = useState(false);
   const [hasPrev, setHasPrev] = useState(false);
+  const pageSize = 5;
 
   // Debounce search input
   useEffect(() => {
@@ -144,6 +147,7 @@ export default function PostsPage() {
       const res = await postsAPI.getList(page, debouncedSearch);
       const data = res.data as unknown as Paginated<PostSummary>;
       setPosts(data.results);
+      setTotalCount(data.count);
       setHasNext(!!data.next);
       setHasPrev(!!data.previous);
     } catch (err: unknown) {
@@ -297,10 +301,12 @@ export default function PostsPage() {
                   }}
                 >
                   <ChevronLeft size={16} />
-                  Prev
+                  {tc('prev')}
                 </button>
 
-                <span className="text-white/40 text-sm px-2">Page {page}</span>
+                <span className="text-white/40 text-sm px-2">
+                  {tc('page_info', { page, total: Math.max(1, Math.ceil(totalCount / pageSize)) })}
+                </span>
 
                 <button
                   onClick={() => setPage((p) => p + 1)}
@@ -318,7 +324,7 @@ export default function PostsPage() {
                     (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.1)';
                   }}
                 >
-                  Next
+                  {tc('next')}
                   <ChevronRight size={16} />
                 </button>
               </div>

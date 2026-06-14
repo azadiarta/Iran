@@ -25,6 +25,8 @@ export default function AdminPostsPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const pageSize = 5;
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<PostDetail | null>(null);
@@ -45,6 +47,7 @@ export default function AdminPostsPage() {
         const data = res.data as unknown as Paginated<PostSummary>;
         setItems(data.results);
         setHasNext(!!data.next);
+        setTotalCount(data.count);
       })
       .catch(() => showToast('error', isRTL ? 'بارگذاری پست‌ها ناموفق بود' : 'Failed to load posts'))
       .finally(() => setLoading(false));
@@ -205,7 +208,17 @@ export default function AdminPostsPage() {
         loading={loading}
         rowKey={(p) => p.id}
         emptyMessage={isRTL ? 'پستی یافت نشد' : 'No posts found'}
-        pagination={{ page, hasNext, hasPrev: page > 1, onPageChange: setPage }}
+        pagination={{
+          page,
+          hasNext,
+          hasPrev: page > 1,
+          onPageChange: setPage,
+          prevLabel: isRTL ? 'قبلی' : 'Prev',
+          nextLabel: isRTL ? 'بعدی' : 'Next',
+          pageLabel: isRTL
+            ? `صفحه ${page} از ${Math.max(1, Math.ceil(totalCount / pageSize))}`
+            : `Page ${page} of ${Math.max(1, Math.ceil(totalCount / pageSize))}`,
+        }}
       />
 
       <AdminModal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editing ? (isRTL ? 'ویرایش پست' : 'Edit Post') : (isRTL ? 'پست جدید' : 'New Post')} maxWidth="max-w-2xl">
@@ -241,6 +254,7 @@ export default function AdminPostsPage() {
             accept="image/*"
             multiple
             onChange={setImages}
+            isRTL={isRTL}
           />
 
           <div className="flex items-center gap-3 mt-1">

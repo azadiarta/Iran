@@ -27,6 +27,8 @@ export default function AdminExpensesPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const pageSize = 5;
 
   const [modalOpen, setModalOpen] = useState(false);
   const [amount, setAmount] = useState('');
@@ -47,6 +49,7 @@ export default function AdminExpensesPage() {
         const data = res.data as unknown as Paginated<Expense>;
         setItems(data.results);
         setHasNext(!!data.next);
+        setTotalCount(data.count);
       })
       .catch(() => showToast('error', isRTL ? 'بارگذاری هزینه‌ها ناموفق بود' : 'Failed to load expenses'))
       .finally(() => setLoading(false));
@@ -186,7 +189,17 @@ export default function AdminExpensesPage() {
         loading={loading}
         rowKey={(e) => e.id}
         emptyMessage={isRTL ? 'هزینه‌ای یافت نشد' : 'No expenses found'}
-        pagination={{ page, hasNext, hasPrev: page > 1, onPageChange: setPage }}
+        pagination={{
+          page,
+          hasNext,
+          hasPrev: page > 1,
+          onPageChange: setPage,
+          prevLabel: isRTL ? 'قبلی' : 'Prev',
+          nextLabel: isRTL ? 'بعدی' : 'Next',
+          pageLabel: isRTL
+            ? `صفحه ${page} از ${Math.max(1, Math.ceil(totalCount / pageSize))}`
+            : `Page ${page} of ${Math.max(1, Math.ceil(totalCount / pageSize))}`,
+        }}
       />
 
       <AdminModal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={isRTL ? 'ثبت هزینه جدید' : 'Record New Expense'}>
@@ -199,6 +212,7 @@ export default function AdminExpensesPage() {
             label={isRTL ? 'تصویر رسید (اختیاری)' : 'Receipt Image (optional)'}
             accept="image/*"
             onChange={(files) => setReceipt(files[0] || null)}
+            isRTL={isRTL}
           />
           <div className="flex items-center gap-3 mt-1">
             <button
