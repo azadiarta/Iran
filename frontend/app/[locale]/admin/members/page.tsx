@@ -1,9 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Search, Eye } from 'lucide-react';
+import { Search, Eye, Plus } from 'lucide-react';
 import AdminTable, { AdminTableColumn } from '@/components/admin/AdminTable';
 import AdminBadge from '@/components/admin/AdminBadge';
+import AdminModal from '@/components/admin/AdminModal';
 import AdminInput from '@/components/admin/fields/AdminInput';
 import AdminSelect from '@/components/admin/fields/AdminSelect';
 import useAuthStore from '@/store/authStore';
@@ -32,6 +33,16 @@ export default function AdminMembersPage() {
   const [groupFilter, setGroupFilter] = useState('');
   const [activeFilter, setActiveFilter] = useState('');
 
+  const [modalOpen, setModalOpen] = useState(false);
+  const [fullName, setFullName] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [newGroupId, setNewGroupId] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [saving, setSaving] = useState(false);
+
   useEffect(() => {
     groupsAPI
       .getList()
@@ -39,7 +50,7 @@ export default function AdminMembersPage() {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
+  function load() {
     if (!canManage) {
       setLoading(false);
       return;
@@ -60,6 +71,10 @@ export default function AdminMembersPage() {
       })
       .catch(() => showToast('error', isRTL ? 'بارگذاری اعضا ناموفق بود' : 'Failed to load members'))
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canManage, page, search, groupFilter, activeFilter]);
 
@@ -67,6 +82,52 @@ export default function AdminMembersPage() {
     e.preventDefault();
     setPage(1);
     setSearch(searchInput.trim());
+  }
+
+  function openCreate() {
+    setFullName('');
+    setDisplayName('');
+    setPhone('');
+    setEmail('');
+    setNewGroupId('');
+    setPassword('');
+    setPasswordConfirm('');
+    setModalOpen(true);
+  }
+
+  async function submitCreate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!phone.trim() && !email.trim()) {
+      showToast('warning', isRTL ? 'حداقل یکی از تلفن یا ایمیل را وارد کنید' : 'Enter at least one of phone or email');
+      return;
+    }
+    if (password !== passwordConfirm) {
+      showToast('warning', isRTL ? 'رمزهای عبور مطابقت ندارند' : 'Passwords do not match');
+      return;
+    }
+    if (password.length < 8) {
+      showToast('warning', isRTL ? 'رمز عبور باید حداقل ۸ کاراکتر باشد' : 'Password must be at least 8 characters');
+      return;
+    }
+    setSaving(true);
+    try {
+      await membersAPI.create({
+        full_name: fullName,
+        display_name: displayName || undefined,
+        phone: phone || undefined,
+        email: email || undefined,
+        password,
+        password_confirm: passwordConfirm,
+        group_id: newGroupId || undefined,
+      });
+      showToast('success', isRTL ? 'عضو با موفقیت ایجاد شد' : 'Member created successfully');
+      setModalOpen(false);
+      load();
+    } catch {
+      showToast('error', isRTL ? 'ایجاد عضو ناموفق بود' : 'Failed to create member');
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (!canManage) {
@@ -105,9 +166,19 @@ export default function AdminMembersPage() {
 
   return (
     <div className="flex flex-col gap-6" dir={isRTL ? 'rtl' : 'ltr'}>
-      <div>
-        <h1 className="text-2xl font-bold text-white">{isRTL ? 'اعضا' : 'Members'}</h1>
-        <p className="text-sm text-white/40 mt-1">{isRTL ? 'مدیریت اعضای سامانه' : 'Manage system members'}</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-white">{isRTL ? 'اعضا' : 'Members'}</h1>
+          <p className="text-sm text-white/40 mt-1">{isRTL ? 'مدیریت اعضای سامانه' : 'Manage system members'}</p>
+        </div>
+        <button
+          onClick={openCreate}
+          className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all"
+          style={{ backgroundColor: '#00ffff', color: '#0a0a0f', boxShadow: '0 0 16px rgba(0,255,255,0.3)' }}
+        >
+          <Plus className="w-4 h-4" />
+          {isRTL ? 'افزودن عضو' : 'Add Member'}
+        </button>
       </div>
 
       <div className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -162,6 +233,37 @@ export default function AdminMembersPage() {
             : `Page ${page} of ${Math.max(1, Math.ceil(totalCount / pageSize))}`,
         }}
       />
+
+      <AdminModal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={isRTL ? 'افزودن عضو' : 'Add Member'}>
+        <form onSubmit={submitCreate} className="flex flex-col gap-4">
+          <AdminInput label={isRTL ? 'نام کامل' : 'Full Name'} value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+          <AdminInput label={isRTL ? 'نام نمایشی (اختیاری)' : 'Display Name (optional)'} value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+          <AdminInput label={isRTL ? 'تلفن (اختیاری)' : 'Phone (optional)'} value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <AdminInput label={isRTL ? 'ایمیل (اختیاری)' : 'Email (optional)'} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <AdminSelect
+            label={isRTL ? 'گروه دسترسی' : 'Access Group'}
+            value={newGroupId}
+            onChange={(e) => setNewGroupId(e.target.value)}
+            options={groups.map((g) => ({ value: g.id, label: g.name }))}
+            placeholder={isRTL ? 'پیش‌فرض' : 'Default'}
+          />
+          <AdminInput label={isRTL ? 'رمز عبور' : 'Password'} type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <AdminInput label={isRTL ? 'تکرار رمز عبور' : 'Confirm Password'} type="password" value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)} required />
+          <div className="flex items-center gap-3 mt-1">
+            <button
+              type="submit"
+              disabled={saving || !fullName.trim() || !password || !passwordConfirm}
+              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
+              style={{ backgroundColor: '#00ffff', color: '#0a0a0f', boxShadow: '0 0 16px rgba(0,255,255,0.3)' }}
+            >
+              {saving ? (isRTL ? 'در حال ایجاد...' : 'Creating...') : (isRTL ? 'ایجاد عضو' : 'Create Member')}
+            </button>
+            <button type="button" onClick={() => setModalOpen(false)} className="rounded-xl px-5 py-2.5 text-sm font-medium text-white/60 hover:text-white/90 transition-colors">
+              {isRTL ? 'انصراف' : 'Cancel'}
+            </button>
+          </div>
+        </form>
+      </AdminModal>
     </div>
   );
 }

@@ -399,6 +399,15 @@ export const fundAPI = {
     return api.get<ApiResponse>(`/api/fund/contributions/?${params.toString()}`);
   },
 
+  createManualContribution: (data: {
+    guest_name: string;
+    amount: number;
+    currency?: string;
+    payment_method?: string;
+    status?: string;
+    notes?: string;
+  }) => api.post<ApiResponse>('/api/fund/contributions/create-manual/', data),
+
   updateContributionStatus: (id: string, status: 'completed' | 'failed') =>
     api.patch<ApiResponse>(`/api/fund/contributions/${id}/status/`, { status }),
 
@@ -529,6 +538,16 @@ export const membersAPI = {
     if (filters.is_active !== undefined) params.set('is_active', String(filters.is_active));
     return api.get<ApiResponse>(`/api/members/?${params.toString()}`);
   },
+
+  create: (data: {
+    full_name: string;
+    display_name?: string;
+    phone?: string;
+    email?: string;
+    password: string;
+    password_confirm: string;
+    group_id?: string;
+  }) => api.post<ApiResponse>('/api/members/create/', data),
 
   changeGroup: (id: string, groupId: string) =>
     api.patch<ApiResponse>(`/api/members/${id}/group/`, { group_id: groupId }),

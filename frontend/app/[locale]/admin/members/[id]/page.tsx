@@ -99,8 +99,19 @@ export default function AdminMemberDetailPage() {
       const res = await membersAPI.changeGroup(id, groupId);
       setTarget(res.data as unknown as MemberDetail);
       showToast('success', isRTL ? 'گروه عضو با موفقیت تغییر کرد' : 'Member group changed successfully');
-    } catch {
-      showToast('error', isRTL ? 'تغییر گروه ناموفق بود' : 'Failed to change group');
+    } catch (err: unknown) {
+      const status =
+        err && typeof err === 'object' && 'response' in err && err.response &&
+        typeof err.response === 'object' && 'status' in err.response
+          ? (err.response as { status?: number }).status
+          : undefined;
+      if (status === 403) {
+        showToast('warning', isRTL
+          ? 'گروه کاربران سوپریوزر را نمی‌توان تغییر داد.'
+          : 'The group of a superuser account cannot be changed.');
+      } else {
+        showToast('error', isRTL ? 'تغییر گروه ناموفق بود' : 'Failed to change group');
+      }
     } finally {
       setSavingGroup(false);
     }
@@ -183,7 +194,7 @@ export default function AdminMemberDetailPage() {
         <button
           onClick={() => router.push(`/${locale}/admin/members`)}
           className="p-2 rounded-lg text-white/50 hover:text-white/90 hover:bg-white/[0.04] transition-colors"
-          aria-label="Back"
+          aria-label={isRTL ? 'بازگشت' : 'Back'}
         >
           <ArrowLeft className="w-5 h-5" style={{ transform: isRTL ? 'scaleX(-1)' : 'none' }} />
         </button>
