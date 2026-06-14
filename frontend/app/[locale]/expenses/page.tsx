@@ -4,10 +4,11 @@ import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { DollarSign, User, Calendar, ChevronLeft, ChevronRight, X, Wallet, Receipt } from 'lucide-react';
+import { User, Calendar, ChevronLeft, ChevronRight, Wallet, Receipt } from 'lucide-react';
 import { fundAPI } from '@/lib/api';
 import type { FundBalance, Expense } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
+import ImageLightbox from '@/components/common/ImageLightbox';
 
 interface ExpensesResponse {
   count: number;
@@ -18,6 +19,7 @@ interface ExpensesResponse {
 
 export default function ExpensesPage() {
   const t = useTranslations('expenses');
+  const tc = useTranslations('common');
   const params = useParams();
   const router = useRouter();
   const locale = (params?.locale as string) || 'en';
@@ -41,7 +43,7 @@ export default function ExpensesPage() {
     setMounted(true);
   }, []);
   const canViewBalance = mounted && hasPermission('can_view_balance');
-  const pageSize = 10;
+  const pageSize = 5;
 
   const fetchExpenses = useCallback(
     async (pageNum: number) => {
@@ -200,20 +202,25 @@ export default function ExpensesPage() {
         ) : (
           <div className="space-y-3">
             {expenses.map((expense) => (
-              <div
+              <Link
                 key={expense.id}
-                className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-5 hover:border-white/20 transition-colors"
+                href={`/${locale}/expenses/${expense.id}`}
+                className="block rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-5 hover:border-white/20 transition-colors"
               >
                 <div className="flex items-start gap-4">
                   {/* Receipt thumbnail */}
                   {expense.receipt_image && (
                     <button
-                      onClick={() => setReceiptModal(expense.receipt_image!)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setReceiptModal(expense.receipt_image!);
+                      }}
                       className="flex-shrink-0 rounded-xl overflow-hidden border border-white/10 hover:border-[#00ffff]/50 transition-colors"
                     >
                       <Image
                         src={expense.receipt_image}
-                        alt="Receipt"
+                        alt={t('receipt_label')}
                         width={50}
                         height={50}
                         className="object-cover w-[50px] h-[50px]"
@@ -248,7 +255,7 @@ export default function ExpensesPage() {
                         style={{ color: '#00ffff' }}
                       >
                         <User className="w-3.5 h-3.5" />
-                        {expense.withdrawn_by?.display_name || 'Admin'}
+                        {expense.withdrawn_by?.display_name || t('admin_label')}
                       </span>
                       <span className="flex items-center gap-1.5 text-sm text-white/50">
                         <Calendar className="w-3.5 h-3.5" />
@@ -257,7 +264,7 @@ export default function ExpensesPage() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}
@@ -292,29 +299,12 @@ export default function ExpensesPage() {
 
       {/* Receipt modal */}
       {receiptModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-          onClick={() => setReceiptModal(null)}
-        >
-          <div
-            className="relative max-w-2xl w-full rounded-2xl overflow-hidden border border-white/10"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setReceiptModal(null)}
-              className="absolute top-3 right-3 z-10 p-1.5 rounded-lg bg-black/60 hover:bg-black/80 transition-colors"
-            >
-              <X className="w-5 h-5 text-white" />
-            </button>
-            <Image
-              src={receiptModal}
-              alt="Receipt"
-              width={800}
-              height={600}
-              className="w-full h-auto object-contain"
-            />
-          </div>
-        </div>
+        <ImageLightbox
+          src={receiptModal}
+          alt={t('receipt_label')}
+          onClose={() => setReceiptModal(null)}
+          hintText={tc('lightbox_hint')}
+        />
       )}
     </div>
   );

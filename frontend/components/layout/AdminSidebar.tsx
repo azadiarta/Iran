@@ -12,6 +12,7 @@ import {
   MessageSquare,
   Wallet,
   Settings,
+  Database,
   ScrollText,
   Terminal,
   X,
@@ -60,6 +61,7 @@ export default function AdminSidebar({
     { key: 'comments', href: 'comments', label: isRTL ? 'نظرات' : 'Comments', icon: MessageSquare, permission: 'can_approve_comments', badge: pendingCommentCount },
     { key: 'payments', href: 'payments', label: isRTL ? 'تنظیمات پرداخت' : 'Payments', icon: Wallet, permission: 'can_manage_permissions' },
     { key: 'settings', href: 'settings', label: isRTL ? 'تنظیمات' : 'Settings', icon: Settings, permission: 'can_manage_permissions' },
+    { key: 'system-status', href: 'system', label: isRTL ? 'وضعیت سیستم' : 'System Status', icon: Database, superuserOnly: true },
     { key: 'activity-log', href: 'logs/activity', label: isRTL ? 'گزارش فعالیت' : 'Activity Log', icon: ScrollText, divider: true, permission: 'can_manage_permissions' },
     { key: 'system-log', href: 'logs/system', label: isRTL ? 'گزارش سیستم' : 'System Log', icon: Terminal, superuserOnly: true },
   ];

@@ -437,6 +437,17 @@ export const fundAPI = {
 
   deleteExpense: (id: string) =>
     api.delete<ApiResponse>(`/api/fund/expenses/${id}/delete/`),
+
+  getExpenseDetail: (id: string) =>
+    api.get<ApiResponse>(`/api/fund/expenses/${id}/`),
+
+  getExpenseComments: (id: string) =>
+    api.get<ApiResponse>(`/api/fund/expenses/${id}/comments/`),
+
+  createExpenseComment: (
+    id: string,
+    data: { text: string; rating?: number; guest_name?: string }
+  ) => api.post<ApiResponse>(`/api/fund/expenses/${id}/comments/create/`, data),
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -690,6 +701,32 @@ export const settingsAPI = {
 
   update: (key: string, value: string) =>
     api.patch<ApiResponse>(`/api/settings/${key}/`, { value }),
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// System Status API
+// ═══════════════════════════════════════════════════════════════════════════════
+export interface SystemStatus {
+  database: {
+    engine: string;
+    connected: boolean;
+  };
+  debug: boolean;
+  environment: 'railway' | 'local';
+  media_storage: 's3' | 'local';
+  django_version: string;
+  counts: {
+    members_total: number;
+    members_active: number;
+    posts: number;
+    contributions: number;
+    expenses: number;
+    pending_comments: number;
+  };
+}
+
+export const systemAPI = {
+  getStatus: () => api.get<ApiResponse>('/api/settings/system-status/'),
 };
 
 export default api;
