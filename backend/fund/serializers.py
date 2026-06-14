@@ -58,6 +58,38 @@ class ContributionCreateSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
+class ContributionManualCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Contribution
+        fields = ['guest_name', 'amount', 'currency', 'payment_method', 'status', 'notes']
+        extra_kwargs = {
+            'payment_method': {'required': False},
+            'status': {'required': False},
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        setting = DefaultSetting.objects.filter(key='default_currency').first()
+        self.fields['currency'].default = setting.value if setting else 'GBP'
+        self.fields['currency'].required = False
+
+    def validate_amount(self, value):
+        if value <= 0:
+            raise serializers.ValidationError('Amount must be a positive number.')
+        return value
+
+    def validate_guest_name(self, value):
+        if not value:
+            raise serializers.ValidationError('Contributor name is required.')
+        return value
+
+    def create(self, validated_data):
+        validated_data.setdefault('currency', 'GBP')
+        validated_data.setdefault('payment_method', Contribution.PaymentMethod.MANUAL)
+        validated_data.setdefault('status', Contribution.Status.COMPLETED)
+        return super().create(validated_data)
+
+
 class ContributionStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = Contribution

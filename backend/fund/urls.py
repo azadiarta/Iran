@@ -4,6 +4,7 @@ from fund.views import (
     ContributionCreateView,
     ContributionDeleteView,
     ContributionListView,
+    ContributionManualCreateView,
     ContributionStatusUpdateView,
     ExpenseCreateView,
     ExpenseDeleteView,
@@ -16,6 +17,7 @@ from posts.views import CommentCreateView, CommentListView
 urlpatterns = [
     path('contributions/',                       ContributionListView.as_view(),         name='contribution-list'),
     path('contributions/create/',                ContributionCreateView.as_view(),        name='contribution-create'),
+    path('contributions/create-manual/',         ContributionManualCreateView.as_view(),  name='contribution-create-manual'),
     path('contributions/<uuid:pk>/status/',      ContributionStatusUpdateView.as_view(),  name='contribution-status'),
     path('contributions/<uuid:pk>/delete/',      ContributionDeleteView.as_view(),        name='contribution-delete'),
     path('expenses/',                            ExpenseListView.as_view(),               name='expense-list'),

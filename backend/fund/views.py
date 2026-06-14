@@ -12,6 +12,7 @@ from core.utils import api_error, api_success
 from fund.models import Contribution, Expense
 from fund.serializers import (
     ContributionCreateSerializer,
+    ContributionManualCreateSerializer,
     ContributionSerializer,
     ContributionStatusSerializer,
     ExpenseCreateSerializer,
@@ -89,6 +90,22 @@ class ContributionCreateView(APIView):
         return api_success(
             ContributionSerializer(contribution).data,
             message='Contribution submitted.',
+            status_code=201,
+        )
+
+
+class ContributionManualCreateView(APIView):
+    permission_classes = [IsAuthenticated, HasGroupPermission('can_manage_permissions')]
+
+    def post(self, request):
+        serializer = ContributionManualCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return api_error('Validation failed.', errors=serializer.errors)
+        contribution = serializer.save()
+        _log(request.user, 'contribution_added_manually', target=contribution, ip=_get_ip(request))
+        return api_success(
+            ContributionSerializer(contribution).data,
+            message='Contribution added.',
             status_code=201,
         )
 
