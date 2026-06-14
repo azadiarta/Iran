@@ -116,7 +116,11 @@ export default function AdminSettingsPage() {
                         description: isRTL ? o.description.fa : o.description.en,
                       }));
                 return (
-                  <div key={s.key} className="flex items-end gap-2">
+                  <div
+                    key={s.key}
+                    className="flex items-end gap-2 rounded-xl px-4 py-3"
+                    style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
+                  >
                     <div className="flex-1 min-w-0">
                       <AdminSelectWithDescription
                         label={isRTL ? meta.label.fa : meta.label.en}
@@ -126,7 +130,6 @@ export default function AdminSettingsPage() {
                         placeholder={isRTL ? 'انتخاب کنید...' : 'Select...'}
                       />
                       <p className="mt-1.5 text-xs text-white/40">{isRTL ? meta.description.fa : meta.description.en}</p>
-                      <p className="mt-1 text-[10px] text-white/25 font-mono">{s.key}</p>
                     </div>
                     <SaveButton onClick={() => save(s.key)} loading={savingKey === s.key} isRTL={isRTL} />
                   </div>
@@ -147,7 +150,6 @@ export default function AdminSettingsPage() {
                         label={isRTL ? meta.label.fa : meta.label.en}
                         description={isRTL ? meta.description.fa : meta.description.en}
                       />
-                      <p className="mt-1.5 text-[10px] text-white/25 font-mono">{s.key}</p>
                     </div>
                     <SaveButton onClick={() => save(s.key)} loading={savingKey === s.key} isRTL={isRTL} />
                   </div>
@@ -155,7 +157,11 @@ export default function AdminSettingsPage() {
               }
 
               return (
-                <div key={s.key} className="flex items-end gap-2">
+                <div
+                  key={s.key}
+                  className="flex items-end gap-2 rounded-xl px-4 py-3"
+                  style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
+                >
                   <div className="flex-1 min-w-0">
                     <AdminInput
                       label={meta ? (isRTL ? meta.label.fa : meta.label.en) : s.description || s.key}
@@ -164,7 +170,6 @@ export default function AdminSettingsPage() {
                       onChange={(e) => set(s.key, e.target.value)}
                     />
                     {meta && <p className="mt-1.5 text-xs text-white/40">{isRTL ? meta.description.fa : meta.description.en}</p>}
-                    <p className="mt-1 text-[10px] text-white/25 font-mono">{s.key}</p>
                   </div>
                   <SaveButton onClick={() => save(s.key)} loading={savingKey === s.key} isRTL={isRTL} />
                 </div>
