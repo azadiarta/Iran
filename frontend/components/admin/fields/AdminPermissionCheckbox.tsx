@@ -1,6 +1,8 @@
 'use client';
 import { Check } from 'lucide-react';
 
+import { PERMISSION_META } from '@/lib/permissionsMeta';
+
 export interface PermissionOption {
   codename: string;
   label: string;
@@ -11,6 +13,7 @@ interface AdminPermissionCheckboxProps {
   selected: string[];
   onChange: (codenames: string[]) => void;
   alwaysOn?: string[];
+  isRTL?: boolean;
 }
 
 export default function AdminPermissionCheckbox({
@@ -18,6 +21,7 @@ export default function AdminPermissionCheckbox({
   selected,
   onChange,
   alwaysOn = ['can_contribute', 'can_comment'],
+  isRTL = false,
 }: AdminPermissionCheckboxProps) {
   function toggle(codename: string) {
     if (alwaysOn.includes(codename)) return;
@@ -53,7 +57,11 @@ export default function AdminPermissionCheckbox({
             >
               {checked && <Check className="w-3.5 h-3.5" style={{ color: '#0a0a0f' }} />}
             </span>
-            <span className="text-sm text-white/80">{perm.label}</span>
+            <span className="text-sm text-white/80">
+              {PERMISSION_META[perm.codename]
+                ? (isRTL ? PERMISSION_META[perm.codename].label.fa : PERMISSION_META[perm.codename].label.en)
+                : perm.label}
+            </span>
           </label>
         );
       })}

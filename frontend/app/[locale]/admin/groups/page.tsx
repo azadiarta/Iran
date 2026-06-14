@@ -11,6 +11,7 @@ import { LionAndSun } from '@/components/animations/IranianSymbols';
 import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
 import { groupsAPI, permissionsAPI, AccessGroup, Permission } from '@/lib/api';
+import { PERMISSION_META } from '@/lib/permissionsMeta';
 
 export default function AdminGroupsPage() {
   const params = useParams();
@@ -195,7 +196,9 @@ export default function AdminGroupsPage() {
                     className="text-[10px] px-2 py-1 rounded-md"
                     style={{ backgroundColor: 'rgba(0,255,255,0.06)', border: '1px solid rgba(0,255,255,0.2)', color: '#00ffff' }}
                   >
-                    {p.label}
+                    {PERMISSION_META[p.codename]
+                      ? (isRTL ? PERMISSION_META[p.codename].label.fa : PERMISSION_META[p.codename].label.en)
+                      : p.label}
                   </span>
                 ))}
                 {g.permissions.length > 4 && (
@@ -244,7 +247,7 @@ export default function AdminGroupsPage() {
           <AdminTextarea label={isRTL ? 'توضیحات' : 'Description'} value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
           <div>
             <label className="block text-xs text-white/50 mb-1.5">{isRTL ? 'دسترسی‌ها' : 'Permissions'}</label>
-            <AdminPermissionCheckbox permissions={allPermissions} selected={selectedPermissions} onChange={setSelectedPermissions} />
+            <AdminPermissionCheckbox permissions={allPermissions} selected={selectedPermissions} onChange={setSelectedPermissions} isRTL={isRTL} />
           </div>
           <div className="flex items-center gap-3 mt-1">
             <button
