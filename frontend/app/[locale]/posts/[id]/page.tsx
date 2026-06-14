@@ -333,7 +333,7 @@ export default function PostDetailPage() {
             <div className="flex flex-wrap items-center gap-4 text-sm">
               <div className="flex items-center gap-1.5" style={{ color: '#00ffff' }}>
                 <User size={14} />
-                <span>{post.author?.display_name || '—'}</span>
+                <span>{post.author?.display_name || post.author?.full_name || '—'}</span>
               </div>
               <div className="flex items-center gap-1.5 text-white/50">
                 <Calendar size={14} />

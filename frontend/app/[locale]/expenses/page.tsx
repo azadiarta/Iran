@@ -255,7 +255,7 @@ export default function ExpensesPage() {
                         style={{ color: '#00ffff' }}
                       >
                         <User className="w-3.5 h-3.5" />
-                        {expense.withdrawn_by?.display_name || t('admin_label')}
+                        {expense.withdrawn_by?.display_name || expense.withdrawn_by?.full_name || t('admin_label')}
                       </span>
                       <span className="flex items-center gap-1.5 text-sm text-white/50">
                         <Calendar className="w-3.5 h-3.5" />

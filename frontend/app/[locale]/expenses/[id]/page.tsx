@@ -379,7 +379,7 @@ export default function ExpenseDetailPage() {
               <div className="flex items-center gap-1.5" style={{ color: '#00ffff' }}>
                 <User size={14} />
                 <span className="text-white/40">{t('withdrawn_by_label')}:</span>
-                <span>{expense.withdrawn_by?.display_name || t('admin_label')}</span>
+                <span>{expense.withdrawn_by?.display_name || expense.withdrawn_by?.full_name || t('admin_label')}</span>
               </div>
               <div className="flex items-center gap-1.5 text-white/50">
                 <Calendar size={14} />

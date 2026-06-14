@@ -126,7 +126,7 @@ export default function AdminExpensesPage() {
   const columns: AdminTableColumn<Expense>[] = [
     { key: 'reason', header: isRTL ? 'علت' : 'Reason', render: (e) => <span className="text-white/80">{e.short_reason}</span> },
     { key: 'amount', header: isRTL ? 'مبلغ' : 'Amount', render: (e) => <span style={{ color: '#ef4444' }}>-{fmt(e.amount)}</span> },
-    { key: 'withdrawn_by', header: isRTL ? 'برداشت توسط' : 'Withdrawn By', render: (e) => <span className="text-white/60">{e.withdrawn_by?.display_name || '—'}</span> },
+    { key: 'withdrawn_by', header: isRTL ? 'برداشت توسط' : 'Withdrawn By', render: (e) => <span className="text-white/60">{e.withdrawn_by?.display_name || e.withdrawn_by?.full_name || '—'}</span> },
     {
       key: 'receipt',
       header: isRTL ? 'رسید' : 'Receipt',
