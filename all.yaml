@@ -13,7 +13,7 @@ rules:
   after_build: update exports + update imports with status
 
 progress:
-  current_phase: 13
+  current_phase: 14
   current_task: "complete (except phase 10 — deferred per project decision)"
   phases:
     1:
@@ -67,6 +67,10 @@ progress:
       name: "i18n cleanup, detail pages, 5-item pagination, image-modal Escape fix, admin System Status"
       status: done
       done: ["Fixed remaining hardcoded-English leaks on the Persian site: AdminTable Prev/Next/Page-N buttons gained optional bilingual prevLabel/nextLabel/pageLabel (default 'Prev'/'Next', back-compat); AdminFileUpload gained an isRTL prop for its hint text + 'Clear' button; admin/settings Save button aria-label is now bilingual; posts list pagination now uses common.prev/next/page_info; posts/[id] guest-comment placeholder and 'Submitting…' now use posts.comment_name_placeholder/common.submitting.", "Backend pagination consolidated into NEW backend/core/pagination.py (paginate(queryset, request, serializer_class, page_size=5)), replacing 4 duplicated `_paginate` helpers in fund/views.py, posts/views.py, accounts/member_views.py, logs/views.py. Page sizes: members/posts/contributions/expenses 10→5 (the 'show last 5 items' lists); comments(global)=10 and activity/system logs=25 kept unchanged but now explicit. All 7 admin list pages (members/contributions/expenses/posts/comments/logs-activity/logs-system) updated with totalCount state + bilingual prevLabel/nextLabel/pageLabel.", "NEW shared frontend/components/common/ImageLightbox.tsx (Escape key + backdrop + X to close) — extracted from posts/[id]'s old local Lightbox (which had NO Escape handler) and used to replace expenses/page.tsx's ad-hoc receipt modal (the reported 'hard to close' bug), plus the new expense detail page.", "NEW expense detail page frontend/app/[locale]/expenses/[id]/page.tsx (full description, amount, date, withdrawn-by, receipt lightbox, comments+rating form) — backed by NEW backend ExpenseDetailView (GET /api/fund/expenses/{id}/, permissions mirror ExpenseListView's expense_list_visibility logic) and 3 new fundAPI methods (getExpenseDetail/getExpenseComments/createExpenseComment). expenses/page.tsx rows are now Links to the detail page (receipt thumbnail still opens the lightbox via stopPropagation), pageSize 10→5, and 22 new bilingual `expenses.*` i18n keys added.", "NEW bilingual custom-listbox component frontend/components/admin/fields/AdminSelectWithDescription.tsx (label+description per option, click-outside/Escape to close) and NEW frontend/lib/settingsMeta.ts (SETTINGS_META) driving a rewritten /admin/settings: select-type settings (default_currency, expense/post/member_profile_list_visibility, default_group) now render as bilingual dropdowns-with-description (default_group's options come from groupsAPI.getList()), require_comment_approval renders as an AdminToggle, and unmapped keys keep the old plain-AdminInput fallback.", "NEW admin System Status page frontend/app/[locale]/admin/system/page.tsx (route /admin/system, superuser-only, AdminSidebar entry with a Database icon) backed by NEW backend SystemStatusView (GET /api/settings/system-status/, superuser-only) — shows DB engine+connection status, DEBUG mode (warns if on in Railway), environment, media storage (S3/local), Django version, and AdminStatCard counts for members/posts/contributions/expenses/pending-comments."]
+    14:
+      name: "i18n generalization sweep (permissions/payments/settings), published-post-edit crash fix, real System Status logging, manual contribution/member creation, superuser group-change error message, clickable post cards"
+      status: done
+      done: ["i18n — admin permission labels: NEW frontend/lib/permissionsMeta.ts (PERMISSION_META, all 11 codenames' label+description in en/fa, mirroring backend/core/management/commands/seed_initial_data.py). AdminPermissionCheckbox gained an optional isRTL prop and now renders PERMISSION_META[perm.codename].label.fa/.en (fallback to raw perm.label for unmapped codenames); admin/groups/page.tsx's permission chips on each group card use the same lookup, and pass isRTL to AdminPermissionCheckbox in the create/edit modal — fixes English-only permission checkboxes/chips when managing groups in Persian.", "i18n — admin payment settings: NEW PAYMENT_SETTINGS_META export added to frontend/lib/settingsMeta.ts (bilingual label+description for all 9 payment_manual_*/payment_paypal_* keys). admin/payments/page.tsx's renderField() now uses it for a bilingual label + description <p> per field (removed the old English-only fieldLabel() helper and now-unused settings/byKey/useMemo state); Save button aria-label is now bilingual.", "i18n — admin/settings/page.tsx: removed the 3 remaining `<p className='...font-mono'>{s.key}</p>` debug lines (raw English setting keys like 'default_currency', 'require_comment_approval' shown to end users — the last English leak on this page) and unified the select/toggle/input row wrapper styling into one consistent boxed 'card' look (toggle row's styling extended to select and input/number rows).", "FIXED published-post-edit crash (item 7): admin/posts/page.tsx openEdit() was doing `res.data as unknown as PostDetail`, but postsAPI.getDetail() actually resolves `{post: PostDetail, comments: Comment[]}` per PostDetailView.get — so `editing.images` was undefined and `.length` threw 'Application error: a client-side exception has occurred', a CLIENT-SIDE React crash that never reached the backend (hence nothing in System Status). Now correctly reads `(res.data as unknown as { post: PostDetail }).post`.", "FIXED System Status never logging anything (item 5) — this was a REAL backend gap, not just a misunderstanding: NO code anywhere wrote to the SystemLog model. NEW backend/core/logging_handlers.py (SystemLogHandler, a logging.Handler subclass that creates SystemLog rows for WARNING+ records, with lazy model import + try/except to avoid app-loading-order issues and to never crash logging itself) wired into backend/groupfund/settings.py LOGGING as a new 'system_log' handler (level=WARNING) added to both the 'root' logger and the 'django' logger (which has propagate=False so django.request/django.security wouldn't otherwise reach root) — real backend errors/warnings (500s, security warnings) now appear in /admin/logs/system.", "i18n generalization sweep — display_name||full_name author/contributor fallback (item 2 + general instruction): PostAuthorSerializer/MemberMinimalSerializer always return both display_name and full_name, but ~10 frontend spots only checked display_name, showing blank/'—'/'Guest' for members who left display_name empty. Added `|| X.full_name` before the final fallback in: posts/page.tsx (PostCard author), posts/[id]/page.tsx (author), expenses/page.tsx + expenses/[id]/page.tsx (withdrawn_by), admin/page.tsx (contributor/expense withdrawn_by/post author — 3 spots), admin/posts/page.tsx (author column), admin/expenses/page.tsx (withdrawn_by column), admin/contributions/page.tsx (contributor column).", "i18n generalization sweep — hardcoded English aria-labels (item 4 + general instruction): fixed aria-label='Remove image' (admin/posts/page.tsx), aria-label='Delete' (admin/contributions/page.tsx), aria-label='Back' (admin/members/[id]/page.tsx) to bilingual isRTL ternaries (aria-label='Save' in admin/payments and admin/settings fixed as part of the payments/settings work above).", "NEW manual-contribution creation (item 8): backend ContributionManualCreateSerializer (fund/serializers.py — guest_name/amount/currency/payment_method/status/notes, currency defaults from DefaultSetting default_currency, validates amount>0 and guest_name required, defaults payment_method=manual/status=completed) + ContributionManualCreateView (fund/views.py, POST /api/fund/contributions/create-manual/, IsAuthenticated+can_manage_permissions, logs 'contribution_added_manually'). Frontend fundAPI.createManualContribution() (lib/api.ts) + admin/contributions/page.tsx '+ Add Contribution' button (gated canManage) opening an AdminModal form (guest_name, amount, currency/payment_method/status selects, optional notes).", "NEW manual member/account creation (item 10): backend MemberCreateSerializer(RegisterSerializer) (accounts/serializers.py — adds optional group_id, reuses all RegisterSerializer validation) + MemberCreateView (accounts/member_views.py, POST /api/members/create/, IsAuthenticated+can_manage_permissions, logs 'member_created_via_admin'). Frontend membersAPI.create() (lib/api.ts) + admin/members/page.tsx '+ Add Member' button opening an AdminModal form (full_name, display_name, phone, email, group select, password+confirm with client-side validation); inline useEffect fetch body extracted into a reusable load() function so the modal can refresh the list on success. 2 new ActivityLog.action choices added: contribution_added_manually, member_created_via_admin.", "IMPROVED superuser group-change error (item 9): admin/members/[id]/page.tsx saveGroup() now distinguishes a 403 response (MemberChangeGroupView intentionally refuses to change a superuser's group — by design) with a dedicated bilingual explanatory toast, instead of the generic 'Failed to change group' error for all failures.", "Whole-card clickable post listing (item 11): posts/page.tsx PostCard restructured so the entire card (thumbnail, title, author, date) is wrapped in the <Link> to the post detail page, not just a small trailing arrow icon; the arrow is now a decorative <span> (no nested links)."]
 
 roadmap:
   # Task-oriented navigation index. When the user asks for a change, find the
@@ -730,7 +734,7 @@ files:
       drf_default_auth: JWTAuthentication
       drf_default_permission: IsAuthenticated
       production_security: "SECURE_PROXY_SSL_HEADER always set (works behind any TLS-terminating reverse proxy, e.g. Caddy in the Docker setup); when DEBUG=False also sets SECURE_SSL_REDIRECT/SECURE_HSTS_SECONDS/SECURE_HSTS_INCLUDE_SUBDOMAINS/SECURE_HSTS_PRELOAD/SESSION_COOKIE_SECURE/CSRF_COOKIE_SECURE/X_FRAME_OPTIONS — note docker-compose.yml hardcodes SECURE_SSL_REDIRECT=False since Caddy↔backend traffic is plain HTTP (TLS already terminated at the edge), avoiding an infinite redirect loop"
-      logging: "console handler; INFO in DEBUG, WARNING in production"
+      logging: "console handler + NEW (Phase 14) 'system_log' handler (core.logging_handlers.SystemLogHandler, level=WARNING) writing WARNING+ records into logs.models.SystemLog — added to both the 'root' logger and the 'django' logger (propagate=False, so django.request/django.security records don't reach root without it); INFO in DEBUG, WARNING in production for level thresholds. FIXES a real gap: previously NOTHING in the backend ever wrote to SystemLog, so /admin/system's System Status log was always empty even for real 500s/security warnings."
     imports:
       external: [{from: os, items: [environ]}, {from: pathlib, items: [Path]}, {from: datetime, items: [timedelta]}]
       internal: []
@@ -1060,6 +1064,20 @@ files:
       - {file: "backend/accounts/member_views.py", items: [paginate], status: available, note: "MemberListView — page_size=5 (default)"}
       - {file: "backend/logs/views.py",            items: [paginate], status: available, note: "ActivityLogListView/SystemLogListView — page_size=25 (explicit)"}
 
+  "backend/core/logging_handlers.py":
+    status: done
+    kind: module
+    note: "NEW (Phase 14) — SystemLogHandler(logging.Handler), registered in groupfund/settings.py LOGGING. emit() maps the stdlib logging level to SystemLog.level (debug/info/warning/error/critical) and creates a SystemLog row with source=record.name, message=self.format(record); imports logs.models.SystemLog INSIDE emit() (avoids app-loading-order issues) and wraps the whole body in try/except Exception: pass (a logging call must never itself raise/crash the request). Fixes the previously-empty /admin/system System Status log — see backend/groupfund/settings.py.key_settings.logging."
+    imports:
+      external: [{from: logging, items: [Handler, DEBUG, INFO, WARNING, ERROR, CRITICAL]}]
+      internal:
+        - {from: "backend/logs/models.py", items: [{name: SystemLog, status: available}], note: "imported lazily inside emit()"}
+    exports:
+      - {name: SystemLogHandler, kind: class, type: "logging.Handler subclass"}
+      - {name: LEVEL_MAP, kind: constant, type: "dict[int, str] — stdlib level -> SystemLog.level choice"}
+    needed_by:
+      - {file: "backend/groupfund/settings.py", items: [SystemLogHandler], status: available}
+
   "backend/core/serializers.py":
     status: done
     imports:
@@ -1275,9 +1293,10 @@ files:
       - {name: AccessGroupSerializer,      kind: class, type: DRF ModelSerializer, fields: [id, name, description, is_default, permissions(codename+label), member_count, created_at]}
       - {name: AccessGroupCreateSerializer,kind: class, type: DRF ModelSerializer, fields: [name, description, permission_ids], note: "auto-adds can_contribute + can_comment"}
       - {name: AccessGroupUpdateSerializer,kind: class, type: DRF ModelSerializer, fields: [name, description, permission_ids], note: "cannot remove can_contribute or can_comment"}
+      - {name: MemberCreateSerializer, kind: class, type: "DRF ModelSerializer (extends RegisterSerializer)", fields: "RegisterSerializer.Meta.fields + [group_id]", note: "NEW (Phase 14) — admin manual member creation. group_id = PrimaryKeyRelatedField(source='group', queryset=AccessGroup.objects.all(), required=False, allow_null=True). create() pops password_confirm + password, sets member.group = group or default group (via get_default_group_id), set_password(password), save(). Reuses ALL of RegisterSerializer's validation (phone/email uniqueness, password match)."}
     needed_by:
       - {file: "backend/accounts/views.py",        items: [RegisterSerializer, LoginSerializer, MemberProfileSerializer], status: available}
-      - {file: "backend/accounts/member_views.py",  items: [MemberListSerializer, MemberDetailSerializer, MemberUpdateSerializer, ChangePasswordSerializer], status: available}
+      - {file: "backend/accounts/member_views.py",  items: [MemberListSerializer, MemberDetailSerializer, MemberUpdateSerializer, ChangePasswordSerializer, MemberCreateSerializer], status: available}
       - {file: "backend/accounts/group_views.py",   items: [AccessGroupSerializer, AccessGroupCreateSerializer, AccessGroupUpdateSerializer], status: available}
 
   "backend/accounts/permissions.py":
@@ -1329,7 +1348,7 @@ files:
 
   "backend/accounts/member_views.py":
     status: done
-    note: "Phase 13 — removed local `_paginate` helper (page_size=10), now imports `paginate` from core.pagination; MemberListView uses paginate(qs, request, MemberListSerializer) → page_size=5 (default, was 10)."
+    note: "Phase 13 — removed local `_paginate` helper (page_size=10), now imports `paginate` from core.pagination; MemberListView uses paginate(qs, request, MemberListSerializer) → page_size=5 (default, was 10). Phase 14 — added MemberCreateView (see export below)."
     imports:
       external:
         - {from: django.contrib.contenttypes.models, items: [ContentType]}
@@ -1338,30 +1357,32 @@ files:
       internal:
         - {from: "backend/accounts/models.py",      items: [{name: Member, status: available}]}
         - {from: "backend/accounts/permissions.py", items: [{name: HasGroupPermission, status: available}]}
-        - {from: "backend/accounts/serializers.py", items: [{name: MemberListSerializer, status: available}, {name: MemberDetailSerializer, status: available}, {name: MemberUpdateSerializer, status: available}, {name: ChangePasswordSerializer, status: available}]}
+        - {from: "backend/accounts/serializers.py", items: [{name: MemberListSerializer, status: available}, {name: MemberDetailSerializer, status: available}, {name: MemberUpdateSerializer, status: available}, {name: ChangePasswordSerializer, status: available}, {name: MemberCreateSerializer, status: available}]}
         - {from: "backend/core/models.py",          items: [{name: DefaultSetting, status: available}]}
         - {from: "backend/core/pagination.py",      items: [{name: paginate, status: available}]}
         - {from: "backend/core/utils.py",           items: [{name: api_success, status: available}, {name: api_error, status: available}]}
         - {from: "backend/logs/models.py",          items: [{name: ActivityLog, status: available}]}
     exports:
       - {name: MemberListView,         kind: class, type: DRF APIView, endpoint: "GET    /api/members/",                       auth: can_manage_permissions, note: "filterable by group/is_active/search; paginated page_size=5"}
+      - {name: MemberCreateView,       kind: class, type: DRF APIView, endpoint: "POST   /api/members/create/",                auth: can_manage_permissions, note: "NEW (Phase 14) — admin manual member creation via MemberCreateSerializer; logs member_created_via_admin to ActivityLog; returns api_success(MemberDetailSerializer(member).data, message='Member created.', status_code=201)"}
       - {name: MemberDetailView,       kind: class, type: DRF APIView, endpoint: "GET    /api/members/{id}/",                  auth: dynamic(member_profile_visibility), note: "full detail to owner or admin only"}
       - {name: MemberUpdateView,       kind: class, type: DRF APIView, endpoint: "PATCH  /api/members/{id}/update/",           auth: owner or can_manage_permissions}
-      - {name: MemberChangeGroupView,  kind: class, type: DRF APIView, endpoint: "PATCH  /api/members/{id}/group/",            auth: can_manage_permissions, note: "cannot change superuser group"}
+      - {name: MemberChangeGroupView,  kind: class, type: DRF APIView, endpoint: "PATCH  /api/members/{id}/group/",            auth: can_manage_permissions, note: "cannot change superuser group (returns 403 — frontend admin/members/[id]/page.tsx now shows a dedicated bilingual message for this 403, Phase 14)"}
       - {name: MemberToggleActiveView, kind: class, type: DRF APIView, endpoint: "PATCH  /api/members/{id}/toggle-active/",    auth: can_manage_permissions, note: "cannot deactivate superuser"}
       - {name: MemberDeleteView,       kind: class, type: DRF APIView, endpoint: "DELETE /api/members/{id}/delete/",           auth: can_delete_member, note: "cannot delete superuser"}
       - {name: ChangePasswordView,     kind: class, type: DRF APIView, endpoint: "POST   /api/members/{id}/change-password/",  auth: owner(needs old_pw) or can_change_any_password, note: "cannot change superuser password"}
     needed_by:
-      - {file: "backend/accounts/member_urls.py", items: [MemberListView, MemberDetailView, MemberUpdateView, MemberChangeGroupView, MemberToggleActiveView, MemberDeleteView, ChangePasswordView], status: available}
+      - {file: "backend/accounts/member_urls.py", items: [MemberListView, MemberCreateView, MemberDetailView, MemberUpdateView, MemberChangeGroupView, MemberToggleActiveView, MemberDeleteView, ChangePasswordView], status: available}
 
   "backend/accounts/member_urls.py":
     status: done
+    note: "Phase 14 — added 'create/' route (MemberCreateView), registered first/before <uuid:pk>/ routes."
     imports:
       external: [{from: django.urls, items: [path]}]
       internal:
-        - {from: "backend/accounts/member_views.py", items: [{name: MemberListView, status: available}, {name: MemberDetailView, status: available}, {name: MemberUpdateView, status: available}, {name: MemberChangeGroupView, status: available}, {name: MemberToggleActiveView, status: available}, {name: MemberDeleteView, status: available}, {name: ChangePasswordView, status: available}]}
+        - {from: "backend/accounts/member_views.py", items: [{name: MemberListView, status: available}, {name: MemberCreateView, status: available}, {name: MemberDetailView, status: available}, {name: MemberUpdateView, status: available}, {name: MemberChangeGroupView, status: available}, {name: MemberToggleActiveView, status: available}, {name: MemberDeleteView, status: available}, {name: ChangePasswordView, status: available}]}
     exports:
-      - {name: urlpatterns, kind: constant, type: list}
+      - {name: urlpatterns, kind: constant, type: list, routes: ["GET /", "POST /create/ (NEW, Phase 14)", "GET /{id}/", "PATCH /{id}/update/", "PATCH /{id}/group/", "PATCH /{id}/toggle-active/", "DELETE /{id}/delete/", "POST /{id}/change-password/"]}
     needed_by:
       - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: available}
 
@@ -1457,12 +1478,13 @@ files:
       - {name: ExpenseSerializer,            kind: class, type: DRF ModelSerializer, fields: [id, withdrawn_by(nested), amount, short_reason, description, receipt_image, expense_date, created_at]}
       - {name: ExpenseCreateSerializer,      kind: class, type: DRF ModelSerializer, note: "auto-sets withdrawn_by, validates amount>0, checks max_receipt_image_size_mb from DefaultSetting"}
       - {name: FundBalanceSerializer,        kind: class, type: DRF Serializer, fields: [total_contributions, total_expenses, balance, currency]}
+      - {name: ContributionManualCreateSerializer, kind: class, type: DRF ModelSerializer, fields: [guest_name, amount, currency, payment_method, status, notes], note: "NEW (Phase 14) — admin manual contribution entry (no contributor account needed). currency defaults from DefaultSetting key=default_currency (fallback GBP), required=False. validate_amount (>0), validate_guest_name (required). create() defaults payment_method=Contribution.PaymentMethod.MANUAL and status=Contribution.Status.COMPLETED if not provided."}
     needed_by:
-      - {file: "backend/fund/views.py", items: [ContributionSerializer, ContributionCreateSerializer, ContributionStatusSerializer, ExpenseSerializer, ExpenseCreateSerializer, FundBalanceSerializer], status: available}
+      - {file: "backend/fund/views.py", items: [ContributionSerializer, ContributionCreateSerializer, ContributionStatusSerializer, ExpenseSerializer, ExpenseCreateSerializer, FundBalanceSerializer, ContributionManualCreateSerializer], status: available}
 
   "backend/fund/views.py":
     status: done
-    note: "Phase 13 — removed local `_paginate` helper, now imports `paginate` from core.pagination (see backend/core/pagination.py); ContributionListView/ExpenseListView use paginate(qs, request, SerializerClass) → page_size=5 (default). Also ADDED ExpenseDetailView (see export below)."
+    note: "Phase 13 — removed local `_paginate` helper, now imports `paginate` from core.pagination (see backend/core/pagination.py); ContributionListView/ExpenseListView use paginate(qs, request, SerializerClass) → page_size=5 (default). Also ADDED ExpenseDetailView (see export below). Phase 14 — ADDED ContributionManualCreateView (see export below)."
     imports:
       external:
         - {from: decimal, items: [Decimal]}
@@ -1476,11 +1498,12 @@ files:
         - {from: "backend/core/pagination.py",       items: [{name: paginate, status: available}]}
         - {from: "backend/core/utils.py",            items: [{name: api_success, status: available}, {name: api_error, status: available}]}
         - {from: "backend/fund/models.py",           items: [{name: Contribution, status: available}, {name: Expense, status: available}]}
-        - {from: "backend/fund/serializers.py",      items: [{name: ContributionSerializer, status: available}, {name: ContributionCreateSerializer, status: available}, {name: ContributionStatusSerializer, status: available}, {name: ExpenseSerializer, status: available}, {name: ExpenseCreateSerializer, status: available}, {name: FundBalanceSerializer, status: available}]}
+        - {from: "backend/fund/serializers.py",      items: [{name: ContributionSerializer, status: available}, {name: ContributionCreateSerializer, status: available}, {name: ContributionStatusSerializer, status: available}, {name: ExpenseSerializer, status: available}, {name: ExpenseCreateSerializer, status: available}, {name: FundBalanceSerializer, status: available}, {name: ContributionManualCreateSerializer, status: available}]}
         - {from: "backend/logs/models.py",           items: [{name: ActivityLog, status: available}]}
     exports:
       - {name: ContributionListView,         kind: class, type: DRF APIView, endpoint: "GET  /api/fund/contributions/",              auth: required}
       - {name: ContributionCreateView,       kind: class, type: DRF APIView, endpoint: "POST /api/fund/contributions/create/",       auth: optional(guests allowed)}
+      - {name: ContributionManualCreateView, kind: class, type: DRF APIView, endpoint: "POST /api/fund/contributions/create-manual/", auth: can_manage_permissions, note: "NEW (Phase 14) — admin manual contribution entry via ContributionManualCreateSerializer; logs contribution_added_manually to ActivityLog; returns api_success(ContributionSerializer(contribution).data, message='Contribution added.', status_code=201)"}
       - {name: ContributionStatusUpdateView, kind: class, type: DRF APIView, endpoint: "PATCH /api/fund/contributions/{id}/status/", auth: can_manage_permissions}
       - {name: ContributionDeleteView,       kind: class, type: DRF APIView, endpoint: "DELETE /api/fund/contributions/{id}/delete/", auth: superuser}
       - {name: ExpenseListView,              kind: class, type: DRF APIView, endpoint: "GET  /api/fund/expenses/",                   auth: dynamic(expense_list_visibility setting)}
@@ -1489,18 +1512,18 @@ files:
       - {name: ExpenseDeleteView,            kind: class, type: DRF APIView, endpoint: "DELETE /api/fund/expenses/{id}/delete/",     auth: can_manage_permissions}
       - {name: FundBalanceView,              kind: class, type: DRF APIView, endpoint: "GET  /api/fund/balance/",                   auth: can_view_balance, note: "always recalculates from DB"}
     needed_by:
-      - {file: "backend/fund/urls.py", items: [ContributionListView, ContributionCreateView, ContributionStatusUpdateView, ContributionDeleteView, ExpenseListView, ExpenseDetailView, ExpenseCreateView, ExpenseDeleteView, FundBalanceView], status: available}
+      - {file: "backend/fund/urls.py", items: [ContributionListView, ContributionCreateView, ContributionManualCreateView, ContributionStatusUpdateView, ContributionDeleteView, ExpenseListView, ExpenseDetailView, ExpenseCreateView, ExpenseDeleteView, FundBalanceView], status: available}
 
   "backend/fund/urls.py":
     status: done
-    note: "Phase 13 — added route for new ExpenseDetailView: GET expenses/<uuid:pk>/, registered between expenses/create/ and expenses/<uuid:pk>/delete/ (no ordering conflict — create/ and delete/ are literal path segments, <uuid:pk>/ only matches a bare UUID)."
+    note: "Phase 13 — added route for new ExpenseDetailView: GET expenses/<uuid:pk>/, registered between expenses/create/ and expenses/<uuid:pk>/delete/ (no ordering conflict — create/ and delete/ are literal path segments, <uuid:pk>/ only matches a bare UUID). Phase 14 — added 'contributions/create-manual/' route (ContributionManualCreateView), next to 'contributions/create/'."
     imports:
       external: [{from: django.urls, items: [path]}]
       internal:
-        - {from: "backend/fund/views.py",  items: [{name: ContributionListView, status: available}, {name: ContributionCreateView, status: available}, {name: ContributionStatusUpdateView, status: available}, {name: ContributionDeleteView, status: available}, {name: ExpenseListView, status: available}, {name: ExpenseCreateView, status: available}, {name: ExpenseDeleteView, status: available}, {name: ExpenseDetailView, status: available}]}
+        - {from: "backend/fund/views.py",  items: [{name: ContributionListView, status: available}, {name: ContributionCreateView, status: available}, {name: ContributionManualCreateView, status: available}, {name: ContributionStatusUpdateView, status: available}, {name: ContributionDeleteView, status: available}, {name: ExpenseListView, status: available}, {name: ExpenseCreateView, status: available}, {name: ExpenseDeleteView, status: available}, {name: ExpenseDetailView, status: available}]}
         - {from: "backend/posts/views.py", items: [{name: CommentListView, status: available}, {name: CommentCreateView, status: available}]}
     exports:
-      - {name: urlpatterns, kind: constant, type: list, routes: ["GET /contributions/", "POST /contributions/create/", "PATCH /contributions/<uuid:pk>/status/", "DELETE /contributions/<uuid:pk>/delete/", "GET /expenses/", "POST /expenses/create/", "GET /expenses/<uuid:pk>/ (NEW, Phase 13 — ExpenseDetailView)", "DELETE /expenses/<uuid:pk>/delete/", "GET /balance/", "GET /expenses/<uuid:pk>/comments/", "POST /expenses/<uuid:pk>/comments/create/"]}
+      - {name: urlpatterns, kind: constant, type: list, routes: ["GET /contributions/", "POST /contributions/create/", "POST /contributions/create-manual/ (NEW, Phase 14 — ContributionManualCreateView)", "PATCH /contributions/<uuid:pk>/status/", "DELETE /contributions/<uuid:pk>/delete/", "GET /expenses/", "POST /expenses/create/", "GET /expenses/<uuid:pk>/ (NEW, Phase 13 — ExpenseDetailView)", "DELETE /expenses/<uuid:pk>/delete/", "GET /balance/", "GET /expenses/<uuid:pk>/comments/", "POST /expenses/<uuid:pk>/comments/create/"]}
     needed_by:
       - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: available}
 
@@ -1640,7 +1663,7 @@ files:
           id: UUID, pk, auto
           actor: FK → accounts.Member, SET_NULL, null (null = anonymous)
           actor_display: str(100), snapshot at action time
-          action: str(100) [created_post, deleted_comment, changed_permission, login, logout, failed_login, contributed, added_expense, approved_comment, edited_post, deleted_post, changed_group, created_member, deactivated_member]
+          action: str(100) [created_post, deleted_comment, changed_permission, login, logout, failed_login, contributed, added_expense, approved_comment, edited_post, deleted_post, changed_group, created_member, deactivated_member, "contribution_added_manually (NEW, Phase 14 — ContributionManualCreateView)", "member_created_via_admin (NEW, Phase 14 — MemberCreateView)"]
           target_type: FK → ContentType, null
           target_id: UUID, null
           target_display: str(255), snapshot at action time
@@ -1666,6 +1689,7 @@ files:
     needed_by:
       - {file: "backend/logs/serializers.py", items: [ActivityLog, SystemLog], status: pending}
       - {file: "backend/logs/views.py",       items: [ActivityLog, SystemLog], status: pending}
+      - {file: "backend/core/logging_handlers.py", items: [SystemLog], status: available, note: "NEW (Phase 14) — SystemLogHandler.emit() creates SystemLog rows for WARNING+ log records"}
 
   "backend/logs/serializers.py":
     status: done
@@ -1847,14 +1871,14 @@ files:
   "frontend/lib/api.ts":
     status: done
     kind: module
-    note: "axios instance + interceptors: attaches JWT, unwraps {success,message,data} → data (leaves raw paginated/auth payloads untouched), 401 refresh-queue, 403→/forbidden, 404→/not-found, 503→/unavailable. EXTENDED in Phase 7B with admin-only methods/types (additions only — no Phase 7A method signatures changed, except Comment.id corrected number→string/UUID). Phase 13 — added fundAPI.getExpenseDetail/getExpenseComments/createExpenseComment (mirrors postsAPI.getDetail/getComments/createComment, for the new expense detail page) and a new systemAPI."
+    note: "axios instance + interceptors: attaches JWT, unwraps {success,message,data} → data (leaves raw paginated/auth payloads untouched), 401 refresh-queue, 403→/forbidden, 404→/not-found, 503→/unavailable. EXTENDED in Phase 7B with admin-only methods/types (additions only — no Phase 7A method signatures changed, except Comment.id corrected number→string/UUID). Phase 13 — added fundAPI.getExpenseDetail/getExpenseComments/createExpenseComment (mirrors postsAPI.getDetail/getComments/createComment, for the new expense detail page) and a new systemAPI. Phase 14 — added fundAPI.createManualContribution and membersAPI.create (both additive, admin-only)."
     exports:
       - {name: authAPI, kind: object, methods: [register, login, logout, getProfile, refreshToken]}
       - {name: postsAPI, kind: object, methods: [getList, getDetail, getComments, createComment, "(7B) create(multipart)", "(7B) update", "(7B) delete", "(7B) uploadImages(multipart)", "(7B) deleteImage"]}
       - {name: commentsAPI, kind: object, "phase": 7B, methods: [approve, delete], note: "target-agnostic moderation actions only — no global list endpoint exists in backend"}
-      - {name: fundAPI, kind: object, methods: [getBalance, getContributions, getExpenses, "(7B) updateContributionStatus(completed|failed)", "(7B) deleteContribution(superuser)", "(7B) createExpense(multipart)", "(7B) deleteExpense", "(Phase 13) getExpenseDetail(id) → GET /api/fund/expenses/{id}/", "(Phase 13) getExpenseComments(id) → GET /api/fund/expenses/{id}/comments/", "(Phase 13) createExpenseComment(id, {text, rating?, guest_name?}) → POST /api/fund/expenses/{id}/comments/create/"]}
+      - {name: fundAPI, kind: object, methods: [getBalance, getContributions, getExpenses, "(7B) updateContributionStatus(completed|failed)", "(7B) deleteContribution(superuser)", "(7B) createExpense(multipart)", "(7B) deleteExpense", "(Phase 13) getExpenseDetail(id) → GET /api/fund/expenses/{id}/", "(Phase 13) getExpenseComments(id) → GET /api/fund/expenses/{id}/comments/", "(Phase 13) createExpenseComment(id, {text, rating?, guest_name?}) → POST /api/fund/expenses/{id}/comments/create/", "(Phase 14) createManualContribution({guest_name, amount, currency?, payment_method?, status?, notes?}) → POST /api/fund/contributions/create-manual/"]}
       - {name: paymentsAPI, kind: object, methods: [getMethods, initiate, uploadReceipt(field=receipt_image), getStatus]}
-      - {name: membersAPI, kind: object, methods: [getProfile, updateProfile, changePassword, "(7B) getList(paginated+filters)", "(7B) changeGroup", "(7B) toggleActive", "(7B) delete"]}
+      - {name: membersAPI, kind: object, methods: [getProfile, updateProfile, changePassword, "(7B) getList(paginated+filters)", "(7B) changeGroup", "(7B) toggleActive", "(7B) delete", "(Phase 14) create({full_name, display_name?, phone?, email?, password, password_confirm, group_id?}) → POST /api/members/create/"]}
       - {name: groupsAPI, kind: object, "phase": 7B, methods: [getList, create, update, setDefault(superuser), delete(superuser)]}
       - {name: dashboardAPI, kind: object, "phase": 7B, methods: [getStats]}
       - {name: logsAPI, kind: object, "phase": 7B, methods: [getActivity, getActivityDetail, getSystem(superuser), getSystemDetail(superuser)]}
@@ -1864,17 +1888,33 @@ files:
     needed_by:
       - {file: "frontend/app/[locale]/**/page.tsx", items: [authAPI, postsAPI, fundAPI, paymentsAPI, membersAPI, settingsAPI], status: available}
       - {file: "frontend/app/[locale]/admin/**/page.tsx", items: [commentsAPI, groupsAPI, dashboardAPI, logsAPI, systemAPI, "extended fundAPI/membersAPI/postsAPI/settingsAPI"], status: available}
+      - {file: "frontend/app/[locale]/admin/contributions/page.tsx", items: [fundAPI.createManualContribution], status: available, note: "NEW (Phase 14) — 'Add Contribution' modal"}
+      - {file: "frontend/app/[locale]/admin/members/page.tsx", items: [membersAPI.create], status: available, note: "NEW (Phase 14) — 'Add Member' modal"}
 
   "frontend/lib/settingsMeta.ts":
     status: done
     kind: module
-    note: "NEW (Phase 13) — SETTINGS_META: Record<string, SettingMeta> bilingual metadata for /admin/settings, keyed by DefaultSetting.key. Keeps option VALUES in sync with backend core/settings_views.py's `_CHOICES` validation dict while providing bilingual label/description text. Covers: default_currency (select: GBP/USD/EUR), expense_list_visibility/post_list_visibility/member_profile_visibility (select: all/members_only/admin_only or group_based), require_comment_approval (toggle, stored as string 'true'/'false'), default_group (select, options populated dynamically by the page from groupsAPI.getList() — `options` left undefined here), max_receipt_image_size_mb (number, label/description only). Any DefaultSetting key NOT present in this map falls back to the pre-Phase-13 plain AdminInput rendering (label = s.description || s.key) — unknown future settings keys still work."
+    note: "NEW (Phase 13) — SETTINGS_META: Record<string, SettingMeta> bilingual metadata for /admin/settings, keyed by DefaultSetting.key. Keeps option VALUES in sync with backend core/settings_views.py's `_CHOICES` validation dict while providing bilingual label/description text. Covers: default_currency (select: GBP/USD/EUR), expense_list_visibility/post_list_visibility/member_profile_visibility (select: all/members_only/admin_only or group_based), require_comment_approval (toggle, stored as string 'true'/'false'), default_group (select, options populated dynamically by the page from groupsAPI.getList() — `options` left undefined here), max_receipt_image_size_mb (number, label/description only). Any DefaultSetting key NOT present in this map falls back to the pre-Phase-13 plain AdminInput rendering (label = s.description || s.key) — unknown future settings keys still work. Phase 14 — added a second export PAYMENT_SETTINGS_META (same {label:{en,fa}, description:{en,fa}} shape, no `type`/`options`) covering the 9 payment_manual_*/payment_paypal_* keys rendered on /admin/payments, replacing that page's old fieldLabel()-from-DB-description approach."
     exports:
       - {name: SETTINGS_META, kind: const, type: "Record<string, SettingMeta>"}
       - {name: SettingMeta, kind: "interface ({label: {en,fa}, description: {en,fa}, type: 'select'|'toggle'|'number', options?: SettingOption[]})"}
       - {name: SettingOption, kind: "interface ({value: string, label: {en,fa}, description: {en,fa}})"}
+      - {name: PAYMENT_SETTINGS_META, kind: const, type: "Record<string, PaymentSettingMeta>", note: "NEW (Phase 14) — keys: payment_manual_bank_name, payment_manual_account_name, payment_manual_account_number, payment_manual_sort_code, payment_manual_reference_prefix, payment_manual_instructions, payment_paypal_email, payment_paypal_me_link, payment_paypal_instructions"}
+      - {name: PaymentSettingMeta, kind: "interface ({label: {en,fa}, description: {en,fa}})"}
     needed_by:
-      - {file: "frontend/app/[locale]/admin/settings/page.tsx", status: available}
+      - {file: "frontend/app/[locale]/admin/settings/page.tsx", items: [SETTINGS_META], status: available}
+      - {file: "frontend/app/[locale]/admin/payments/page.tsx", items: [PAYMENT_SETTINGS_META], status: available, note: "NEW (Phase 14)"}
+
+  "frontend/lib/permissionsMeta.ts":
+    status: done
+    kind: module
+    note: "NEW (Phase 14) — PERMISSION_META: Record<string, PermissionMeta> bilingual {label,description} metadata for all 11 Permission codenames seeded by backend/core/management/commands/seed_initial_data.py (can_contribute, can_comment, can_post, can_expense, can_view_balance, can_view_posts, can_view_dashboard, can_approve_comments, can_delete_member, can_change_any_password, can_manage_permissions). Same pattern as SETTINGS_META (frontend/lib/settingsMeta.ts) — translates DB-sourced English Permission.label/description for display in the admin UI. Any codename NOT present falls back to the raw perm.label from the backend (safe for future permissions added without an i18n update)."
+    exports:
+      - {name: PERMISSION_META, kind: const, type: "Record<string, PermissionMeta>"}
+      - {name: PermissionMeta, kind: "interface ({label: {en,fa}, description: {en,fa}})"}
+    needed_by:
+      - {file: "frontend/components/admin/fields/AdminPermissionCheckbox.tsx", items: [PERMISSION_META], status: available}
+      - {file: "frontend/app/[locale]/admin/groups/page.tsx", items: [PERMISSION_META], status: available}
 
   "frontend/next.config.mjs":
     status: done
@@ -1977,7 +2017,7 @@ files:
     status: done
     kind: page
     route: "/{locale}/posts"
-    note: "postsAPI.getList(page, search) → Paginated<PostSummary>; debounced search, pageSize=5. Phase 13 — pagination Prev/Next/Page-X-of-Y now bilingual via useTranslations('common') (prev/next/page_info), replacing hardcoded English 'Prev'/'Page {page}'/'Next'; totalCount tracked from Paginated.count for page_info's total."
+    note: "postsAPI.getList(page, search) → Paginated<PostSummary>; debounced search, pageSize=5. Phase 13 — pagination Prev/Next/Page-X-of-Y now bilingual via useTranslations('common') (prev/next/page_info), replacing hardcoded English 'Prev'/'Page {page}'/'Next'; totalCount tracked from Paginated.count for page_info's total. Phase 14 — PostCard restructured so the ENTIRE card (thumbnail/title/meta, not just the small trailing arrow) is a single <Link href={`/${locale}/posts/${post.id}`}> (className=\"flex flex-col gap-3 h-full p-6\"); outer motion.div keeps only appearance classes + the hover border-color effect (style={{cursor:'default'}} removed — Link provides pointer cursor); the trailing arrow is now a decorative non-link <span> (no nested <a>). Also added `|| post.author?.full_name` before the final '—' fallback for the author name (display_name is optional; full_name is always present)."
     imports:
       external:
         - {from: react, items: [useState, useEffect, useCallback]}
@@ -1997,7 +2037,7 @@ files:
     status: done
     kind: page
     route: "/{locale}/posts/{id}"
-    note: "postsAPI.getDetail → {post, comments}; postsAPI.getComments → Comment[] (filters is_approved); postsAPI.createComment for guest/member comment submission. Phase 13 — removed local `Lightbox` component, now uses shared ImageLightbox (Escape/backdrop/X close) with hintText=tc('lightbox_hint'); fixed hardcoded English 'Your name' placeholder → t('comment_name_placeholder') and 'Submitting…' → tc('submitting')."
+    note: "postsAPI.getDetail → {post, comments}; postsAPI.getComments → Comment[] (filters is_approved); postsAPI.createComment for guest/member comment submission. Phase 13 — removed local `Lightbox` component, now uses shared ImageLightbox (Escape/backdrop/X close) with hintText=tc('lightbox_hint'); fixed hardcoded English 'Your name' placeholder → t('comment_name_placeholder') and 'Submitting…' → tc('submitting'). Phase 14 — added `|| post.author?.full_name` before the final '—' fallback for the post-author byline (display_name is optional; full_name is always present)."
     imports:
       external:
         - {from: react, items: [useState, useEffect]}
@@ -2019,7 +2059,7 @@ files:
     status: done
     kind: page
     route: "/{locale}/expenses"
-    note: "fundAPI.getExpenses → raw Paginated<Expense> (page_size=5, via core.pagination.paginate); fundAPI.getBalance → FundBalance (gated on can_view_balance permission). Phase 13 — each row is now a Link to /{locale}/expenses/{id} (detail page; receipt-thumbnail button stopPropagation/preventDefault so it still opens the lightbox instead of navigating); receipt modal replaced with shared ImageLightbox (Escape/backdrop/X close, hintText=tc('lightbox_hint')); pageSize 10→5; fixed hardcoded English alt='Receipt'/'Admin' → t('receipt_label')/t('admin_label')."
+    note: "fundAPI.getExpenses → raw Paginated<Expense> (page_size=5, via core.pagination.paginate); fundAPI.getBalance → FundBalance (gated on can_view_balance permission). Phase 13 — each row is now a Link to /{locale}/expenses/{id} (detail page; receipt-thumbnail button stopPropagation/preventDefault so it still opens the lightbox instead of navigating); receipt modal replaced with shared ImageLightbox (Escape/backdrop/X close, hintText=tc('lightbox_hint')); pageSize 10→5; fixed hardcoded English alt='Receipt'/'Admin' → t('receipt_label')/t('admin_label'). Phase 14 — added `|| expense.withdrawn_by?.full_name` before t('admin_label') in the withdrawn-by fallback chain (display_name is optional; full_name is always present)."
     imports:
       external:
         - {from: react, items: [useState, useEffect, useCallback]}
@@ -2041,7 +2081,7 @@ files:
     status: done
     kind: page
     route: "/{locale}/expenses/{id}"
-    note: "NEW (Phase 13) — expense detail page, modeled on posts/[id]/page.tsx. fundAPI.getExpenseDetail(id) → Expense (full untruncated description, amount via formatAmount, expense_date, withdrawn_by.display_name or admin_label); fundAPI.getBalance → FundBalance (gated on can_view_balance, used only for the currency symbol); fundAPI.getExpenseComments(id) → Comment[] (filters is_approved) + fundAPI.createExpenseComment for guest/member comment submission (StarRating 1-10, optional). Receipt image (if present) opens shared ImageLightbox (hintText=tc('lightbox_hint')). Handles loading skeleton, 404 (not_found), 401 (login_required_detail + login_cta), 403 (router.push to /{locale}/forbidden) states. StarRating/StarDisplay/CommentItem are local duplicates of the equivalent components in posts/[id]/page.tsx (kept local, not extracted to a shared module)."
+    note: "NEW (Phase 13) — expense detail page, modeled on posts/[id]/page.tsx. fundAPI.getExpenseDetail(id) → Expense (full untruncated description, amount via formatAmount, expense_date, withdrawn_by.display_name or admin_label); fundAPI.getBalance → FundBalance (gated on can_view_balance, used only for the currency symbol); fundAPI.getExpenseComments(id) → Comment[] (filters is_approved) + fundAPI.createExpenseComment for guest/member comment submission (StarRating 1-10, optional). Receipt image (if present) opens shared ImageLightbox (hintText=tc('lightbox_hint')). Handles loading skeleton, 404 (not_found), 401 (login_required_detail + login_cta), 403 (router.push to /{locale}/forbidden) states. StarRating/StarDisplay/CommentItem are local duplicates of the equivalent components in posts/[id]/page.tsx (kept local, not extracted to a shared module). Phase 14 — added `|| expense.withdrawn_by?.full_name` before t('admin_label') in the withdrawn-by fallback chain (display_name is optional; full_name is always present)."
     imports:
       external:
         - {from: react, items: [useState, useEffect]}
@@ -2207,7 +2247,7 @@ files:
     status: done
     kind: page
     route: "/{locale}/admin"
-    note: "Dashboard — dashboardAPI.getStats(): 4 AdminStatCards (balance/contributions/expenses/members), recharts BarChart (contributions vs expenses this month), 4 RecentCard grids (contributions/expenses/posts/pending_comments). Gated on can_view_dashboard"
+    note: "Dashboard — dashboardAPI.getStats(): 4 AdminStatCards (balance/contributions/expenses/members), recharts BarChart (contributions vs expenses this month), 4 RecentCard grids (contributions/expenses/posts/pending_comments). Gated on can_view_dashboard. Phase 14 — added `|| <x>.full_name` to 3 display-name fallback chains in the recent-activity cards: contributor (before guest_name/'Guest'), expense withdrawn_by (before '—'), post author (before '—') — display_name is optional; full_name is always present."
     imports:
       external:
         - {from: react, items: [useEffect, useState]}
@@ -2232,15 +2272,16 @@ files:
     status: done
     kind: page
     route: "/{locale}/admin/members"
-    note: "membersAPI.getList(page,{search,group,is_active}) + groupsAPI.getList() for filter options; AdminTable w/ search+group+status filters, links to detail page. Gated on can_manage_permissions. Phase 13 — added totalCount state (from Paginated.count) and pageSize=5 (was 10); AdminTable's pagination prop now passes bilingual prevLabel ('قبلی'/'Prev'), nextLabel ('بعدی'/'Next'), and pageLabel ('صفحه X از Y'/'Page X of Y')."
+    note: "membersAPI.getList(page,{search,group,is_active}) + groupsAPI.getList() for filter options; AdminTable w/ search+group+status filters, links to detail page. Gated on can_manage_permissions. Phase 13 — added totalCount state (from Paginated.count) and pageSize=5 (was 10); AdminTable's pagination prop now passes bilingual prevLabel ('قبلی'/'Prev'), nextLabel ('بعدی'/'Next'), and pageLabel ('صفحه X از Y'/'Page X of Y'). Phase 14 — extracted the inline useEffect fetch body into a `load()` function (same deps: canManage/page/search/groupFilter/activeFilter); added a '+ Add Member' button (gated canManage) opening an AdminModal create-member form (full_name required; display_name/phone/email optional; AdminSelect group from `groups` state, placeholder = Default; password + confirm password) with client-side validation (phone-or-email required, password match, min 8 chars) → membersAPI.create(...), bilingual toast on success/error, closes modal and calls load() to refresh the list."
     imports:
       external:
         - {from: react, items: [useEffect, useState]}
         - {from: next/navigation, items: [useParams, useRouter]}
-        - {from: lucide-react, items: [Search, Eye]}
+        - {from: lucide-react, items: [Search, Eye, Plus]}
       internal:
         - {file: "frontend/components/admin/AdminTable.tsx", items: [default, AdminTableColumn], status: available}
         - {file: "frontend/components/admin/AdminBadge.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/AdminModal.tsx", items: [default], status: available}
         - {file: "frontend/components/admin/fields/AdminInput.tsx", items: [default], status: available}
         - {file: "frontend/components/admin/fields/AdminSelect.tsx", items: [default], status: available}
         - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
@@ -2256,7 +2297,7 @@ files:
     status: done
     kind: page
     route: "/{locale}/admin/members/{id}"
-    note: "membersAPI.getProfile/updateProfile/changeGroup/changePassword/toggleActive/delete — profile edit form, group-change form, password-change form (gated can_change_any_password), danger zone (deactivate via AdminConfirmDialog, delete gated can_delete_member)"
+    note: "membersAPI.getProfile/updateProfile/changeGroup/changePassword/toggleActive/delete — profile edit form, group-change form, password-change form (gated can_change_any_password), danger zone (deactivate via AdminConfirmDialog, delete gated can_delete_member). Phase 14 — saveGroup's catch block now narrows the axios error (unknown, manual 'response'/'status' checks) and shows a dedicated bilingual toast when the backend returns 403 (MemberChangeGroupView intentionally rejects changing a superuser's group: 'گروه کاربران سوپریوزر را نمی‌توان تغییر داد.'/'The group of a superuser account cannot be changed.'), falling back to the generic 'Failed to change group' toast for other errors; also fixed the back-button's hardcoded aria-label='Back' → bilingual ({isRTL ? 'بازگشت' : 'Back'})."
     imports:
       external:
         - {from: react, items: [useEffect, useState]}
@@ -2281,7 +2322,7 @@ files:
     status: done
     kind: page
     route: "/{locale}/admin/groups"
-    note: "groupsAPI CRUD — card grid (name/description/member_count/permission chips/is_default star), create/edit AdminModal w/ AdminPermissionCheckbox, set-default + delete (superuser-only, AdminConfirmDialog). KNOWN LIMITATION: permission grid options are derived as the union of permissions already attached to existing groups (workaround — see note at bottom of file)"
+    note: "groupsAPI CRUD — card grid (name/description/member_count/permission chips/is_default star), create/edit AdminModal w/ AdminPermissionCheckbox, set-default + delete (superuser-only, AdminConfirmDialog). KNOWN LIMITATION: permission grid options are derived as the union of permissions already attached to existing groups (workaround — see note at bottom of file). Phase 14 — permission chips on each group card now render bilingual labels via PERMISSION_META[p.codename] (isRTL ? .label.fa : .label.en), falling back to the raw p.label for any codename not present in the map; <AdminPermissionCheckbox> in the create/edit modal now receives isRTL={isRTL} so its permission list is also bilingual."
     imports:
       external:
         - {from: react, items: [useEffect, useState]}
@@ -2297,6 +2338,7 @@ files:
         - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
         - {file: "frontend/store/toastStore.ts", items: [useToastStore], status: available}
         - {file: "frontend/lib/api.ts", items: [groupsAPI, permissionsAPI, "types: AccessGroup, Permission"], status: available}
+        - {file: "frontend/lib/permissionsMeta.ts", items: [PERMISSION_META], status: available, note: "NEW (Phase 14)"}
     exports:
       - {name: default, kind: function, type: "React Server/Client Component (page)"}
     notes_extra: "useAuthStore usage: hasPermission('can_manage_permissions'), member.is_superuser (canManage bypass AND gates Set-Default/Delete buttons, isSuperuser flag). useToastStore usage: show(...) on load/loadPermissions/create/update/setDefault/delete success+error paths. permissionsAPI.getList() result is cast to Permission[] but assigned into a PermissionOption[] state (allPermissions) — feeds AdminPermissionCheckbox."
@@ -2307,20 +2349,24 @@ files:
     status: done
     kind: page
     route: "/{locale}/admin/contributions"
-    note: "fundAPI.getContributions(page,{status,payment_method}) — AdminTable w/ status/method filters, approve→status=completed / reject→status=failed (no 'rejected' status exists on backend) via AdminConfirmDialog, superuser-only delete. Gated on can_view_balance. Phase 13 — added totalCount state (from Paginated.count) and pageSize=5 (was 10); AdminTable's pagination prop now passes bilingual prevLabel ('قبلی'/'Prev'), nextLabel ('بعدی'/'Next'), and pageLabel ('صفحه X از Y'/'Page X of Y')."
+    note: "fundAPI.getContributions(page,{status,payment_method}) — AdminTable w/ status/method filters, approve→status=completed / reject→status=failed (no 'rejected' status exists on backend) via AdminConfirmDialog, superuser-only delete. Gated on can_view_balance. Phase 13 — added totalCount state (from Paginated.count) and pageSize=5 (was 10); AdminTable's pagination prop now passes bilingual prevLabel ('قبلی'/'Prev'), nextLabel ('بعدی'/'Next'), and pageLabel ('صفحه X از Y'/'Page X of Y'). Phase 14 — added a '+ Add Contribution' button (gated canManage, same can_manage_permissions check used for approve/reject) opening an AdminModal manual-contribution form (guest_name required, amount required >0, currency AdminSelect — options from SETTINGS_META.default_currency.options, default GBP — payment_method AdminSelect manual/paypal/other default manual, status AdminSelect pending/pending_review/completed/failed default completed, optional AdminTextarea notes) → fundAPI.createManualContribution(...), bilingual toast on success/error, closes modal and calls load() to refresh; contributor display now falls back display_name || full_name || guest_name || Guest; the delete button's hardcoded aria-label='Delete' is now bilingual ({isRTL ? 'حذف' : 'Delete'})."
     imports:
       external:
         - {from: react, items: [useEffect, useState]}
         - {from: next/navigation, items: [useParams]}
-        - {from: lucide-react, items: [Check, X, Trash2]}
+        - {from: lucide-react, items: [Check, X, Trash2, Plus]}
       internal:
         - {file: "frontend/components/admin/AdminTable.tsx", items: [default, AdminTableColumn], status: available}
         - {file: "frontend/components/admin/AdminBadge.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/AdminModal.tsx", items: [default], status: available, note: "NEW (Phase 14)"}
+        - {file: "frontend/components/admin/fields/AdminInput.tsx", items: [default], status: available, note: "NEW (Phase 14)"}
+        - {file: "frontend/components/admin/fields/AdminTextarea.tsx", items: [default], status: available, note: "NEW (Phase 14)"}
         - {file: "frontend/components/admin/fields/AdminSelect.tsx", items: [default], status: available}
         - {file: "frontend/components/admin/AdminConfirmDialog.tsx", items: [default], status: available}
         - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
         - {file: "frontend/store/toastStore.ts", items: [useToastStore], status: available}
         - {file: "frontend/lib/api.ts", items: [fundAPI, "types: Contribution, Paginated"], status: available}
+        - {file: "frontend/lib/settingsMeta.ts", items: [SETTINGS_META], status: available, note: "NEW (Phase 14) — currency options for the manual-contribution modal"}
     exports:
       - {name: default, kind: function, type: "React Server/Client Component (page)"}
     notes_extra: "useAuthStore usage: hasPermission('can_view_balance'/'can_manage_permissions'), member.is_superuser (canView bypass, canManage bypass for approve/reject buttons, isSuperuser gates the delete button). useToastStore usage: show(...) on load failure and on approve/reject/delete success+error."
@@ -2331,7 +2377,7 @@ files:
     status: done
     kind: page
     route: "/{locale}/admin/expenses"
-    note: "fundAPI.getExpenses/createExpense(multipart receipt_image)/deleteExpense — AdminTable + 'Add Expense' AdminModal (AdminFileUpload for receipt). Create gated can_expense, delete gated can_manage_permissions, view gated can_view_balance. Phase 13 — added totalCount state (from Paginated.count) and pageSize=5 (was 10); AdminTable's pagination prop now passes bilingual prevLabel/nextLabel/pageLabel ('قبلی'/'بعدی'/'صفحه X از Y' vs 'Prev'/'Next'/'Page X of Y'); AdminFileUpload now receives isRTL={isRTL}."
+    note: "fundAPI.getExpenses/createExpense(multipart receipt_image)/deleteExpense — AdminTable + 'Add Expense' AdminModal (AdminFileUpload for receipt). Create gated can_expense, delete gated can_manage_permissions, view gated can_view_balance. Phase 13 — added totalCount state (from Paginated.count) and pageSize=5 (was 10); AdminTable's pagination prop now passes bilingual prevLabel/nextLabel/pageLabel ('قبلی'/'بعدی'/'صفحه X از Y' vs 'Prev'/'Next'/'Page X of Y'); AdminFileUpload now receives isRTL={isRTL}. Phase 14 — 'withdrawn_by' display now falls back display_name || full_name || '—' (was display_name || '—'), so members without a display_name show their registered full name."
     imports:
       external:
         - {from: react, items: [useEffect, useState]}
@@ -2357,7 +2403,7 @@ files:
     status: done
     kind: page
     route: "/{locale}/admin/posts"
-    note: "postsAPI CRUD incl. multipart create/uploadImages/deleteImage — AdminTable + create/edit AdminModal (AdminFileUpload multi-image, existing-image removal grid). Gated on can_post. Phase 13 — added totalCount state (from Paginated.count) and pageSize=5 (was 10); AdminTable's pagination prop now passes bilingual prevLabel/nextLabel/pageLabel ('قبلی'/'بعدی'/'صفحه X از Y' vs 'Prev'/'Next'/'Page X of Y'); AdminFileUpload now receives isRTL={isRTL}."
+    note: "postsAPI CRUD incl. multipart create/uploadImages/deleteImage — AdminTable + create/edit AdminModal (AdminFileUpload multi-image, existing-image removal grid). Gated on can_post. Phase 13 — added totalCount state (from Paginated.count) and pageSize=5 (was 10); AdminTable's pagination prop now passes bilingual prevLabel/nextLabel/pageLabel ('قبلی'/'بعدی'/'صفحه X از Y' vs 'Prev'/'Next'/'Page X of Y'); AdminFileUpload now receives isRTL={isRTL}. Phase 14 — FIXED a crash when editing a published post: openEdit() previously did `res.data as unknown as PostDetail` but postsAPI.getDetail() actually resolves to `{post: PostDetail, comments: Comment[]}` (per PostDetailView.get), so `editing.images` was undefined and `editing.images.length` threw 'Application error: a client-side exception has occurred' (never reaching the backend, so it was never in System Status). Now reads `(res.data as unknown as { post: PostDetail }).post`. Also: author column display falls back display_name || full_name || '—'; the remove-existing-image button's hardcoded aria-label='Remove image' is now bilingual ({isRTL ? 'حذف تصویر' : 'Remove image'})."
     imports:
       external:
         - {from: react, items: [useEffect, useState]}
@@ -2408,10 +2454,10 @@ files:
     status: done
     kind: page
     route: "/{locale}/admin/payments"
-    note: "settingsAPI.getAll/update — manual bank transfer + PayPal sections (AdminToggle for *_enabled, per-field save buttons incl. AdminFileUpload-free text fields + instructions textarea). Superuser-only"
+    note: "settingsAPI.getAll/update — manual bank transfer + PayPal sections (AdminToggle for *_enabled, per-field save buttons incl. AdminFileUpload-free text fields + instructions textarea). Superuser-only. Phase 14 — removed the local fieldLabel() helper (which derived an English-only label from item.description or a hardcoded English fallback) and the `settings`/`byKey`/`useMemo` state; renderField(key, multiline) now looks up PAYMENT_SETTINGS_META[key] and renders a bilingual label (meta.label.fa/.en) PLUS a description <p> below the field (meta.description.fa/.en), matching the /admin/settings pattern — unmapped keys still fall back to `key.replace(/^payment_(manual|paypal)_/, '').replace(/_/g, ' ')` with no description. Also fixed the Save button's hardcoded aria-label='Save' → bilingual ({isRTL ? 'ذخیره' : 'Save'})."
     imports:
       external:
-        - {from: react, items: [useEffect, useMemo, useState]}
+        - {from: react, items: [useEffect, useState]}
         - {from: next/navigation, items: [useParams]}
         - {from: lucide-react, items: [Save, Wallet, Banknote]}
       internal:
@@ -2422,6 +2468,7 @@ files:
         - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
         - {file: "frontend/store/toastStore.ts", items: [useToastStore], status: available}
         - {file: "frontend/lib/api.ts", items: [settingsAPI, "types: DefaultSettingItem"], status: available}
+        - {file: "frontend/lib/settingsMeta.ts", items: [PAYMENT_SETTINGS_META], status: available, note: "NEW (Phase 14)"}
     exports:
       - {name: default, kind: function, type: "React Server/Client Component (page)"}
     notes_extra: "useAuthStore usage: member.is_superuser only (isSuperuser — sole gate, no hasPermission calls). useToastStore usage: show(...) on settingsAPI.getAll() failure and on every per-field/per-toggle settingsAPI.update() success+error. Local constants MANUAL_FIELDS (5 payment_manual_* keys) and PAYPAL_FIELDS (2 payment_paypal_* keys) drive which DefaultSettingItem rows render here vs on /admin/settings (PAYMENT_PREFIXES exclusion in that page)."
@@ -2432,7 +2479,7 @@ files:
     status: done
     kind: page
     route: "/{locale}/admin/settings"
-    note: "settingsAPI.getAll/update — generic key/value editor for all non-payment DefaultSetting rows (default_group, default_currency, require_comment_approval, max_receipt_image_size_mb, *_visibility, etc.), per-field save. Superuser-only. Phase 13 — rows whose key has a SETTINGS_META entry now render as: type='select' → AdminSelectWithDescription (bilingual label above + description below, options from meta.options, except default_group whose options are built at runtime from groupsAPI.getList() as {value: g.id, label: g.name, description: g.description}); type='toggle' → AdminToggle (checked = values[key]==='true', stores 'true'/'false' string); type='number' → AdminInput type='number' with bilingual label/description from meta. Keys with NO meta entry keep the original plain AdminInput (label = s.description || s.key) — safe fallback for unknown future settings. Each row keeps its own Save button (extracted into a local SaveButton helper); aria-label='Save' fixed to bilingual ('ذخیره'/'Save') via isRTL."
+    note: "settingsAPI.getAll/update — generic key/value editor for all non-payment DefaultSetting rows (default_group, default_currency, require_comment_approval, max_receipt_image_size_mb, *_visibility, etc.), per-field save. Superuser-only. Phase 13 — rows whose key has a SETTINGS_META entry now render as: type='select' → AdminSelectWithDescription (bilingual label above + description below, options from meta.options, except default_group whose options are built at runtime from groupsAPI.getList() as {value: g.id, label: g.name, description: g.description}); type='toggle' → AdminToggle (checked = values[key]==='true', stores 'true'/'false' string); type='number' → AdminInput type='number' with bilingual label/description from meta. Keys with NO meta entry keep the original plain AdminInput (label = s.description || s.key) — safe fallback for unknown future settings. Each row keeps its own Save button (extracted into a local SaveButton helper); aria-label='Save' fixed to bilingual ('ذخیره'/'Save') via isRTL. Phase 14 — removed the debug-only `<p className=\"...font-mono\">{s.key}</p>` line shown under every select/toggle/number row (e.g. raw 'default_currency', 'require_comment_approval' — English keys with no end-user purpose, the last remaining English leak in this page); also unified the row wrapper styling — the select and input/number rows now use the same boxed style (`rounded-xl px-4 py-3`, bg rgba(255,255,255,0.02), border 1px solid rgba(255,255,255,0.06)) that the toggle row already had, so all three row types render as consistent 'cards' (select/input keep items-end, toggle keeps items-center)."
     imports:
       external:
         - {from: react, items: [useEffect, useState]}
@@ -2768,9 +2815,11 @@ files:
   "frontend/components/admin/fields/AdminPermissionCheckbox.tsx":
     status: done
     kind: component
-    note: "permission grid with locked always-on entries (can_contribute/can_comment, force-included by backend regardless); no internal imports"
+    note: "permission grid with locked always-on entries (can_contribute/can_comment, force-included by backend regardless). Phase 14 — added optional `isRTL?: boolean` prop (default false); each permission's label now renders via PERMISSION_META[perm.codename] (isRTL ? .label.fa : .label.en), falling back to the raw perm.label for any codename not present in the map — fixes the permission grid showing English-only labels when adding/editing a group in Persian."
     imports:
       external: [{from: lucide-react, items: [Check]}]
+      internal:
+        - {file: "frontend/lib/permissionsMeta.ts", items: [PERMISSION_META], status: available, note: "NEW (Phase 14)"}
     exports: [default, PermissionOption]
     needed_by: "see shared_components.admin_component_library.fields.AdminPermissionCheckbox for the full per-admin-page consumer list"
   # ─── FRONTEND — Stores, lib, messages, new config files (pass 5) ─────────
