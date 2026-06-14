@@ -1,13 +1,19 @@
-from django.contrib.contenttypes.models import ContentType
+import os
+
+import django
+from django.conf import settings as django_settings
+from django.db import connection
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
-from accounts.models import AccessGroup
+from accounts.models import AccessGroup, Member
 from accounts.permissions import IsSuperuser
 from core.models import DefaultSetting
 from core.serializers import DefaultSettingSerializer
 from core.utils import api_error, api_success
+from fund.models import Contribution, Expense
 from logs.models import ActivityLog
+from posts.models import Comment, Post
 
 # Validation rules per key
 _CHOICES = {
@@ -83,3 +89,36 @@ class DefaultSettingUpdateView(APIView):
             extra_data={'key': key, 'old_value': old_value, 'new_value': new_value},
         )
         return api_success(DefaultSettingSerializer(setting).data, message='Setting updated.')
+
+
+class SystemStatusView(APIView):
+    permission_classes = [IsAuthenticated, IsSuperuser]
+
+    def get(self, request):
+        engine = django_settings.DATABASES['default']['ENGINE'].rsplit('.', 1)[-1]
+
+        try:
+            connection.ensure_connection()
+            db_connected = True
+        except Exception:
+            db_connected = False
+
+        data = {
+            'database': {
+                'engine': engine,
+                'connected': db_connected,
+            },
+            'debug': django_settings.DEBUG,
+            'environment': 'railway' if os.environ.get('RAILWAY_ENVIRONMENT') else 'local',
+            'media_storage': 's3' if django_settings.AWS_STORAGE_BUCKET_NAME else 'local',
+            'django_version': django.get_version(),
+            'counts': {
+                'members_total': Member.objects.count(),
+                'members_active': Member.objects.filter(is_active=True).count(),
+                'posts': Post.objects.count(),
+                'contributions': Contribution.objects.count(),
+                'expenses': Expense.objects.count(),
+                'pending_comments': Comment.objects.filter(is_approved=False).count(),
+            },
+        }
+        return api_success(data)

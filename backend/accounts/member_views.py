@@ -12,6 +12,7 @@ from accounts.serializers import (
     MemberUpdateSerializer,
 )
 from core.models import DefaultSetting
+from core.pagination import paginate
 from core.utils import api_error, api_success
 from logs.models import ActivityLog
 
@@ -39,14 +40,6 @@ def _log(actor, action, target=None, extra_data=None, ip=None):
 def _get_ip(request):
     forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
     return forwarded.split(',')[0].strip() if forwarded else request.META.get('REMOTE_ADDR')
-
-
-def _paginate(queryset, request, serializer_class):
-    from rest_framework.pagination import PageNumberPagination
-    paginator = PageNumberPagination()
-    paginator.page_size = 10
-    page = paginator.paginate_queryset(queryset, request)
-    return paginator.get_paginated_response(serializer_class(page, many=True).data)
 
 
 def _is_admin(user):
@@ -82,7 +75,7 @@ class MemberListView(APIView):
             )
             qs = qs.distinct()
 
-        return _paginate(qs, request, MemberListSerializer)
+        return paginate(qs, request, MemberListSerializer)
 
 
 class MemberDetailView(APIView):

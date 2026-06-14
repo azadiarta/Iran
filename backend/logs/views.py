@@ -1,18 +1,11 @@
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from accounts.permissions import HasGroupPermission, IsSuperuser
+from core.pagination import paginate
 from core.utils import api_error, api_success
 from logs.models import ActivityLog, SystemLog
 from logs.serializers import ActivityLogSerializer, SystemLogSerializer
-
-
-def _paginate(queryset, request, serializer_class, page_size=25):
-    paginator = PageNumberPagination()
-    paginator.page_size = page_size
-    page = paginator.paginate_queryset(queryset, request)
-    return paginator.get_paginated_response(serializer_class(page, many=True).data)
 
 
 # ─── ActivityLog ──────────────────────────────────────────────────────────────
@@ -42,7 +35,7 @@ class ActivityLogListView(APIView):
         if ip:
             qs = qs.filter(ip_address=ip)
 
-        return _paginate(qs, request, ActivityLogSerializer)
+        return paginate(qs, request, ActivityLogSerializer, page_size=25)
 
 
 class ActivityLogDetailView(APIView):
@@ -79,7 +72,7 @@ class SystemLogListView(APIView):
         if date_to:
             qs = qs.filter(created_at__date__lte=date_to)
 
-        return _paginate(qs, request, SystemLogSerializer)
+        return paginate(qs, request, SystemLogSerializer, page_size=25)
 
 
 class SystemLogDetailView(APIView):

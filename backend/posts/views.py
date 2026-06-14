@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 
 from accounts.permissions import HasGroupPermission
 from core.models import DefaultSetting
+from core.pagination import paginate
 from core.utils import api_error, api_success
 from fund.models import Expense
 from logs.models import ActivityLog
@@ -44,15 +45,6 @@ def _log(actor, action, target=None, extra_data=None, ip=None):
 def _get_ip(request):
     forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
     return forwarded.split(',')[0].strip() if forwarded else request.META.get('REMOTE_ADDR')
-
-
-def _paginate(queryset, request, serializer_class):
-    from rest_framework.pagination import PageNumberPagination
-    paginator = PageNumberPagination()
-    paginator.page_size = 10
-    page = paginator.paginate_queryset(queryset, request)
-    serializer = serializer_class(page, many=True, context={'request': request})
-    return paginator.get_paginated_response(serializer.data)
 
 
 def _post_visible(request):
@@ -98,7 +90,7 @@ class PostListView(APIView):
         if not visible:
             return err
         qs = Post.objects.prefetch_related('images').select_related('author').order_by('-created_at')
-        return _paginate(qs, request, PostSerializer)
+        return paginate(qs, request, PostSerializer)
 
 
 class PostDetailView(APIView):
@@ -289,7 +281,7 @@ class CommentGlobalListView(APIView):
                 | models.Q(author__display_name__icontains=search)
             )
 
-        return _paginate(qs, request, CommentSerializer)
+        return paginate(qs, request, CommentSerializer, page_size=10)
 
 
 class CommentListView(APIView):

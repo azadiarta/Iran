@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 
 from accounts.permissions import HasGroupPermission, IsSuperuser
 from core.models import DefaultSetting
+from core.pagination import paginate
 from core.utils import api_error, api_success
 from fund.models import Contribution, Expense
 from fund.serializers import (
@@ -45,15 +46,6 @@ def _get_ip(request):
     return forwarded.split(',')[0].strip() if forwarded else request.META.get('REMOTE_ADDR')
 
 
-def _paginate(queryset, request, serializer_class):
-    from rest_framework.pagination import PageNumberPagination
-    paginator = PageNumberPagination()
-    paginator.page_size = 10
-    page = paginator.paginate_queryset(queryset, request)
-    serializer = serializer_class(page, many=True, context={'request': request})
-    return paginator.get_paginated_response(serializer.data)
-
-
 # ─── Contribution ──────────────────────────────────────────────────────────────
 
 class ContributionListView(APIView):
@@ -81,7 +73,7 @@ class ContributionListView(APIView):
         if contributor_id:
             qs = qs.filter(contributor__id=contributor_id)
 
-        return _paginate(qs, request, ContributionSerializer)
+        return paginate(qs, request, ContributionSerializer)
 
 
 class ContributionCreateView(APIView):
@@ -167,7 +159,28 @@ class ExpenseListView(APIView):
         if withdrawn_by:
             qs = qs.filter(withdrawn_by__id=withdrawn_by)
 
-        return _paginate(qs, request, ExpenseSerializer)
+        return paginate(qs, request, ExpenseSerializer)
+
+
+class ExpenseDetailView(APIView):
+
+    def get_permissions(self):
+        setting = DefaultSetting.objects.filter(key='expense_list_visibility').first()
+        visibility = setting.value if setting else 'members_only'
+
+        if visibility == 'all':
+            return [AllowAny()]
+        if visibility == 'admin_only':
+            return [IsAuthenticated(), HasGroupPermission('can_manage_permissions')()]
+        return [IsAuthenticated()]
+
+    def get(self, request, pk):
+        try:
+            expense = Expense.objects.select_related('withdrawn_by').get(pk=pk)
+        except Expense.DoesNotExist:
+            return api_error('Expense not found.', status_code=404)
+
+        return api_success(ExpenseSerializer(expense, context={'request': request}).data)
 
 
 class ExpenseCreateView(APIView):

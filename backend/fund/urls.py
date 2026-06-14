@@ -7,6 +7,7 @@ from fund.views import (
     ContributionStatusUpdateView,
     ExpenseCreateView,
     ExpenseDeleteView,
+    ExpenseDetailView,
     ExpenseListView,
     FundBalanceView,
 )
@@ -19,6 +20,7 @@ urlpatterns = [
     path('contributions/<uuid:pk>/delete/',      ContributionDeleteView.as_view(),        name='contribution-delete'),
     path('expenses/',                            ExpenseListView.as_view(),               name='expense-list'),
     path('expenses/create/',                     ExpenseCreateView.as_view(),             name='expense-create'),
+    path('expenses/<uuid:pk>/',                  ExpenseDetailView.as_view(),             name='expense-detail'),
     path('expenses/<uuid:pk>/delete/',           ExpenseDeleteView.as_view(),             name='expense-delete'),
     path('balance/',                             FundBalanceView.as_view(),               name='fund-balance'),
 
