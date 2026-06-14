@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Save, Wallet, Banknote } from 'lucide-react';
 import AdminInput from '@/components/admin/fields/AdminInput';
@@ -9,6 +9,7 @@ import { LionAndSun } from '@/components/animations/IranianSymbols';
 import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
 import { settingsAPI, DefaultSettingItem } from '@/lib/api';
+import { PAYMENT_SETTINGS_META } from '@/lib/settingsMeta';
 
 const MANUAL_FIELDS = [
   'payment_manual_bank_name',
@@ -28,7 +29,6 @@ export default function AdminPaymentsPage() {
 
   const isSuperuser = !!currentMember?.is_superuser;
 
-  const [settings, setSettings] = useState<DefaultSettingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [values, setValues] = useState<Record<string, string>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -42,7 +42,6 @@ export default function AdminPaymentsPage() {
       .getAll()
       .then((res) => {
         const data = res.data as unknown as DefaultSettingItem[];
-        setSettings(data);
         const map: Record<string, string> = {};
         data.forEach((s) => { map[s.key] = s.value; });
         setValues(map);
@@ -51,12 +50,6 @@ export default function AdminPaymentsPage() {
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSuperuser]);
-
-  const byKey = useMemo(() => {
-    const map = new Map<string, DefaultSettingItem>();
-    settings.forEach((s) => map.set(s.key, s));
-    return map;
-  }, [settings]);
 
   function set(key: string, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -72,12 +65,6 @@ export default function AdminPaymentsPage() {
     } finally {
       setSavingKey(null);
     }
-  }
-
-  function fieldLabel(key: string) {
-    const item = byKey.get(key);
-    if (item?.description) return item.description;
-    return key.replace(/^payment_(manual|paypal)_/, '').replace(/_/g, ' ');
   }
 
   if (!isSuperuser) {
@@ -98,24 +85,31 @@ export default function AdminPaymentsPage() {
 
   function renderField(key: string, multiline = false) {
     const value = values[key] ?? '';
+    const meta = PAYMENT_SETTINGS_META[key];
+    const label = meta ? (isRTL ? meta.label.fa : meta.label.en) : key.replace(/^payment_(manual|paypal)_/, '').replace(/_/g, ' ');
     return (
-      <div key={key} className="flex items-end gap-2">
-        <div className="flex-1">
-          {multiline ? (
-            <AdminTextarea label={fieldLabel(key)} value={value} onChange={(e) => set(key, e.target.value)} rows={2} />
-          ) : (
-            <AdminInput label={fieldLabel(key)} value={value} onChange={(e) => set(key, e.target.value)} />
-          )}
+      <div key={key} className="flex flex-col">
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            {multiline ? (
+              <AdminTextarea label={label} value={value} onChange={(e) => set(key, e.target.value)} rows={2} />
+            ) : (
+              <AdminInput label={label} value={value} onChange={(e) => set(key, e.target.value)} />
+            )}
+          </div>
+          <button
+            onClick={() => save(key)}
+            disabled={savingKey === key}
+            className="flex-shrink-0 flex items-center justify-center rounded-xl px-3 py-2.5 transition-all disabled:opacity-50"
+            style={{ border: '1px solid rgba(0,255,255,0.3)', color: '#00ffff', backgroundColor: 'rgba(0,255,255,0.05)' }}
+            aria-label={isRTL ? 'ذخیره' : 'Save'}
+          >
+            <Save className="w-4 h-4" />
+          </button>
         </div>
-        <button
-          onClick={() => save(key)}
-          disabled={savingKey === key}
-          className="flex-shrink-0 flex items-center justify-center rounded-xl px-3 py-2.5 transition-all disabled:opacity-50"
-          style={{ border: '1px solid rgba(0,255,255,0.3)', color: '#00ffff', backgroundColor: 'rgba(0,255,255,0.05)' }}
-          aria-label="Save"
-        >
-          <Save className="w-4 h-4" />
-        </button>
+        {meta && (
+          <p className="mt-1.5 text-xs text-white/40">{isRTL ? meta.description.fa : meta.description.en}</p>
+        )}
       </div>
     );
   }

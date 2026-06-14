@@ -142,3 +142,76 @@ export const SETTINGS_META: Record<string, SettingMeta> = {
     type: 'number',
   },
 };
+
+// Bilingual metadata for the payment settings rendered on /admin/payments.
+
+export interface PaymentSettingMeta {
+  label: { en: string; fa: string };
+  description: { en: string; fa: string };
+}
+
+export const PAYMENT_SETTINGS_META: Record<string, PaymentSettingMeta> = {
+  payment_manual_bank_name: {
+    label: { en: 'Bank Name', fa: 'نام بانک' },
+    description: {
+      en: 'Bank name shown to contributors for manual bank transfers.',
+      fa: 'نام بانکی که برای انتقال بانکی دستی به مشارکت‌کنندگان نمایش داده می‌شود.',
+    },
+  },
+  payment_manual_account_name: {
+    label: { en: 'Account Holder Name', fa: 'نام صاحب حساب' },
+    description: {
+      en: 'Account holder name shown to contributors for manual bank transfers.',
+      fa: 'نام صاحب حساب که برای انتقال بانکی دستی به مشارکت‌کنندگان نمایش داده می‌شود.',
+    },
+  },
+  payment_manual_account_number: {
+    label: { en: 'Account Number', fa: 'شماره حساب' },
+    description: {
+      en: 'Account number shown to contributors for manual bank transfers.',
+      fa: 'شماره حسابی که برای انتقال بانکی دستی به مشارکت‌کنندگان نمایش داده می‌شود.',
+    },
+  },
+  payment_manual_sort_code: {
+    label: { en: 'Sort Code', fa: 'کد شعبه (Sort Code)' },
+    description: {
+      en: 'Sort code shown to contributors for manual bank transfers.',
+      fa: 'کد شعبه (Sort Code) که برای انتقال بانکی دستی به مشارکت‌کنندگان نمایش داده می‌شود.',
+    },
+  },
+  payment_manual_reference_prefix: {
+    label: { en: 'Reference Prefix', fa: 'پیشوند کد پیگیری' },
+    description: {
+      en: 'Prefix used to generate payment reference codes for manual transfers.',
+      fa: 'پیشوندی که برای ساخت کدهای پیگیری پرداخت‌های انتقال بانکی دستی استفاده می‌شود.',
+    },
+  },
+  payment_manual_instructions: {
+    label: { en: 'Instructions', fa: 'راهنمای پرداخت' },
+    description: {
+      en: 'Extra instructions shown to contributors for manual bank transfers.',
+      fa: 'راهنمای تکمیلی که برای انتقال بانکی دستی به مشارکت‌کنندگان نمایش داده می‌شود.',
+    },
+  },
+  payment_paypal_email: {
+    label: { en: 'PayPal Email', fa: 'ایمیل پی‌پل' },
+    description: {
+      en: 'PayPal email shown to contributors.',
+      fa: 'ایمیل پی‌پلی که به مشارکت‌کنندگان نمایش داده می‌شود.',
+    },
+  },
+  payment_paypal_me_link: {
+    label: { en: 'PayPal.me Link', fa: 'لینک PayPal.me' },
+    description: {
+      en: 'paypal.me link shown to contributors.',
+      fa: 'لینک paypal.me که به مشارکت‌کنندگان نمایش داده می‌شود.',
+    },
+  },
+  payment_paypal_instructions: {
+    label: { en: 'Instructions', fa: 'راهنمای پرداخت' },
+    description: {
+      en: 'Extra instructions shown to contributors for PayPal payments.',
+      fa: 'راهنمای تکمیلی که برای پرداخت از طریق پی‌پل به مشارکت‌کنندگان نمایش داده می‌شود.',
+    },
+  },
+};
