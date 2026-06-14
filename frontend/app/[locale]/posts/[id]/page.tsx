@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { User, Calendar, Star, Send, ChevronLeft } from 'lucide-react';
 import { postsAPI } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
+import ImageLightbox from '@/components/common/ImageLightbox';
 import type { PostDetail, Comment } from '@/lib/api';
 
 // ─── Star Rating Selector ─────────────────────────────────────────────────────
@@ -106,63 +107,11 @@ function CommentItem({ comment, locale, t }: { comment: Comment; locale: string;
   );
 }
 
-// ─── Image Lightbox ───────────────────────────────────────────────────────────
-
-function Lightbox({
-  src,
-  alt,
-  onClose,
-}: {
-  src: string;
-  alt: string;
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(8px)' }}
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Image preview"
-    >
-      <div
-        className="relative max-w-4xl max-h-[90vh] w-full"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={src}
-          alt={alt}
-          className="w-full h-full object-contain rounded-xl"
-          style={{ maxHeight: '85vh' }}
-        />
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
-          style={{ background: 'rgba(0,0,0,0.6)' }}
-          aria-label="Close preview"
-        >
-          ✕
-        </button>
-        <p className="text-center text-white/30 text-xs mt-2">Click outside or press Esc to close</p>
-      </div>
-    </div>
-  );
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function PostDetailPage() {
   const t = useTranslations('posts');
+  const tc = useTranslations('common');
   const router = useRouter();
   const params = useParams();
   const locale = params?.locale as string || 'en';
@@ -438,10 +387,11 @@ export default function PostDetailPage() {
 
         {/* Lightbox */}
         {lightboxSrc && (
-          <Lightbox
+          <ImageLightbox
             src={lightboxSrc}
             alt={post.title}
             onClose={() => setLightboxSrc(null)}
+            hintText={tc('lightbox_hint')}
           />
         )}
 
@@ -517,7 +467,7 @@ export default function PostDetailPage() {
                     onChange={(e) => setCommentName(e.target.value)}
                     readOnly={isAuthenticated}
                     disabled={commentSubmitting}
-                    placeholder={isAuthenticated ? (member?.display_name || member?.full_name || '') : 'Your name'}
+                    placeholder={isAuthenticated ? (member?.display_name || member?.full_name || '') : t('comment_name_placeholder')}
                     className="w-full rounded-xl px-4 py-3 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50"
                     style={{
                       background: isAuthenticated
@@ -633,7 +583,7 @@ export default function PostDetailPage() {
                       >
                         <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                       </svg>
-                      Submitting…
+                      {tc('submitting')}
                     </>
                   ) : (
                     <>

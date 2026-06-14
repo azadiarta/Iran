@@ -8,9 +8,10 @@ interface AdminFileUploadProps {
   multiple?: boolean;
   onChange: (files: File[]) => void;
   hint?: string;
+  isRTL?: boolean;
 }
 
-export default function AdminFileUpload({ label, accept, multiple = false, onChange, hint }: AdminFileUploadProps) {
+export default function AdminFileUpload({ label, accept, multiple = false, onChange, hint, isRTL = false }: AdminFileUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [previews, setPreviews] = useState<{ name: string; url: string | null }[]>([]);
   const [dragOver, setDragOver] = useState(false);
@@ -53,7 +54,7 @@ export default function AdminFileUpload({ label, accept, multiple = false, onCha
         }}
       >
         <UploadCloud className="w-7 h-7" style={{ color: dragOver ? '#00ffff' : 'rgba(255,255,255,0.3)' }} />
-        <p className="text-xs text-white/40 text-center">{hint || 'Click or drag files to upload'}</p>
+        <p className="text-xs text-white/40 text-center">{hint || (isRTL ? 'برای آپلود کلیک کنید یا فایل را بکشید' : 'Click or drag files to upload')}</p>
         <input
           ref={inputRef}
           type="file"
@@ -88,7 +89,7 @@ export default function AdminFileUpload({ label, accept, multiple = false, onCha
             style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
           >
             <X className="w-3.5 h-3.5" />
-            Clear
+            {isRTL ? 'پاک کردن' : 'Clear'}
           </button>
         </div>
       )}

@@ -15,6 +15,8 @@ interface PaginationState {
   hasPrev: boolean;
   onPageChange: (page: number) => void;
   pageLabel?: string;
+  prevLabel?: string;
+  nextLabel?: string;
 }
 
 interface AdminTableProps<T> {
@@ -107,7 +109,7 @@ export default function AdminTable<T>({
             }}
           >
             <ChevronLeft size={14} />
-            Prev
+            {pagination.prevLabel || 'Prev'}
           </button>
 
           <span className="text-white/40 text-xs">{pagination.pageLabel || `Page ${pagination.page}`}</span>
@@ -122,7 +124,7 @@ export default function AdminTable<T>({
               color: pagination.hasNext ? '#00ffff' : 'rgba(255,255,255,0.3)',
             }}
           >
-            Next
+            {pagination.nextLabel || 'Next'}
             <ChevronRight size={14} />
           </button>
         </div>
