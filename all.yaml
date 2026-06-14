@@ -4,7 +4,7 @@ meta:
   frontend: next.js/react/typescript
   db: postgresql
   deploy: "docker-compose (primary, any VPS — one command: docker compose up -d --build); Railway (single combined backend+frontend image, see Dockerfile.railway/railway.json — zero required service variables)"
-  payment: stripe (gbp primary, expandable: paypal, google_pay, multi-currency)
+  payment: "stripe (gbp primary, expandable: paypal, google_pay, multi-currency)"
 
 rules:
   status: [done, in-progress, pending]
@@ -13,7 +13,7 @@ rules:
   after_build: update exports + update imports with status
 
 progress:
-  current_phase: 11
+  current_phase: 12
   current_task: "complete (except phase 10 — deferred per project decision)"
   phases:
     1:
@@ -59,6 +59,617 @@ progress:
       name: deploy
       status: done
       done: [requirements.txt (gunicorn, whitenoise, django-storages, boto3), backend/groupfund/wsgi.py, whitenoise middleware + STATICFILES_STORAGE, "S3-compatible media storage (DEFAULT_FILE_STORAGE=storages.backends.s3.S3Storage) — conditional on AWS_STORAGE_BUCKET_NAME env var, falls back to local MEDIA_ROOT for dev; supports AWS S3 / Cloudflare R2 / Backblaze B2 via AWS_S3_ENDPOINT_URL + AWS_S3_CUSTOM_DOMAIN", "MEDIA_URL→MEDIA_ROOT URL serving added to groupfund/urls.py (FIXED real gap — nothing served uploaded media before in dev OR prod-without-S3)", "CSRF_TRUSTED_ORIGINS derived from ALLOWED_HOSTS (FIXED real gap — admin POST/PATCH/DELETE would 403 in production without it)", "seed_initial_data management command (FIXED CRITICAL gap — Permission/AccessGroup/DefaultSetting rows were never seeded anywhere; fresh prod DB had a completely empty, non-functional permission system)", production security settings (SECURE_SSL_REDIRECT/HSTS/SESSION_COOKIE_SECURE/CSRF_COOKIE_SECURE/SECURE_PROXY_SSL_HEADER, conditional on DEBUG), LOGGING config, full Docker Compose deployment (docker-compose.yml, backend/Dockerfile + docker-entrypoint.sh, frontend/Dockerfile, Caddyfile reverse-proxy, .env.docker.example — see dedicated entries below; replaces the old Procfile/runtime.txt PaaS-style deploy, now removed), .env.example documented for production + S3 bucket env vars, "frontend/next.config.mjs dynamic remotePatterns from NEXT_PUBLIC_API_URL + optional NEXT_PUBLIC_MEDIA_URL (FIXED real gap — S3/CDN-hosted images would be blocked by next/image without this)", "DEPLOYMENT.md fully translated to Persian/Farsi", "second-pass hardening audit fixes: logging added to 6 previously-silent except blocks (posts/admin.py, fund/admin.py, accounts/models.py, payments/views.py, payments/manual.py, payments/paypal.py), select_related() added to fix N+1 queries in posts/views.py (Comment.author) and logs/views.py (SystemLog.related_member), @transaction.atomic added to PaymentInitiateView/ReceiptUploadView/MemberChangeGroupView, DRF DEFAULT_THROTTLE_CLASSES/DEFAULT_THROTTLE_RATES added to settings.py REST_FRAMEWORK (anon 100/hour, user 1000/hour) to mitigate brute-force on auth endpoints, ~13 hardcoded English strings in posts pages moved into the i18n posts namespace (en.json/fa.json), accessibility improvements to AdminConfirmDialog (role=alertdialog, aria-label) and post image gallery (descriptive alt text)", "RAILWAY SINGLE-SERVICE COMBINED IMAGE: replaced the 2-service Railway setup (which suffered from a Root-Directory/Dockerfile-detection caching quirk — a service whose Root Directory was changed to frontend kept building backend/Dockerfile) with ONE image/ONE service running both backend (gunicorn, 127.0.0.1:8000, internal-only) and frontend (Next.js standalone, Railway's $PORT) as two processes (docker-entrypoint.railway.sh, wait -n supervises both). New files: Dockerfile.railway (multi-stage, repo root), docker-entrypoint.railway.sh (repo root), backend/scripts/prepare.sh (DB-wait+migrate+seed+collectstatic, extracted from and reused by backend/docker-entrypoint.sh), frontend/public/.gitkeep (FIXED pre-existing bug — frontend/public/ didn't exist, breaking 'COPY --from=builder /frontend/public' in BOTH frontend/Dockerfile and Dockerfile.railway). railway.json now points dockerfilePath at Dockerfile.railway; frontend/railway.json removed (no second service). ZERO Railway service variables required. docker-compose/VPS path (docker-compose.yml, Caddyfile, backend/Dockerfile, frontend/Dockerfile) untouched except the prepare.sh refactor — fully backward compatible, re-verified via docker build+run.", "5 SEVERE PRE-EXISTING BUGS found + fixed during end-to-end Railway testing (all apply to docker-compose too, not just Railway): (1) infinite redirect loop on every /api/* and /admin/* proxied request (frontend/next.config.mjs rewrites()/skipTrailingSlashRedirect — APPEND_SLASH vs trailing-slash-stripping rewrite mismatch); (2) /admin/* completely unreachable via the proxy, 404'd as /en/admin/* (frontend/middleware.ts next-intl matcher didn't exclude /admin); (3) Django admin login always rejected correct credentials (backend/accounts/backends.py MemberAuthBackend.authenticate() didn't accept username= as sent by Django's AuthenticationForm); (4) every /admin/ page 500'd with AttributeError after login (backend/accounts/models.py Member missing get_all_permissions/get_user_permissions/get_group_permissions needed by jazzmin); (5) every /admin/ page 500'd with NoReverseMatch: set_language (backend/groupfund/urls.py missing path('i18n/', include('django.conf.urls.i18n')), needed by jazzmin's language switcher — its /i18n/setlang/ POST also added to next.config.mjs rewrites + middleware.ts matcher). All verified fixed via full end-to-end curl test pass against the built Railway combined image: /, /en, /api/payments/methods/, /admin/login/, /admin/ (unauthenticated redirect + authenticated dashboard), /static/admin/css/base.css, /i18n/setlang/, /en/admin."]
+    12:
+      name: "AI project map expansion (all.yaml)"
+      status: done
+      done: ["added top-level `roadmap:` section (12 task-oriented categories — change_ui_copy_translation, change_heritage_emblem_visuals, add_admin_page_or_feature, change_navbar_footer, change_public_page_layout_content, change_db_model_field, change_permissions_access_groups, add_modify_payment_provider, change_deployment_env_config, change_auth_login_flow, change_admin_component_library, change_zustand_store — each with description/entry_points/typical_files/order_of_operations/gotchas/see_also)", "added top-level `shared_components:` section — blast-radius registry for IranianSymbols.tsx exports (LionAndSun: 18 consumers, CulturalEmblem: 1, FaravaharSimple: 1, GeometricPattern: 2 — all verified per-file), the 3 zustand stores (useAuthStore: 24 consumers w/ per-file field usage, useLangStore: 3, useToastStore: 13), and the admin component library (AdminTable/AdminModal/AdminConfirmDialog/AdminStatCard/AdminBadge/AdminToastContainer + 6 admin/fields/* — each with a verified per-admin-page consumer list)", "added top-level `i18n:` section — EN/FA invariant (238 leaf keys, 13 namespaces, parity verified via python3 json diff), per-namespace key lists + consumer files, admin_panel_i18n_policy (admin panel uses inline isRTL ternaries, NOT messages/*.json)", "completed `files:` entries (imports/exports/needed_by) for all 53 previously note-only or missing frontend files: 13 public pages, 13 admin pages + admin layout, 9 layout/animation components (incl. marking frontend/components/animations/PageTransition.tsx as ORPHANED — zero importers), 12 admin component-library files, 3 zustand stores, frontend/lib/i18n.ts + frontend/lib/auth.ts (latter marked DEAD CODE — zero importers), messages/en.json + messages/fa.json (pointers to the new i18n: section), and 6 previously-undocumented frontend config files (package.json, tsconfig.json, tailwind.config.ts, postcss.config.js, .env.example, .gitignore) plus next-env.d.ts/public/.gitkeep", "fixed pre-existing YAML scanner error on line 7 (unquoted `payment:` value containing a bare colon)", "NOTE: progress:/meta: sections (lines 1-61) and pre-existing backend `files:` entries still contain unquoted flow-sequence values with embedded colons/brackets (e.g. `done: [...]` lists, `posts/[id]`) that make `yaml.safe_load` fail on the FULL file — this is pre-existing and out of scope for this pass; the NEW roadmap:/shared_components:/i18n: sections and all NEW/rewritten files: entries (this phase) are individually valid YAML (verified via yaml.safe_load on each)."]
+
+roadmap:
+  # Task-oriented navigation index. When the user asks for a change, find the
+  # matching category below FIRST. Each entry has: description (what kinds of
+  # requests map here), entry_points (open these files first), typical_files
+  # (the full set usually touched, ordered by layer), order_of_operations
+  # (sequence to follow), gotchas (cross-file traps that cause silent bugs if
+  # missed), see_also (related roadmap/shared_components/i18n keys).
+  # Reading order for a new task: meta -> rules -> progress -> roadmap (this
+  # section) -> shared_components (blast-radius lookup) -> i18n (translation
+  # lookup) -> files (full per-file index, consult only the specific files
+  # named above).
+
+  change_ui_copy_translation:
+    description: "Change visible text/labels on PUBLIC pages (English and/or Persian). Admin-panel copy uses a different mechanism — see i18n.admin_panel_i18n_policy."
+    entry_points:
+      - "frontend/messages/en.json"
+      - "frontend/messages/fa.json"
+    typical_files:
+      - "frontend/messages/en.json"
+      - "frontend/messages/fa.json"
+      - "the consuming page/component — see i18n.namespaces.<namespace>.used_by for the exact file"
+    order_of_operations:
+      - "1. Identify the i18n namespace the text belongs to (see i18n.namespaces — each namespace lists its keys and consumer files with the exact useTranslations() call pattern)."
+      - "2. Edit the key under that namespace in BOTH en.json and fa.json (see i18n.invariant — a key present in only one locale falls back to the raw key-path string at runtime in the OTHER locale, producing visibly broken UI)."
+      - "3. If ADDING a new key: match the consuming file's translator pattern — most pages call useTranslations('namespace') then t('key'); landing page.tsx and contribute/page.tsx use a root-level useTranslations() and call t('namespace.key') instead."
+      - "4. If the text is in the ADMIN panel (frontend/app/[locale]/admin/**), it is an inline `isRTL ? '...' : '...'` ternary, NOT a messages/*.json key — edit the .tsx file directly (see i18n.admin_panel_i18n_policy). Do not add admin copy to messages/*.json."
+    gotchas:
+      - "fa.json MUST mirror en.json's key structure EXACTLY (i18n.invariant) — adding/renaming/removing a key in only one file breaks the OTHER locale's UI for that string (shows the raw key path)."
+      - "the `common` namespace (loading/error/retry/close/prev/next) exists in both en.json/fa.json but currently has ZERO consumers anywhere in the project (verified via grep) — safe to extend, but don't assume any component currently reads it."
+      - "`help.sections` and `heritage.items` are NESTED objects (per-key sub-objects), not flat string keys — see i18n.namespaces.help / i18n.namespaces.heritage for their inner shapes before editing."
+    see_also: ["i18n", "change_public_page_layout_content"]
+
+  change_heritage_emblem_visuals:
+    description: >
+      User wants to change how the Lion-and-Sun / Faravahar / geometric
+      pattern / generic cultural-emblem visuals look. ALL of these are
+      emoji+CSS (CulturalEmblem/LionAndSun) or inline SVG
+      (FaravaharSimple/GeometricPattern) — there are NO image files in the
+      project (frontend/public/ is empty except .gitkeep).
+    entry_points:
+      - "frontend/components/animations/IranianSymbols.tsx"
+    typical_files:
+      - "frontend/components/animations/IranianSymbols.tsx"   # source of truth for all 4 exports
+      - "frontend/app/[locale]/page.tsx"                       # landing — uses ALL 4 exports
+      - "frontend/components/layout/Navbar.tsx"                # LionAndSun only
+      - "frontend/components/layout/Footer.tsx"                # LionAndSun only
+      - "frontend/components/layout/AdminSidebar.tsx"           # LionAndSun only
+      - "frontend/components/layout/AdminTopBar.tsx"            # LionAndSun only
+      - "frontend/components/admin/AdminTable.tsx"              # LionAndSun (empty-state icon)
+      - "frontend/components/animations/SplashScreen.tsx"       # LionAndSun + GeometricPattern
+      - "frontend/components/animations/PageTransition.tsx"     # LionAndSun — but UNUSED (see shared_components.IranianSymbols note)
+    order_of_operations:
+      - "1. Read shared_components.IranianSymbols for the FULL per-export needed_by list before editing — do not assume all consumers use all exports."
+      - "2. If changing ONLY the emoji/color/size defaults of CulturalEmblem/LionAndSun: edit IranianSymbols.tsx only — the medallion wrapper (CulturalEmblem) is shared, so a color/size prop default change ripples to every LionAndSun call site automatically; check call sites still pass the props they expect (most pass only `size`, some pass `animated`)."
+      - "3. If REPLACING an emoji/SVG with a real image asset: frontend/public/ is currently empty — would need to add image files there; next.config.mjs remotePatterns is NOT needed for local /public assets (only for next/image with external URLs); update IranianSymbols.tsx to use next/image, then verify every consumer's `size`/`className`/`animated` prop usage still makes sense for an <Image> element."
+      - "4. If adding a NEW symbol/export: add it to IranianSymbols.tsx, add a needed_by entry under shared_components.IranianSymbols.exports for the new export, and update files['frontend/components/animations/IranianSymbols.tsx'].exports."
+    gotchas:
+      - "Landing page (page.tsx) is the ONLY consumer of CulturalEmblem/FaravaharSimple/GeometricPattern — changing their signature breaks ONLY that file, not the other consumers."
+      - "LionAndSun is used in 17 places (15 direct app/component consumers + SplashScreen + PageTransition) — changing its prop signature (size/className/animated) breaks all 17."
+      - "PageTransition.tsx imports LionAndSun and is itself UNUSED (zero importers, orphaned despite status:done) — editing it has NO visible effect; do not waste effort there unless also wiring it up into ClientLayout.tsx."
+      - "All 'images' are emoji glyphs (🦁☀️🏛️🪦🗿📜📖) or inline SVG — there is no asset pipeline, no /public images, no next/image usage for these symbols today."
+    see_also: ["shared_components.IranianSymbols", "change_public_page_layout_content", "change_navbar_footer"]
+
+  add_admin_page_or_feature:
+    description: "Add a new page/section to the admin panel (frontend/app/[locale]/admin/**) or extend an existing one with new functionality."
+    entry_points:
+      - "frontend/app/[locale]/admin/<closest-existing-similar>/page.tsx"   # use as a template
+      - "frontend/components/layout/AdminSidebar.tsx"
+    typical_files:
+      - "frontend/app/[locale]/admin/<new>/page.tsx"            # new page
+      - "frontend/components/layout/AdminSidebar.tsx"            # nav entry + permission gate
+      - "frontend/app/[locale]/admin/layout.tsx"                 # route-protection ADMIN_PERMISSIONS list, if a NEW permission is required to reach the page
+      - "frontend/lib/api.ts"                                     # new API namespace + TS types, if a new backend endpoint is needed
+      - "backend/<app>/views.py + backend/<app>/urls.py + backend/groupfund/urls.py"  # new backend endpoint, if needed
+      - "frontend/app/[locale]/help/page.tsx"                     # add the new page to the permission->help-section mapping (help.sections), if relevant
+    order_of_operations:
+      - "1. Pick the closest existing admin page as a template — see shared_components.admin_component_library for which AdminTable/AdminModal/AdminConfirmDialog/AdminBadge/admin/fields/* components to reuse. Do NOT build new table/modal/form primitives."
+      - "2. If a new backend endpoint is needed: add a view to backend/<app>/views.py, wire it in backend/<app>/urls.py + backend/groupfund/urls.py, extend the serializer in backend/<app>/serializers.py."
+      - "3. Add a new API namespace/function + TS types to frontend/lib/api.ts."
+      - "4. Create frontend/app/[locale]/admin/<new>/page.tsx — copy the structure of a similar page (imports from admin_component_library + useAuthStore + useToastStore), gate on the relevant permission via hasPermission()/member.is_superuser (see shared_components.useAuthStore for the pattern used by all 12 existing admin pages)."
+      - "5. Add a nav entry + permission gate to frontend/components/layout/AdminSidebar.tsx."
+      - "6. If the page needs a NEW permission codename, follow roadmap.change_permissions_access_groups for the full propagation (backend permissions.py + seed_initial_data + frontend gating + admin/layout.tsx route guard + help page mapping)."
+      - "7. Admin panel pages do NOT use messages/*.json — all copy is inline isRTL ternaries (see i18n.admin_panel_i18n_policy)."
+    gotchas:
+      - "Every admin page renders inside AdminLayout.tsx (mounted by the admin/layout.tsx route guard) — AdminToastContainer is already mounted there, so useToastStore().show(...) just works; do not re-mount AdminToastContainer on the new page."
+      - "admin/layout.tsx redirects to /forbidden if the member lacks ALL of [can_manage_permissions, can_post, can_expense, can_approve_comments, can_view_dashboard] (is_superuser bypasses). A brand-new permission codename is NOT automatically in this list — if the new page should be reachable by members holding ONLY the new permission, admin/layout.tsx's gate list must be updated too."
+      - "AdminTable has no shared column-definition file — column.render functions are defined inline per-page (7 existing pages each define their own columns); copying a similar page's columns is the fastest path."
+    see_also: ["change_admin_component_library", "change_permissions_access_groups", "change_db_model_field", "shared_components.admin_component_library"]
+
+  change_navbar_footer:
+    description: >
+      Change the public navbar (logo/branding, nav links, language switcher,
+      auth dropdown) or footer (links, copyright, dedication line).
+    entry_points:
+      - "frontend/components/layout/Navbar.tsx"
+      - "frontend/components/layout/Footer.tsx"
+    typical_files:
+      - "frontend/components/layout/Navbar.tsx"
+      - "frontend/components/layout/Footer.tsx"
+      - "frontend/app/[locale]/ClientLayout.tsx"   # composes Navbar+Footer; admin routes skip both
+      - "frontend/messages/en.json + frontend/messages/fa.json"  # nav.* and footer.* namespaces
+      - "frontend/store/authStore.ts"   # auth dropdown state (isAuthenticated, member, hasPermission)
+      - "frontend/store/langStore.ts"   # language switcher state
+    order_of_operations:
+      - "1. For LINK/label text changes: edit nav.* / footer.* keys in BOTH messages/en.json and messages/fa.json (see i18n EN/FA-pair invariant)."
+      - "2. For new nav items: add the Link in Navbar.tsx (desktop + mobile drawer — two separate render blocks), add the i18n key pair, and if the link should also appear in AdminSidebar.tsx for parity, check that too."
+      - "3. For branding/logo changes: Navbar.tsx and Footer.tsx both render <LionAndSun size=... /> — see shared_components.IranianSymbols (LionAndSun) for the full 17-consumer blast radius if changing the component itself vs just this call site's props."
+      - "4. ClientLayout.tsx conditionally renders Navbar/Footer only on non-/admin routes — if adding a NEW top-level route that should behave like 'admin' (no public chrome), update the isAdminRoute check in ClientLayout.tsx."
+    gotchas:
+      - "Navbar has a SEPARATE mobile-drawer render block — nav-link changes must be made in BOTH places or mobile/desktop will diverge."
+      - "Footer's dedication line (footer.dedication) is a deliberate fixed bilingual line — do not remove without confirming with the user (project-specific memorial text)."
+      - "AdminTopBar.tsx (admin equivalent) duplicates Navbar's language-switcher and logout logic (per its file note: 'mirrors Navbar handleLanguageSwitch'/'mirrors Navbar handleLogout') — changes to Navbar's auth/lang logic should be mirrored there if AdminTopBar should stay in sync."
+    see_also: ["shared_components.useLangStore", "shared_components.useAuthStore", "i18n.namespaces.nav", "i18n.namespaces.footer"]
+
+  change_public_page_layout_content:
+    description: "Change a public-facing page's layout/content/behavior (landing, login, register, posts, posts/[id], expenses, contribute, profile, contact, help, forbidden, unavailable, not-found)."
+    entry_points:
+      - "frontend/app/[locale]/<page>/page.tsx"
+    typical_files:
+      - "the target page.tsx — see its files entry for current imports/i18n_namespace/note"
+      - "frontend/messages/en.json + frontend/messages/fa.json   # if changing copy — see change_ui_copy_translation"
+      - "frontend/store/authStore.ts   # if changing auth-conditional rendering — see shared_components.useAuthStore for which fields this page already destructures"
+      - "frontend/components/animations/IranianSymbols.tsx   # if the page renders LionAndSun/other symbols — see shared_components.IranianSymbols"
+    order_of_operations:
+      - "1. Read the target page's files.<path> entry for its current imports/i18n_namespace/note before editing."
+      - "2. For copy/text changes: follow roadmap.change_ui_copy_translation (EN+FA pair)."
+      - "3. For auth-conditional changes: check shared_components.useAuthStore's needed_by entry for this page to see which fields (member/isAuthenticated/hasPermission/...) it already uses."
+      - "4. For visual/symbol changes: check shared_components.IranianSymbols for this page's specific export usage (most pages use ONLY LionAndSun; landing page.tsx uniquely uses all 4 exports)."
+      - "5. forbidden/unavailable/not-found pages are interceptor REDIRECT TARGETS (axios 403/503/404 in frontend/lib/api.ts) — changing their ROUTE path requires updating the interceptor's router.replace()/redirect target too."
+    gotchas:
+      - "landing page.tsx (frontend/app/[locale]/page.tsx) is the single largest/most complex public page — multi-namespace root translator (landing/heritage/posts namespaces), all 4 IranianSymbols exports, AND auth-conditional CTA blocks. Treat a landing-page change as touching multiple roadmap categories at once."
+      - "posts/[id]/page.tsx and expenses/page.tsx both use next/image — if NEXT_PUBLIC_MEDIA_URL changes, check next.config.mjs remotePatterns (see change_deployment_env_config)."
+      - "forbidden/unavailable/not-found have `imports.internal: []` — they are intentionally dependency-free interceptor targets; don't add app-wide state (authStore/etc.) to them without checking why the interceptor routes here while unauthenticated."
+    see_also: ["change_ui_copy_translation", "change_heritage_emblem_visuals", "change_zustand_store"]
+
+  change_db_model_field:
+    description: >
+      Add/remove/rename a field on a Django model (Member, AccessGroup,
+      Contribution, Expense, Post, Comment, DefaultSetting, etc.) and
+      propagate the change end-to-end.
+    entry_points:
+      - "backend/<app>/models.py"   # accounts/fund/posts/core/logs/payments
+    typical_files:
+      - "backend/<app>/models.py"            # 1. field definition
+      - "backend/<app>/migrations/"          # 2. makemigrations + migrate
+      - "backend/<app>/serializers.py"       # 3. add/remove field in serializer fields list
+      - "backend/<app>/views.py (or member_views.py / group_views.py / settings_views.py / dashboard_views.py)"  # 4. if field affects filtering/ordering/permissions
+      - "backend/<app>/admin.py"             # 5. Django admin list_display/fields if surfaced there
+      - "frontend/lib/api.ts"                # 6. update the matching TS type (e.g. Member, Contribution, Expense, PostDetail, etc. in `types` export)
+      - "frontend/app/[locale]/**/page.tsx"  # 7. any page rendering/editing that field
+      - "frontend/app/[locale]/admin/**/page.tsx"  # 8. any AdminTable column / AdminModal form field exposing it
+      - "frontend/messages/en.json + frontend/messages/fa.json"  # 9. new label strings, EN+FA pair (see i18n section)
+    order_of_operations:
+      - "1. Edit backend/<app>/models.py field definition."
+      - "2. Run makemigrations (creates backend/<app>/migrations/000X_*.py) — check files['backend/<app>/models.py'].needed_by for which serializers/views reference the model already."
+      - "3. Update backend/<app>/serializers.py — add/remove the field name in `fields = [...]` (or Meta.fields)."
+      - "4. Check backend/<app>/views.py for any filter_fields/ordering_fields/search_fields referencing the old field name."
+      - "5. Update backend/<app>/admin.py jazzmin list_display/fieldsets if the field should be visible in /admin/."
+      - "6. Update the corresponding TS type in frontend/lib/api.ts `types` export (e.g. MemberDetail, Expense, Contribution, PostDetail, AccessGroup, DefaultSettingItem)."
+      - "7. Grep files[].needed_by for that TS type to find every frontend page/component consuming it, and update each (form fields, table columns, display)."
+      - "8. If the field needs a new UI label, add EN+FA i18n keys per the i18n section's update invariant (or, for admin pages, edit the inline isRTL string directly — see i18n.admin_panel_i18n_policy)."
+    gotchas:
+      - "backend has full imports/exports/needed_by graphs — ALWAYS check needed_by on the model file first; frontend's lib/api.ts.exports.types entry is the single choke point for ALL frontend model shapes."
+      - "Renaming a field requires checking BOTH the serializer `fields` list AND any `source=` kwargs, AND any frontend object destructuring (`const { old_name } = ...`)."
+      - "Admin AdminTable columns are defined inline per-page (column.render functions) — there is no shared column-definition file, so each admin page touching that model must be checked individually (see shared_components.admin_component_library.components.AdminTable.needed_by for which pages use AdminTable)."
+    see_also: ["add_admin_page_or_feature", "change_permissions_access_groups"]
+
+  change_permissions_access_groups:
+    description: "Change permission codenames, default groups/access levels, or who-can-do-what logic across backend and frontend."
+    entry_points:
+      - "backend/accounts/permissions.py"
+      - "backend/core/utils.py"
+    typical_files:
+      - "backend/accounts/permissions.py"   # HasGroupPermission, IsSuperuser, IsActiveMember permission classes
+      - "backend/core/utils.py"             # get_default_group_id
+      - "backend/core/management/commands/seed_initial_data.py"  # Permission/AccessGroup/DefaultSetting seed rows — the ONLY place new permission codenames get created in the DB
+      - "backend/accounts/models.py"        # AccessGroup model, Member.group FK
+      - "backend/<app>/views.py"            # permission_classes=[HasGroupPermission('<codename>')] on each view
+      - "frontend/store/authStore.ts"       # hasPermission(codename) — public_interface
+      - "frontend/components/admin/fields/AdminPermissionCheckbox.tsx"  # permission grid UI; hardcoded always-on entries can_contribute/can_comment
+      - "frontend/app/[locale]/admin/groups/page.tsx"  # group CRUD + permission grid
+      - "frontend/app/[locale]/admin/layout.tsx"       # route-protection gate list (ADMIN_PERMISSIONS)
+      - "frontend/components/layout/AdminSidebar.tsx" # per-nav-item permission gating
+      - "frontend/app/[locale]/help/page.tsx"          # permission -> help-section mapping, kept in parity with AdminSidebar's gating
+    order_of_operations:
+      - "1. Add the new permission codename to backend/core/management/commands/seed_initial_data.py (Permission row) — this is the ONLY seeding path; a codename not seeded here does not exist in the DB on fresh installs."
+      - "2. Apply the permission to relevant backend/<app>/views.py via HasGroupPermission('<codename>') in permission_classes."
+      - "3. If the codename should be assignable via the admin UI: AdminPermissionCheckbox.tsx's PermissionOption list is populated dynamically from permissionsAPI.getList() (backend/core/views.py PermissionListView) — no frontend hardcoding needed UNLESS it's one of the 'always-on locked' entries (can_contribute/can_comment), which ARE hardcoded in AdminPermissionCheckbox.tsx."
+      - "4. Add frontend gating via useAuthStore().hasPermission('<codename>') (see shared_components.useAuthStore for the ~23 files already doing this — follow the same `member.is_superuser` bypass pattern used everywhere)."
+      - "5. If the new permission should let a member into the admin panel at all, add it to admin/layout.tsx's ADMIN_PERMISSIONS gate list."
+      - "6. If the new permission unlocks an AdminSidebar nav item, add the gate there (mirrors admin/layout.tsx's per-item check) AND to help/page.tsx's help.sections mapping (kept in parity per existing convention)."
+    gotchas:
+      - "is_superuser ALWAYS bypasses hasPermission checks on both frontend AND backend (IsSuperuser permission class) — every gated page/view has a parallel `member.is_superuser` OR-condition; forgetting it means superusers could lose access to a feature they should always have."
+      - "AdminPermissionCheckbox.tsx hardcodes can_contribute/can_comment as 'always included regardless of what's checked' — these 2 codenames are baseline member permissions, not admin-assignable; do not add them to the dynamic grid."
+      - "seed_initial_data is idempotent (get_or_create) but only runs on fresh/explicit invocation — renaming a codename does NOT rename it in already-deployed DBs; requires a migration or manual data-fix."
+    see_also: ["add_admin_page_or_feature", "shared_components.useAuthStore", "shared_components.admin_component_library"]
+
+  add_modify_payment_provider:
+    description: "Add or modify a payment provider (manual bank transfer / PayPal exist now; Stripe / Google Pay deferred per progress.phases.10)."
+    entry_points:
+      - "backend/payments/base.py"
+      - "backend/payments/factory.py"
+    typical_files:
+      - "backend/payments/base.py"      # BasePaymentProvider abstract interface
+      - "backend/payments/manual.py"    # ManualPaymentProvider
+      - "backend/payments/paypal.py"    # PayPalPaymentProvider
+      - "backend/payments/factory.py"   # PaymentFactory — provider registry/dispatch
+      - "backend/payments/serializers.py"
+      - "backend/payments/views.py"     # PaymentMethodsView / PaymentInitiateView / ReceiptUploadView
+      - "backend/payments/urls.py"
+      - "backend/core/management/commands/seed_initial_data.py"  # DefaultSetting rows: payment_manual_*/payment_paypal_*/payment_<new>_* enabled flags + config fields
+      - "frontend/lib/api.ts"            # paymentsAPI — getMethods/initiate/uploadReceipt
+      - "frontend/app/[locale]/contribute/page.tsx"   # 4-step wizard — method selection + per-method instructions rendering
+      - "frontend/app/[locale]/admin/payments/page.tsx"  # admin settings UI — AdminToggle for *_enabled + AdminInput/AdminTextarea per config field
+    order_of_operations:
+      - "1. Implement a new provider class in backend/payments/<provider>.py subclassing BasePaymentProvider (see manual.py/paypal.py for the interface shape)."
+      - "2. Register it in backend/payments/factory.py's PaymentFactory dispatch."
+      - "3. Add new DefaultSetting rows (payment_<provider>_enabled + any config fields like account numbers/keys) to seed_initial_data.py — PaymentMethodsView reads these to decide which methods to show."
+      - "4. Update frontend/lib/api.ts paymentsAPI types if the new provider has a different `instructions` shape than existing methods."
+      - "5. frontend/app/[locale]/contribute/page.tsx's method-selection step + instructions-rendering step need a new branch for the provider's UI (see existing manual/paypal branches)."
+      - "6. frontend/app/[locale]/admin/payments/page.tsx needs a new section (AdminToggle for enabled flag + AdminInput/AdminTextarea for config fields) — follow the existing MANUAL_FIELDS/PAYPAL_FIELDS local-constant pattern."
+      - "7. If the provider needs settings NOT to appear on /admin/settings (the generic editor), add its key prefix to that page's PAYMENT_PREFIXES exclusion constant."
+    gotchas:
+      - "PAYMENT_PREFIXES (in admin/settings/page.tsx) and MANUAL_FIELDS/PAYPAL_FIELDS (in admin/payments/page.tsx) are LOCAL CONSTANTS, not shared config — a new provider's DefaultSetting keys must be added to BOTH the admin/payments inclusion list AND the admin/settings exclusion list, or its settings will appear in BOTH places (or neither)."
+      - "progress.phases.10 (Stripe/Google Pay) is explicitly DEFERRED — do not assume any Stripe-specific scaffolding exists yet beyond meta.payment's note."
+      - "ReceiptUploadView (manual/PayPal receipt flow) is provider-specific — a fully-automated provider (e.g. real Stripe) would SKIP the receipt-upload step entirely in contribute/page.tsx's wizard, requiring a step-count/flow branch, not just a new method option."
+    see_also: ["change_db_model_field", "change_deployment_env_config"]
+
+  change_deployment_env_config:
+    description: "Change deployment/environment configuration across docker-compose, Railway, Dockerfiles, Caddyfile, or .env files."
+    entry_points:
+      - "docker-compose.yml"
+      - "Dockerfile.railway"
+    typical_files:
+      - "docker-compose.yml"              # VPS/local multi-container: backend, frontend, db, caddy
+      - "Dockerfile.railway"               # single combined image, repo root
+      - "docker-entrypoint.railway.sh"     # repo root — supervises backend+frontend processes via wait -n
+      - "backend/Dockerfile + backend/docker-entrypoint.sh"
+      - "backend/scripts/prepare.sh"       # DB-wait + migrate + seed + collectstatic — shared by both entrypoints
+      - "frontend/Dockerfile"
+      - "Caddyfile"                        # VPS reverse-proxy
+      - "railway.json"                     # points dockerfilePath at Dockerfile.railway
+      - ".env.example / .env.docker.example"   # backend env vars
+      - "frontend/.env.example"            # NEXT_PUBLIC_API_URL / NEXT_PUBLIC_SITE_NAME / NEXT_PUBLIC_MEDIA_URL
+      - "backend/groupfund/settings.py"    # reads the env vars
+      - "frontend/next.config.mjs"         # rewrites()/skipTrailingSlashRedirect/remotePatterns — derived from NEXT_PUBLIC_API_URL/NEXT_PUBLIC_MEDIA_URL
+      - "frontend/middleware.ts"           # next-intl locale matcher — must exclude /admin and /i18n
+      - "DEPLOYMENT.md"                    # Persian-translated deploy docs — keep in sync
+    order_of_operations:
+      - "1. Decide which deploy path is affected: Railway (single combined image, Dockerfile.railway + docker-entrypoint.railway.sh) vs docker-compose/VPS (docker-compose.yml + backend/Dockerfile + frontend/Dockerfile + Caddyfile) — backend/scripts/prepare.sh is SHARED by both."
+      - "2. New env vars: add to BOTH .env.example (or .env.docker.example) AND backend/groupfund/settings.py (os.environ read); for frontend vars, also frontend/.env.example AND check next.config.mjs if it derives remotePatterns/rewrites from it."
+      - "3. Railway requires ZERO service variables by design — if a new env var is REQUIRED (not optional with a sensible default), this breaks that guarantee; prefer optional with default."
+      - "4. New routes needing proxy passthrough (like /i18n/setlang/ historically) must be added to BOTH frontend/next.config.mjs rewrites() AND frontend/middleware.ts's next-intl matcher exclusions, or they 404/redirect-loop."
+      - "5. Update DEPLOYMENT.md (Persian) to document any new required steps/vars."
+    gotchas:
+      - "5 severe pre-existing bugs were already found+fixed in this area (see progress.phases.11.done) — infinite redirect loops and 404s on /admin and /i18n/setlang/ came from next.config.mjs rewrites + middleware.ts matcher being out of sync. ANY new top-level route added to the Next.js app that should bypass next-intl locale prefixing (like /admin) MUST be added to middleware.ts's matcher exclusion AND, if proxied through Next to Django, to next.config.mjs rewrites()."
+      - "frontend/public/.gitkeep exists ONLY to make 'COPY --from=builder /frontend/public' succeed in both Dockerfiles — if real assets are EVER added to frontend/public/, this is no longer just a placeholder; don't delete .gitkeep casually since public/ might become empty again."
+      - "NEXT_PUBLIC_* vars are baked into the JS bundle AT BUILD TIME — changing them requires a rebuild, not just a container restart/env change."
+    see_also: ["add_modify_payment_provider", "change_db_model_field"]
+
+  change_auth_login_flow:
+    description: "Change authentication/login/register/token-refresh flow."
+    entry_points:
+      - "backend/accounts/backends.py"
+      - "frontend/lib/api.ts"
+      - "frontend/store/authStore.ts"
+    typical_files:
+      - "backend/accounts/backends.py"   # MemberAuthBackend — authenticate() accepts username= for Django admin compat too
+      - "backend/accounts/views.py"      # register/login/logout/refresh — JWT simplejwt
+      - "backend/accounts/serializers.py"
+      - "backend/accounts/urls.py"
+      - "frontend/lib/api.ts"            # authAPI (login/register) + axios interceptors (token attach/refresh, 403->/forbidden, 503->/unavailable, 404->/not-found)
+      - "frontend/store/authStore.ts"    # persisted member/accessToken/refreshToken/isAuthenticated/hasPermission; login()/logout()/setTokens()
+      - "frontend/app/[locale]/login/page.tsx"
+      - "frontend/app/[locale]/register/page.tsx"
+      - "frontend/middleware.ts"         # route/locale matcher — does NOT itself check auth tokens, just locale routing + /admin exclusion
+    order_of_operations:
+      - "1. Backend: MemberAuthBackend.authenticate() in backends.py is the single auth entry point — accepts BOTH `username=` (Django admin / AuthenticationForm) and the member's actual credential field; changes here affect BOTH Django admin login AND the JWT API login."
+      - "2. accounts/views.py issues JWT tokens (simplejwt) on login/register — response shape is {tokens: {access, refresh}, member: {...}}."
+      - "3. Frontend: login/register pages call authAPI.login/register, then authStore.login() persists {member, accessToken, refreshToken, isAuthenticated:true} to localStorage (zustand persist, key 'groupfund-auth')."
+      - "4. lib/api.ts's axios interceptors attach `Authorization: Bearer <accessToken>` from authStore on every request, and on 401 attempt a token refresh; also redirect 403->/forbidden, 503->/unavailable, 404->/not-found (see roadmap.change_public_page_layout_content for those target pages)."
+      - "5. login/register pages BOTH have a REDIRECT-IF-AUTHENTICATED guard (once hasHydrated, if isAuthenticated && member, router.replace(`/${locale}`)) — preserve this when modifying either page."
+    gotchas:
+      - "authStore is read by lib/api.ts's axios interceptors OUTSIDE React/zustand's hook context (interceptors call useAuthStore.getState() directly, not the hook) — same pattern as langStore/lib/api.ts's getLocalePrefix() reading localStorage directly (see shared_components.useLangStore note). Don't assume `useAuthStore()` (the hook form) works in non-component code."
+      - "hasHydrated is a zustand-persist-specific flag — login/register pages render NOTHING until hasHydrated is true, to avoid a flash of the login form for an already-authenticated user whose persisted state hasn't loaded yet. Any new auth-gated page should follow the same hasHydrated-gate pattern (see shared_components.useAuthStore needed_by for which pages already do)."
+      - "~23 files consume useAuthStore (see shared_components.useAuthStore) — changing the PUBLIC INTERFACE (login/logout/setTokens/hasPermission signatures) ripples to all of them, not just the login/register pages."
+    see_also: ["change_zustand_store", "shared_components.useAuthStore", "change_permissions_access_groups"]
+
+  change_admin_component_library:
+    description: "Change a shared admin UI primitive (AdminTable/AdminModal/AdminConfirmDialog/AdminStatCard/AdminBadge/AdminToastContainer/admin/fields/*) — affects ALL consuming admin pages."
+    entry_points:
+      - "frontend/components/admin/<Component>.tsx"
+      - "frontend/components/admin/fields/<Component>.tsx"
+    typical_files:
+      - "the target component file (frontend/components/admin/ or admin/fields/)"
+      - "shared_components.admin_component_library.<components|fields>.<Name>.needed_by — EVERY file listed must be checked for prop-shape compatibility"
+    order_of_operations:
+      - "1. Read shared_components.admin_component_library.<components|fields>.<Name> for the FULL list of consuming admin pages BEFORE changing the component's props/exports."
+      - "2. If changing a PROP'S TYPE or REMOVING a prop: grep every consumer in the needed_by list for that prop name and update each call site."
+      - "3. If adding a NEW OPTIONAL prop with a sensible default: no consumer changes are strictly required, but consider whether existing consumers SHOULD opt in."
+      - "4. If changing visual/styling only (no prop changes): no consumer changes needed, but visually spot-check at least one consumer from each distinct 'role' (e.g. AdminTable is used for both simple lists AND filter-heavy lists)."
+    gotchas:
+      - "AdminBadge's status->color mapping (pending/pending_review->amber, completed/approved/active->green, failed/rejected/inactive->red, fallback cyan) is used by 6 pages with DIFFERENT status vocabularies (contributions, members, members/[id], comments, dashboard, logs/system via LEVEL_STATUS mapping) — changing the mapping affects all 6 simultaneously; some pages pass an explicit `label` override, others rely on `status` alone."
+      - "AdminTable<T> and AdminTableColumn<T> are GENERIC — there is no single shared column-definition file; each of the 7 consuming pages defines its own columns inline. A signature change to AdminTableColumn (e.g. renaming `render` to `cell`) requires editing all 7 pages' column arrays."
+      - "AdminToastContainer is mounted ONCE via AdminLayout.tsx (not per-page) — do not add a second mount; all useToastStore consumers (12 admin pages + the container itself) share this single instance."
+    see_also: ["shared_components.admin_component_library", "add_admin_page_or_feature", "change_zustand_store"]
+
+  change_zustand_store:
+    description: "Change one of the 3 zustand stores (authStore/langStore/toastStore) — check shared_components for the full consumer list before changing the store's public interface."
+    entry_points:
+      - "frontend/store/<name>Store.ts"
+    typical_files:
+      - "the target store file (frontend/store/authStore.ts | langStore.ts | toastStore.ts)"
+      - "shared_components.use<Name>Store.needed_by — EVERY consumer file, with the SPECIFIC fields/methods each one uses"
+    order_of_operations:
+      - "1. Read shared_components.use<Name>Store for the full per-consumer field/method usage list BEFORE changing the store's public_interface."
+      - "2. If RENAMING a field/method: grep every consumer's `uses:` list (in shared_components) for the old name and update each call site — for authStore (~23 consumers) and toastStore (13 consumers) this is a wide change."
+      - "3. If the store uses zustand `persist` middleware (authStore, langStore — NOT toastStore): changing the persisted SHAPE may require a migration/version bump, or existing localStorage data becomes stale/incompatible (localStorage keys: 'groupfund-auth' / 'groupfund-lang')."
+      - "4. langStore's locale ALSO independently syncs with localStorage key 'lang', which frontend/lib/api.ts's internal getLocalePrefix() reads directly (not via the store) — changing langStore's localStorage key or shape must be mirrored in lib/api.ts's getLocalePrefix() (the dead frontend/lib/auth.ts has its own unused copy too)."
+    gotchas:
+      - "toastStore has NO persist middleware (toasts are ephemeral) — unlike authStore/langStore."
+      - "authStore's hasPermission(codename) is called with is_superuser-bypass logic DUPLICATED at every call site (`member?.is_superuser || hasPermission('...')`) rather than centralized in the store itself — centralizing this is purely additive/safe but leaves existing call sites inconsistent until each is migrated."
+    see_also: ["shared_components.useAuthStore", "shared_components.useLangStore", "shared_components.useToastStore", "change_auth_login_flow"]
+
+shared_components:
+  # The "blast radius" registry. For each shared export/store/component, the
+  # FULL list of files that import/use it, with per-file context. Use this
+  # BEFORE changing any shared export's signature/behavior — every file listed
+  # under `needed_by` must be checked for compatibility.
+
+  IranianSymbols:
+    file: "frontend/components/animations/IranianSymbols.tsx"
+    exports:
+      LionAndSun:
+        signature: "{ size?: number; className?: string; animated?: boolean }"
+        needed_by:
+          - {file: "frontend/app/[locale]/page.tsx", context: "hero background (size=280, opacity .15) + hero foreground (size=72, animated)"}
+          - {file: "frontend/components/layout/Navbar.tsx", context: "brand logo"}
+          - {file: "frontend/components/layout/Footer.tsx", context: "brand mark"}
+          - {file: "frontend/components/layout/AdminSidebar.tsx", context: "brand logo (collapsed/expanded)"}
+          - {file: "frontend/components/layout/AdminTopBar.tsx", context: "'Admin Panel' brand mark"}
+          - {file: "frontend/components/admin/AdminTable.tsx", context: "empty-state icon, dimmed, size=56"}
+          - {file: "frontend/app/[locale]/login/page.tsx", context: "page header icon"}
+          - {file: "frontend/app/[locale]/register/page.tsx", context: "page header icon"}
+          - {file: "frontend/app/[locale]/help/page.tsx", context: "page header icon"}
+          - {file: "frontend/app/[locale]/contact/page.tsx", context: "page header icon"}
+          - {file: "frontend/app/[locale]/admin/layout.tsx", context: "route-protection loading spinner"}
+          - {file: "frontend/app/[locale]/admin/page.tsx", context: "dashboard header icon"}
+          - {file: "frontend/app/[locale]/admin/members/[id]/page.tsx", context: "page header icon"}
+          - {file: "frontend/app/[locale]/admin/payments/page.tsx", context: "page header icon"}
+          - {file: "frontend/app/[locale]/admin/settings/page.tsx", context: "page header icon"}
+          - {file: "frontend/app/[locale]/admin/groups/page.tsx", context: "page header icon"}
+          - {file: "frontend/components/animations/SplashScreen.tsx", context: "splash centerpiece, size=140, glow-pulse"}
+          - {file: "frontend/components/animations/PageTransition.tsx", context: "transition overlay spinner, size=40 — NOTE: PageTransition itself is UNUSED (zero importers, orphaned), see its files entry"}
+        note: "17 consumers total (16 listed above excluding the definition file itself... actually 17 entries listed — count includes SplashScreen + PageTransition)."
+      CulturalEmblem:
+        signature: "{ emoji: string; size?: number; color?: string; animated?: boolean; className?: string }"
+        needed_by:
+          - {file: "frontend/app/[locale]/page.tsx", context: "Iranian Heritage grid (5 items: persepolis/pasargadae/naqshe_rostam/hafez/saadi, each its own emoji+color) — also the base component LionAndSun is built on"}
+        note: "LionAndSun is implemented AS a CulturalEmblem internally, but other files import LionAndSun directly, not CulturalEmblem — only page.tsx (landing) imports/uses CulturalEmblem directly."
+      FaravaharSimple:
+        signature: "{ size?: number; className?: string; animated?: boolean }"
+        needed_by:
+          - {file: "frontend/app/[locale]/page.tsx", context: "CTA section decoration, size=80, animated — present for BOTH authenticated and guest CTA variants"}
+      GeometricPattern:
+        signature: "{ size?: number; className?: string; animated?: boolean }"
+        needed_by:
+          - {file: "frontend/app/[locale]/page.tsx", context: "6 floating background patterns, rotating"}
+          - {file: "frontend/components/animations/SplashScreen.tsx", context: "radiating-outward pattern, step>=4"}
+    consumer_count_note: "Only frontend/app/[locale]/page.tsx (landing) uses all 4 exports. All other 16 consumer files use ONLY LionAndSun. Verified per-file via JSX grep, not assumption."
+
+  useAuthStore:
+    file: "frontend/store/authStore.ts"
+    exports: ["default (useAuthStore hook)", "Member (interface)"]
+    public_interface: "{ member, accessToken, refreshToken, isAuthenticated, permissions, hasHydrated, login(), logout(), setTokens(), setMember(), hasPermission(codename) }"
+    needed_by:
+      - {file: "frontend/components/layout/Navbar.tsx", uses: [isAuthenticated, member, logout]}
+      - {file: "frontend/components/layout/AdminTopBar.tsx", uses: [member, logout]}
+      - {file: "frontend/components/layout/AdminSidebar.tsx", uses: [hasPermission, "member.is_superuser"]}
+      - {file: "frontend/app/[locale]/admin/layout.tsx", uses: [hasHydrated, isAuthenticated, hasPermission, "member.is_superuser", "member.group_permissions"]}
+      - {file: "frontend/app/[locale]/page.tsx", uses: [hasPermission, isAuthenticated, member]}
+      - {file: "frontend/app/[locale]/login/page.tsx", uses: [hasHydrated, isAuthenticated, member, login]}
+      - {file: "frontend/app/[locale]/register/page.tsx", uses: [hasHydrated, isAuthenticated, member, login]}
+      - {file: "frontend/app/[locale]/profile/page.tsx", uses: [member, setMember]}
+      - {file: "frontend/app/[locale]/posts/[id]/page.tsx", uses: [member, isAuthenticated]}
+      - {file: "frontend/app/[locale]/expenses/page.tsx", uses: [hasPermission]}
+      - {file: "frontend/app/[locale]/help/page.tsx", uses: [member, hasPermission, isAuthenticated]}
+      - {file: "frontend/app/[locale]/contribute/page.tsx", uses: [isAuthenticated, member]}
+      - {file: "frontend/app/[locale]/admin/page.tsx", uses: [hasPermission]}
+      - {file: "frontend/app/[locale]/admin/members/page.tsx", uses: [hasPermission, "member.is_superuser"]}
+      - {file: "frontend/app/[locale]/admin/members/[id]/page.tsx", uses: ["hasPermission('can_manage_permissions'/'can_delete_member'/'can_change_any_password')", "member.is_superuser"]}
+      - {file: "frontend/app/[locale]/admin/groups/page.tsx", uses: ["hasPermission('can_manage_permissions')", "member.is_superuser"]}
+      - {file: "frontend/app/[locale]/admin/contributions/page.tsx", uses: ["hasPermission('can_view_balance'/'can_manage_permissions')", "member.is_superuser"]}
+      - {file: "frontend/app/[locale]/admin/expenses/page.tsx", uses: ["hasPermission('can_view_balance'/'can_expense'/'can_manage_permissions')", "member.is_superuser"]}
+      - {file: "frontend/app/[locale]/admin/posts/page.tsx", uses: ["hasPermission('can_post')", "member.is_superuser"]}
+      - {file: "frontend/app/[locale]/admin/comments/page.tsx", uses: ["hasPermission('can_approve_comments'/'can_manage_permissions')", "member.is_superuser"]}
+      - {file: "frontend/app/[locale]/admin/payments/page.tsx", uses: ["member.is_superuser"]}
+      - {file: "frontend/app/[locale]/admin/settings/page.tsx", uses: ["member.is_superuser"]}
+      - {file: "frontend/app/[locale]/admin/logs/activity/page.tsx", uses: ["hasPermission('can_manage_permissions')", "member.is_superuser"]}
+      - {file: "frontend/app/[locale]/admin/logs/system/page.tsx", uses: ["member.is_superuser"]}
+    note: "23 distinct external consumer files (the store's own definition file is not counted)."
+
+  useLangStore:
+    file: "frontend/store/langStore.ts"
+    exports: ["default (useLangStore hook)", "Locale (type)"]
+    public_interface: "{ locale: 'en'|'fa', setLocale(locale) }"
+    needed_by:
+      - {file: "frontend/components/layout/Navbar.tsx", uses: [locale, setLocale], context: "language switcher"}
+      - {file: "frontend/components/layout/AdminTopBar.tsx", uses: [locale, setLocale], context: "language switcher (mirrors Navbar)"}
+      - {file: "frontend/app/[locale]/ClientLayout.tsx", uses: [setLocale], context: "syncs store locale from the route param on mount"}
+    note: "syncs with localStorage 'lang', which frontend/lib/api.ts's internal getLocalePrefix() ALSO reads directly from localStorage (NOT via this store) — two independent readers of the same localStorage key, by design (lib/api.ts runs outside React/zustand context in interceptors). The dead frontend/lib/auth.ts has its own (unused) copy of getLocalePrefix() too."
+
+  useToastStore:
+    file: "frontend/store/toastStore.ts"
+    exports: ["default (useToastStore hook)", "Toast (type)", "ToastType (type)"]
+    public_interface: "{ toasts: Toast[], show(type, message), dismiss(id) }"
+    needed_by:
+      - {file: "frontend/components/admin/AdminToastContainer.tsx", uses: [toasts, dismiss], context: "renders the toast stack"}
+      - {file: "frontend/app/[locale]/admin/page.tsx", uses: [show], context: "error on dashboardAPI.getStats() failure"}
+      - {file: "frontend/app/[locale]/admin/members/page.tsx", uses: [show], context: "error on membersAPI.getList() failure"}
+      - {file: "frontend/app/[locale]/admin/members/[id]/page.tsx", uses: [show], context: "every profile/group/password/toggle-active/delete success+error path"}
+      - {file: "frontend/app/[locale]/admin/groups/page.tsx", uses: [show], context: "load/loadPermissions/create/update/setDefault/delete success+error"}
+      - {file: "frontend/app/[locale]/admin/contributions/page.tsx", uses: [show], context: "load failure + approve/reject/delete success+error"}
+      - {file: "frontend/app/[locale]/admin/expenses/page.tsx", uses: [show], context: "load failure, create-expense success/error (amount validation = warning), delete success/error"}
+      - {file: "frontend/app/[locale]/admin/posts/page.tsx", uses: [show], context: "load/openEdit/submit/delete/deleteImage success+error"}
+      - {file: "frontend/app/[locale]/admin/comments/page.tsx", uses: [show], context: "load failure + approve/delete success+error"}
+      - {file: "frontend/app/[locale]/admin/payments/page.tsx", uses: [show], context: "settingsAPI.getAll() failure + every per-field/per-toggle settingsAPI.update() success+error"}
+      - {file: "frontend/app/[locale]/admin/settings/page.tsx", uses: [show], context: "settingsAPI.getAll() failure + each per-field settingsAPI.update() success+error"}
+      - {file: "frontend/app/[locale]/admin/logs/activity/page.tsx", uses: [show], context: "logsAPI.getActivity() failure only (read-only page)"}
+      - {file: "frontend/app/[locale]/admin/logs/system/page.tsx", uses: [show], context: "logsAPI.getSystem() failure only (read-only page)"}
+    note: "AdminToastContainer must be mounted (it is, via AdminLayout.tsx) for show() calls anywhere to be visible — if a new admin page is added and calls show() but AdminLayout isn't its ancestor, toasts silently don't render. 13 total consumers (12 admin pages + the container)."
+
+  admin_component_library:
+    # Verified against pass-2 per-admin-page source reads (frontend/app/[locale]/admin/**) — no placeholders.
+    components:
+      AdminTable:
+        file: "frontend/components/admin/AdminTable.tsx"
+        exports: ["default (generic AdminTable<T>)", "AdminTableColumn<T>", "PaginationState"]
+        needed_by:
+          - {file: "frontend/app/[locale]/admin/members/page.tsx", context: "member list w/ search+group+status filters"}
+          - {file: "frontend/app/[locale]/admin/contributions/page.tsx", context: "contributions list w/ status+method filters"}
+          - {file: "frontend/app/[locale]/admin/expenses/page.tsx", context: "expenses list"}
+          - {file: "frontend/app/[locale]/admin/posts/page.tsx", context: "posts list"}
+          - {file: "frontend/app/[locale]/admin/comments/page.tsx", context: "comments list w/ search+status+target_type filters"}
+          - {file: "frontend/app/[locale]/admin/logs/activity/page.tsx", context: "activity log list w/ filter form"}
+          - {file: "frontend/app/[locale]/admin/logs/system/page.tsx", context: "system log list w/ filter form, level->AdminBadge"}
+      AdminModal:
+        file: "frontend/components/admin/AdminModal.tsx"
+        needed_by:
+          - {file: "frontend/app/[locale]/admin/groups/page.tsx", context: "create/edit group form (AdminPermissionCheckbox)"}
+          - {file: "frontend/app/[locale]/admin/expenses/page.tsx", context: "'Add Expense' form (AdminFileUpload for receipt)"}
+          - {file: "frontend/app/[locale]/admin/posts/page.tsx", context: "create/edit post form (AdminFileUpload multi-image)"}
+          - {file: "frontend/app/[locale]/admin/logs/activity/page.tsx", context: "activity log detail (pretty-printed extra_data JSON)"}
+          - {file: "frontend/app/[locale]/admin/logs/system/page.tsx", context: "system log detail"}
+      AdminConfirmDialog:
+        file: "frontend/components/admin/AdminConfirmDialog.tsx"
+        needed_by:
+          - {file: "frontend/app/[locale]/admin/members/[id]/page.tsx", context: "deactivate member confirmation"}
+          - {file: "frontend/app/[locale]/admin/groups/page.tsx", context: "delete group confirmation (superuser-only)"}
+          - {file: "frontend/app/[locale]/admin/contributions/page.tsx", context: "approve/reject confirmation"}
+          - {file: "frontend/app/[locale]/admin/expenses/page.tsx", context: "delete expense confirmation"}
+          - {file: "frontend/app/[locale]/admin/posts/page.tsx", context: "delete post confirmation"}
+          - {file: "frontend/app/[locale]/admin/comments/page.tsx", context: "delete comment confirmation"}
+      AdminStatCard:
+        file: "frontend/components/admin/AdminStatCard.tsx"
+        needed_by:
+          - {file: "frontend/app/[locale]/admin/page.tsx", context: "dashboard — 4 cards: balance/contributions/expenses/members, animated count-up"}
+      AdminBadge:
+        file: "frontend/components/admin/AdminBadge.tsx"
+        needed_by:
+          - {file: "frontend/app/[locale]/admin/page.tsx", context: "dashboard recent-activity badges"}
+          - {file: "frontend/app/[locale]/admin/members/page.tsx", context: "active/inactive status"}
+          - {file: "frontend/app/[locale]/admin/members/[id]/page.tsx", context: "active/inactive status"}
+          - {file: "frontend/app/[locale]/admin/contributions/page.tsx", context: "pending/completed/failed status"}
+          - {file: "frontend/app/[locale]/admin/comments/page.tsx", context: "approved/pending status"}
+          - {file: "frontend/app/[locale]/admin/logs/system/page.tsx", context: "log level via LEVEL_STATUS mapping (info/warning/error/critical -> active/pending/failed/failed) + explicit label override"}
+      AdminToastContainer: "see shared_components.useToastStore — mounted once via AdminLayout.tsx"
+    fields:
+      AdminInput:
+        file: "frontend/components/admin/fields/AdminInput.tsx"
+        needed_by:
+          - {file: "frontend/app/[locale]/admin/members/page.tsx", context: "search field"}
+          - {file: "frontend/app/[locale]/admin/members/[id]/page.tsx", context: "profile edit fields + password change fields"}
+          - {file: "frontend/app/[locale]/admin/groups/page.tsx", context: "group name field"}
+          - {file: "frontend/app/[locale]/admin/expenses/page.tsx", context: "amount/reason fields"}
+          - {file: "frontend/app/[locale]/admin/posts/page.tsx", context: "title field"}
+          - {file: "frontend/app/[locale]/admin/comments/page.tsx", context: "search field"}
+          - {file: "frontend/app/[locale]/admin/payments/page.tsx", context: "bank/PayPal config fields"}
+          - {file: "frontend/app/[locale]/admin/settings/page.tsx", context: "all non-payment DefaultSetting key/value rows"}
+          - {file: "frontend/app/[locale]/admin/logs/activity/page.tsx", context: "Actor/Action/Date From/Date To filter fields"}
+          - {file: "frontend/app/[locale]/admin/logs/system/page.tsx", context: "Source/Date From/Date To filter fields"}
+      AdminSelect:
+        file: "frontend/components/admin/fields/AdminSelect.tsx"
+        needed_by:
+          - {file: "frontend/app/[locale]/admin/members/page.tsx", context: "group + status filters"}
+          - {file: "frontend/app/[locale]/admin/members/[id]/page.tsx", context: "group-change dropdown"}
+          - {file: "frontend/app/[locale]/admin/contributions/page.tsx", context: "status + payment_method filters"}
+          - {file: "frontend/app/[locale]/admin/comments/page.tsx", context: "status + target_type filters"}
+          - {file: "frontend/app/[locale]/admin/logs/system/page.tsx", context: "Level filter"}
+      AdminTextarea:
+        file: "frontend/components/admin/fields/AdminTextarea.tsx"
+        needed_by:
+          - {file: "frontend/app/[locale]/admin/groups/page.tsx", context: "group description"}
+          - {file: "frontend/app/[locale]/admin/expenses/page.tsx", context: "expense reason/description"}
+          - {file: "frontend/app/[locale]/admin/posts/page.tsx", context: "post body"}
+          - {file: "frontend/app/[locale]/admin/payments/page.tsx", context: "payment instructions"}
+      AdminToggle:
+        file: "frontend/components/admin/fields/AdminToggle.tsx"
+        needed_by:
+          - {file: "frontend/app/[locale]/admin/payments/page.tsx", context: "payment_manual_enabled / payment_paypal_enabled toggles"}
+      AdminFileUpload:
+        file: "frontend/components/admin/fields/AdminFileUpload.tsx"
+        needed_by:
+          - {file: "frontend/app/[locale]/admin/expenses/page.tsx", context: "receipt_image"}
+          - {file: "frontend/app/[locale]/admin/posts/page.tsx", context: "multi-image upload"}
+      AdminPermissionCheckbox:
+        file: "frontend/components/admin/fields/AdminPermissionCheckbox.tsx"
+        exports: ["default", "PermissionOption"]
+        needed_by:
+          - {file: "frontend/app/[locale]/admin/groups/page.tsx", context: "permission grid in create/edit group AdminModal"}
+
+i18n:
+  invariant: >
+    frontend/messages/en.json and frontend/messages/fa.json MUST always have
+    IDENTICAL top-level AND nested key structure (verified: both currently
+    have exactly the same 13 top-level keys in the same order: nav, landing,
+    heritage, auth, posts, expenses, contribute, profile, contact, help,
+    errors, footer, common). ANY key added/removed/renamed in en.json MUST be
+    mirrored in fa.json (Persian translation) in the SAME change — a missing
+    key falls back to the key path string itself at runtime (next-intl
+    behavior), producing visibly broken UI in whichever locale is missing it.
+    fa.json additionally requires RTL-correct phrasing, not a literal
+    translation when idiom differs.
+  namespaces:
+    nav:
+      keys: [home, posts, expenses, contribute, help, contact, login, logout, profile]
+      used_by:
+        - {file: "frontend/components/layout/Navbar.tsx", via: "useTranslations('nav')"}
+        - {file: "frontend/components/layout/Footer.tsx", via: "useTranslations('nav') (aliased tNav — footer reuses nav labels for its quick-link column)"}
+      note: "AdminSidebar.tsx does NOT use this namespace (verified — no useTranslations call in that file at all); admin nav labels are inline isRTL strings, see admin_panel_i18n_policy."
+    landing:
+      keys: [headline, tagline, cta_join, cta_profile, cta_contribute, cta_ready_title, cta_authed_title, cta_authed_desc, cta_view_posts, stats_members, stats_contributions, stats_balance, posts_title, how_title, step1_title, step1_desc, step1_title_member, step1_desc_member, step2_title, step2_desc, step3_title, step3_desc]
+      used_by:
+        - {file: "frontend/app/[locale]/page.tsx", via: "useTranslations() — NO namespace arg, root-level translator; calls t('landing.*')"}
+    heritage:
+      keys: ["title", "subtitle", "items.<persepolis|pasargadae|naqshe_rostam|hafez|saadi>.{name,desc}"]
+      used_by:
+        - {file: "frontend/app/[locale]/page.tsx", via: "useTranslations() root translator; calls t('heritage.title'), t('heritage.subtitle'), t(`heritage.items.${key}.name`/desc) for each of the 5 items"}
+    auth:
+      keys: [login_title, register_title, credential_label, password_label, confirm_password_label, full_name_label, display_name_label, phone_label, email_label, phone_or_email_hint, login_btn, register_btn, no_account, has_account, register_link, login_link]
+      used_by:
+        - {file: "frontend/app/[locale]/login/page.tsx", via: "useTranslations('auth')"}
+        - {file: "frontend/app/[locale]/register/page.tsx", via: "useTranslations('auth')"}
+    posts:
+      keys: [title, search_placeholder, no_posts, read_more, comments_title, add_comment, comment_name, comment_text, comment_rating, comment_submit, comment_pending, anonymous, comment_text_required, name_required, comment_submit_error, back_to_posts, updated_label, no_comments, not_found, error_loading_detail, error_loading_list, error_loading_home, login_required_list, login_required_detail, login_required_home, login_cta]
+      used_by:
+        - {file: "frontend/app/[locale]/posts/page.tsx", via: "useTranslations('posts')"}
+        - {file: "frontend/app/[locale]/posts/[id]/page.tsx", via: "useTranslations('posts')"}
+        - {file: "frontend/app/[locale]/page.tsx", via: "useTranslations() root translator; calls t('posts.no_posts'), t('posts.read_more'), t('posts.login_required_home'), t('posts.login_cta'), t('posts.error_loading_home')"}
+    expenses:
+      keys: [title, balance_label, balance_unavailable, amount, reason, date, by, no_expenses, login_required, login_cta, prev, next, page_info]
+      used_by:
+        - {file: "frontend/app/[locale]/expenses/page.tsx", via: "useTranslations('expenses')"}
+    contribute:
+      keys: [title, amount_label, method_label, your_name, next_btn, back_btn, upload_receipt, upload_hint, uploading, success_title, success_msg, reference, copy, copied, unavailable_msg, step1, step2, step3, step4, step_amount, step_instructions, step_receipt, step_done, back, next, back_home, guest_name_label, guest_name_placeholder, amount_to_send, bank_name, account_name, account_number, sort_code, reference_label, paypal_email, paypal_link, continue_receipt, receipt_desc, click_to_upload, error_generic, upload_error]
+      used_by:
+        - {file: "frontend/app/[locale]/contribute/page.tsx", via: "useTranslations() — NO namespace arg, root-level translator; calls t('contribute.*') exclusively"}
+      note: "41 keys total — full list verified directly against messages/en.json (and fa.json, identical key set)."
+    profile:
+      keys: [title, edit_btn, save_btn, cancel_btn, change_password, old_password, new_password, confirm_new_password, group, joined, edit_profile, edit, cancel, save, save_password, full_name, display_name, email, phone, profile_updated, password_changed, save_error, password_error]
+      used_by:
+        - {file: "frontend/app/[locale]/profile/page.tsx", via: "useTranslations('profile')"}
+      note: "22 keys total — verified directly against messages/en.json (corrects an earlier 14-key draft estimate)."
+    contact:
+      keys: [title, email_label, phone_label, name_label, message_label, send_btn, no_contact, name_placeholder, contact_label, contact_placeholder, message_placeholder, send_button, success_msg, send_another]
+      used_by:
+        - {file: "frontend/app/[locale]/contact/page.tsx", via: "useTranslations('contact')"}
+    help:
+      keys: [title, subtitle, guest_heading, member_heading, admin_heading, guest_note, member_note, admin_note, "sections.<home|posts|expenses|contribute|contact|auth|comment|profile|logout|dashboard|members|groups|balance|manage_posts|manage_comments|payments|settings|activity_log|system_log>"]
+      used_by:
+        - {file: "frontend/app/[locale]/help/page.tsx", via: "useTranslations('help')"}
+      note: "help.sections is a NESTED object with 19 keys, one per guest/member/admin section heading — the set of sections actually RENDERED is filtered at runtime by useAuthStore permission checks (can_view_dashboard/can_manage_permissions/can_view_balance/can_post/can_approve_comments/is_superuser), mirroring AdminSidebar's gating."
+    errors:
+      keys: [not_found_title, not_found_msg, forbidden_title, forbidden_msg, unavailable_title, unavailable_msg, back_home]
+      used_by:
+        - {file: "frontend/app/[locale]/not-found/page.tsx", via: "useTranslations('errors')"}
+        - {file: "frontend/app/[locale]/forbidden/page.tsx", via: "useTranslations('errors')"}
+        - {file: "frontend/app/[locale]/unavailable/page.tsx", via: "useTranslations('errors')"}
+    footer:
+      keys: [slogan, copyright, dedication]
+      used_by:
+        - {file: "frontend/components/layout/Footer.tsx", via: "useTranslations('footer')"}
+    common:
+      keys: [loading, error, retry, close, prev, next]
+      used_by: []
+      note: "VERIFIED UNUSED — defined identically in both en.json/fa.json but zero call sites found via grep for 'common.'/useTranslations('common'). Safe to repurpose or extend; not currently wired into any component."
+  admin_panel_i18n_policy: >
+    The admin panel (frontend/app/[locale]/admin/**) does NOT use the
+    messages/{en,fa}.json namespace system. Per the existing convention
+    (Phase 7B), admin pages use INLINE bilingual strings via
+    `isRTL ? '...' : '...'` ternaries, matching the dynamic-copy pattern
+    already used in Phase 7A pages. So admin-panel copy changes do NOT
+    touch messages/en.json or messages/fa.json — they are inline string
+    edits in each admin page/component, gated on a local `isRTL`
+    (derived from locale === 'fa') variable. This is the OPPOSITE of the
+    EN/FA-pair invariant above (which applies only to messages/*.json).
 
 files:
 
@@ -1186,35 +1797,6 @@ files:
       - {file: "frontend/app/[locale]/**/page.tsx", items: [authAPI, postsAPI, fundAPI, paymentsAPI, membersAPI, settingsAPI], status: available}
       - {file: "frontend/app/[locale]/admin/**/page.tsx", items: [commentsAPI, groupsAPI, dashboardAPI, logsAPI, "extended fundAPI/membersAPI/postsAPI/settingsAPI"], status: available}
 
-  "frontend/store/authStore.ts":
-    status: done
-    kind: module
-    note: "zustand + persist; holds member, accessToken, refreshToken, isAuthenticated, hasPermission(codename); login/logout/setTokens"
-
-  "frontend/store/langStore.ts":
-    status: done
-    kind: module
-    note: "zustand + persist; holds locale (en/fa), setLocale, syncs with localStorage 'lang' read by lib/api.ts getLocalePrefix()"
-
-  "frontend/lib/i18n.ts":
-    status: done
-    kind: module
-    note: "next-intl request config — loads messages/{locale}.json, notFound() on unsupported locale"
-
-  "frontend/lib/auth.ts":
-    status: done
-    kind: module
-
-  "frontend/messages/en.json":
-    status: done
-    kind: data
-    note: "translation strings for namespaces: nav, home, posts, expenses, contribute, profile, contact, login, register, errors, footer, etc."
-
-  "frontend/messages/fa.json":
-    status: done
-    kind: data
-    note: "Persian mirror of en.json — RTL layout driven by locale"
-
   "frontend/next.config.mjs":
     status: done
     kind: config
@@ -1234,113 +1816,6 @@ files:
     kind: component
     note: "server layout — wraps children with NextIntlClientProvider + ClientLayout"
 
-  "frontend/app/[locale]/ClientLayout.tsx":
-    status: done
-    kind: component
-    note: "renders SplashScreen → Navbar → main → Footer. MODIFIED in Phase 7B (small addition, not a rewrite): detects /admin routes via usePathname() and skips the public Navbar/Footer there, since AdminLayout renders its own AdminTopBar/AdminSidebar shell — prevents double navigation chrome on admin pages. Public routes render exactly as before."
-
-  "frontend/components/layout/Navbar.tsx":
-    status: done
-    kind: component
-    note: "glassmorphism nav — mobile drawer, language switcher, auth dropdown (login/register/profile/logout via authStore)"
-
-  "frontend/components/layout/Footer.tsx":
-    status: done
-    kind: component
-    note: "added a small dedication line below the copyright notice (footer.dedication i18n key, en.json/fa.json): 'This site was made in memory of Iran's eternal heroes, by arta' / 'این سایت ساخته شده به یاد جاویدنامان ایران، توسط arta', same fontFamily/center alignment as the copyright line but dimmer (rgba(255,255,255,0.25), 0.7rem)"
-
-  "frontend/components/animations/IranianSymbols.tsx":
-    status: done
-    kind: component
-    exports: [LionAndSun, CulturalEmblem, FaravaharSimple, GeometricPattern]
-    note: "LionAndSun reimplemented (replacing the previous hand-drawn SVG, which was repeatedly rejected as 'ugly/childish' with no internet/image-gen available to source real artwork) on top of a new shared CulturalEmblem({emoji, size, color, animated}) component: a circular 'medallion' div (radial-gradient background tinted by color, 2px solid border) centered on a native full-color emoji glyph (professionally designed by Apple/Google/Microsoft, not hand-drawn) — optionally wrapped in the existing motion.div drop-shadow glow-pulse. LionAndSun = CulturalEmblem(emoji='🦁', color='#fbbf24') plus a small absolutely-positioned ☀️ badge in the top-right corner (the 'Lion and Sun' pairing); same size/className/animated prop signature as before, so every call site (Navbar, Footer, login, register, landing hero/CTA) needed no changes. CulturalEmblem is reused by the new 'Iranian Heritage' section on the landing page (5 items: persepolis 🏛️, pasargadae 🪦, naqshe_rostam 🗿, hafez 📜, saadi 📖). FaravaharSimple/GeometricPattern unchanged."
-
-  "frontend/components/animations/PageTransition.tsx":
-    status: done
-    kind: component
-
-  "frontend/components/animations/SplashScreen.tsx":
-    status: done
-    kind: component
-
-  "frontend/app/[locale]/page.tsx":
-    status: done
-    kind: page
-    route: "/{locale}"
-    note: "landing — fundAPI.getBalance() + postsAPI.getList(1,'') (latest 3 posts). AUTH-CONDITIONAL UI (when isAuthenticated && member from useAuthStore): hero CTA replaces the 'Join the Group' register link with a 'My Profile' link (landing.cta_profile) to /{locale}/profile (Contribute Now link unchanged for everyone); 'How It Works' Step 1 card swaps its CheckCircle icon + 'Join'-copy for UserCheck + landing.step1_title_member/step1_desc_member ('You're a Member'); bottom CTA section swaps the 'Ready to join?'/register-button block for landing.cta_authed_title/cta_authed_desc ('Welcome back!') + a 'View Posts' button to /{locale}/posts (landing.cta_view_posts) — FaravaharSimple decoration stays for both states. Also fixed a pre-existing hardcoded-English 'Ready to join?' heading → landing.cta_ready_title for the logged-out case. NEW 'Iranian Heritage' section inserted between 'How It Works' and the CTA section: heading/subtitle (heritage.title/subtitle) + a grid of 5 CulturalEmblem cards (persepolis/pasargadae/naqshe_rostam/hafez/saadi, each with heritage.items.<key>.name/desc from messages/en.json+fa.json)."
-
-  "frontend/app/[locale]/login/page.tsx":
-    status: done
-    kind: page
-    route: "/{locale}/login"
-    note: "authAPI.login → destructures {tokens, member}, persists tokens to localStorage + authStore.login(). REDIRECT-IF-AUTHENTICATED (FIXED real gap — an already-logged-in member could still see/use the login form): once hasHydrated, if isAuthenticated && member, router.replace(`/${locale}`); renders null until hydration completes or the redirect fires, avoiding a form flash."
-
-  "frontend/app/[locale]/register/page.tsx":
-    status: done
-    kind: page
-    route: "/{locale}/register"
-    note: "authAPI.register → same {tokens, member} pattern as login; payload includes password_confirm. REDIRECT-IF-AUTHENTICATED (same fix as login/page.tsx, item C — covers users manually navigating to /register while already signed in): once hasHydrated, if isAuthenticated && member, router.replace(`/${locale}`); renders null until hydration completes or the redirect fires."
-
-  "frontend/app/[locale]/posts/page.tsx":
-    status: done
-    kind: page
-    route: "/{locale}/posts"
-    note: "postsAPI.getList(page, search) → Paginated<PostSummary>; debounced search, prev/next pagination"
-
-  "frontend/app/[locale]/posts/[id]/page.tsx":
-    status: done
-    kind: page
-    route: "/{locale}/posts/{id}"
-    note: "postsAPI.getDetail → {post, comments}; postsAPI.getComments → Comment[] (filters is_approved); postsAPI.createComment for guest/member comment submission"
-
-  "frontend/app/[locale]/expenses/page.tsx":
-    status: done
-    kind: page
-    route: "/{locale}/expenses"
-    note: "fundAPI.getExpenses → raw Paginated<Expense> (no wrapper, via _paginate); fundAPI.getBalance → FundBalance (gated on can_view_balance permission)"
-
-  "frontend/app/[locale]/contribute/page.tsx":
-    status: done
-    kind: page
-    route: "/{locale}/contribute"
-    note: "4-step wizard — paymentsAPI.getMethods → {methods}; paymentsAPI.initiate → {is_available, contribution_id, instructions, ...}; paymentsAPI.uploadReceipt (multipart, field=receipt_image)"
-
-  "frontend/app/[locale]/profile/page.tsx":
-    status: done
-    kind: page
-    route: "/{locale}/profile"
-    note: "membersAPI.updateProfile → Member; membersAPI.changePassword"
-
-  "frontend/app/[locale]/contact/page.tsx":
-    status: done
-    kind: page
-    route: "/{locale}/contact"
-    note: "settingsAPI.getPublicSettings (graceful null on error/403) for contact_email/contact_phone; mailto: form fallback"
-
-  "frontend/app/[locale]/help/page.tsx":
-    status: done
-    kind: page
-    route: "/{locale}/help"
-    note: "site guide using useTranslations('help') (new i18n namespace in messages/en.json + fa.json) + same glass-morphism theme as /contact (LionAndSun, cyan/gold accents). Sections grouped guest/member/admin and gated via useAuthStore (member, hasPermission, is_superuser) with the same permission→section mapping as AdminSidebar (can_view_dashboard, can_manage_permissions, can_view_balance, can_post, can_approve_comments, superuser-only system_log) — only sections relevant to the visitor's access level are rendered. Linked from Navbar + Footer (nav.help / messages help namespace)."
-
-  "frontend/app/[locale]/forbidden/page.tsx":
-    status: done
-    kind: page
-    route: "/{locale}/forbidden"
-    note: "target of axios interceptor 403 redirect; errors.forbidden_* translation keys"
-
-  "frontend/app/[locale]/unavailable/page.tsx":
-    status: done
-    kind: page
-    route: "/{locale}/unavailable"
-    note: "target of axios interceptor 503 redirect; errors.unavailable_* translation keys"
-
-  "frontend/app/[locale]/not-found/page.tsx":
-    status: done
-    kind: page
-    route: "/{locale}/not-found"
-    note: "target of axios interceptor 404 redirect; errors.not_found_* translation keys"
-
   # ─── FRONTEND (Phase 7B) — React Admin Panel (app/[locale]/admin/) ─────────
   # Reuses Phase 7A primitives (LionAndSun, PageTransition, authStore, langStore,
   # lib/api.ts, IranianSymbols) — no Phase 7A component was recreated.
@@ -1354,156 +1829,960 @@ files:
     kind: style
     note: "darker admin theme: --admin-bg #05050a, --admin-surface #0d0d14/#13131e, --admin-sidebar-width 260px/64px collapsed, neon vars (cyan/violet/gold), .admin-glass-card, .admin-shell, .admin-nav-item.active (RTL-aware), .admin-skeleton pulse animation. Imported by app/[locale]/admin/layout.tsx only — does not affect public pages"
 
-  "frontend/store/toastStore.ts":
+  # ─── FRONTEND — Public pages (pass 1) ───────────────────────────────────
+  "frontend/app/[locale]/page.tsx":
     status: done
-    kind: module
-    note: "zustand store backing the custom toast notification system (no 3rd-party toast lib in the project); show(type, message) auto-dismisses after 4s, dismiss(id)"
+    kind: page
+    route: "/{locale}"
+    note: "landing — fundAPI.getBalance() + postsAPI.getList(1,'') (latest 3 posts). AUTH-CONDITIONAL UI (when isAuthenticated && member from useAuthStore): hero CTA replaces the 'Join the Group' register link with a 'My Profile' link (landing.cta_profile) to /{locale}/profile (Contribute Now link unchanged for everyone); 'How It Works' Step 1 card swaps its CheckCircle icon + 'Join'-copy for UserCheck + landing.step1_title_member/step1_desc_member ('You're a Member'); bottom CTA section swaps the 'Ready to join?'/register-button block for landing.cta_authed_title/cta_authed_desc ('Welcome back!') + a 'View Posts' button to /{locale}/posts (landing.cta_view_posts) — FaravaharSimple decoration stays for both states. Also fixed a pre-existing hardcoded-English 'Ready to join?' heading → landing.cta_ready_title for the logged-out case. NEW 'Iranian Heritage' section inserted between 'How It Works' and the CTA section: heading/subtitle (heritage.title/subtitle) + a grid of 5 CulturalEmblem cards (persepolis/pasargadae/naqshe_rostam/hafez/saadi, each with heritage.items.<key>.name/desc from messages/en.json+fa.json)."
+    imports:
+      external:
+        - {from: react, items: [useState, useEffect, useRef]}
+        - {from: next-intl, items: [useTranslations]}
+        - {from: next/link, items: [default (Link)]}
+        - {from: next/navigation, items: [useParams]}
+        - {from: framer-motion, items: [motion, useInView]}
+        - {from: lucide-react, items: [Users, TrendingUp, Wallet, ArrowRight, CheckCircle, UserCheck, User]}
+      internal:
+        - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun, GeometricPattern, FaravaharSimple, CulturalEmblem], status: available}
+        - {file: "frontend/lib/api.ts", items: [postsAPI, fundAPI, "types: PostSummary, FundBalance"], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    i18n_namespace: "none (root translator, multi-namespace: landing, heritage, posts)"
+    needed_by: []
 
-  "frontend/components/admin/AdminToastContainer.tsx":
+  "frontend/app/[locale]/login/page.tsx":
     status: done
-    kind: component
-    note: "fixed top-end toast stack consuming toastStore; color-coded by type (success=green/error=red/warning=amber/info=cyan) with framer-motion enter/exit"
+    kind: page
+    route: "/{locale}/login"
+    note: "authAPI.login → destructures {tokens, member}, persists tokens to localStorage + authStore.login(). REDIRECT-IF-AUTHENTICATED (FIXED real gap — an already-logged-in member could still see/use the login form): once hasHydrated, if isAuthenticated && member, router.replace(`/${locale}`); renders null until hydration completes or the redirect fires, avoiding a form flash."
+    imports:
+      external:
+        - {from: react, items: [useState, useEffect]}
+        - {from: next-intl, items: [useTranslations]}
+        - {from: next/link, items: [default (Link)]}
+        - {from: next/navigation, items: [useRouter, useParams]}
+        - {from: lucide-react, items: [Eye, EyeOff, LogIn]}
+      internal:
+        - {file: "frontend/lib/api.ts", items: [authAPI], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+        - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    i18n_namespace: "auth"
+    needed_by: []
 
-  "frontend/components/admin/AdminBadge.tsx":
+  "frontend/app/[locale]/register/page.tsx":
     status: done
-    kind: component
-    note: "status→color badge (pending/pending_review→amber, completed/approved/active→green, failed/rejected/inactive→red, fallback cyan); optional `label` override"
+    kind: page
+    route: "/{locale}/register"
+    note: "authAPI.register → same {tokens, member} pattern as login; payload includes password_confirm. REDIRECT-IF-AUTHENTICATED (same fix as login/page.tsx, item C — covers users manually navigating to /register while already signed in): once hasHydrated, if isAuthenticated && member, router.replace(`/${locale}`); renders null until hydration completes or the redirect fires."
+    imports:
+      external:
+        - {from: react, items: [useState, useEffect]}
+        - {from: next-intl, items: [useTranslations]}
+        - {from: next/link, items: [default (Link)]}
+        - {from: next/navigation, items: [useRouter, useParams]}
+        - {from: lucide-react, items: [Eye, EyeOff, UserPlus]}
+      internal:
+        - {file: "frontend/lib/api.ts", items: [authAPI], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+        - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    i18n_namespace: "auth"
+    needed_by: []
 
-  "frontend/components/admin/AdminModal.tsx":
+  "frontend/app/[locale]/posts/page.tsx":
     status: done
-    kind: component
-    note: "centered overlay glass-card modal; backdrop click + X to close; framer-motion fade+scale; configurable maxWidth"
+    kind: page
+    route: "/{locale}/posts"
+    note: "postsAPI.getList(page, search) → Paginated<PostSummary>; debounced search, prev/next pagination"
+    imports:
+      external:
+        - {from: react, items: [useState, useEffect, useCallback]}
+        - {from: next-intl, items: [useTranslations]}
+        - {from: next/link, items: [default (Link)]}
+        - {from: next/navigation, items: [useParams]}
+        - {from: lucide-react, items: [Search, MessageSquare, Calendar, User, ArrowRight, ChevronLeft, ChevronRight]}
+        - {from: framer-motion, items: [motion]}
+      internal:
+        - {file: "frontend/lib/api.ts", items: [postsAPI, "types: PostSummary, Paginated"], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    i18n_namespace: "posts"
+    needed_by: []
 
-  "frontend/components/admin/AdminConfirmDialog.tsx":
+  "frontend/app/[locale]/posts/[id]/page.tsx":
     status: done
-    kind: component
-    note: "destructive-action confirmation — AlertTriangle icon, red confirm + neutral cancel, loading state"
+    kind: page
+    route: "/{locale}/posts/{id}"
+    note: "postsAPI.getDetail → {post, comments}; postsAPI.getComments → Comment[] (filters is_approved); postsAPI.createComment for guest/member comment submission"
+    imports:
+      external:
+        - {from: react, items: [useState, useEffect]}
+        - {from: next-intl, items: [useTranslations]}
+        - {from: next/link, items: [default (Link)]}
+        - {from: next/navigation, items: [useParams, useRouter]}
+        - {from: next/image, items: [default (Image)]}
+        - {from: lucide-react, items: [User, Calendar, Star, Send, ChevronLeft]}
+      internal:
+        - {file: "frontend/lib/api.ts", items: [postsAPI, "types: PostDetail, Comment"], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    i18n_namespace: "posts"
+    needed_by: []
 
-  "frontend/components/admin/AdminStatCard.tsx":
+  "frontend/app/[locale]/expenses/page.tsx":
     status: done
-    kind: component
-    note: "dashboard stat card with animated count-up (useMotionValue+animate), trend indicator (up/down/neutral), prefix/suffix/decimals"
+    kind: page
+    route: "/{locale}/expenses"
+    note: "fundAPI.getExpenses → raw Paginated<Expense> (no wrapper, via _paginate); fundAPI.getBalance → FundBalance (gated on can_view_balance permission)"
+    imports:
+      external:
+        - {from: react, items: [useState, useEffect, useCallback]}
+        - {from: next-intl, items: [useTranslations]}
+        - {from: next/link, items: [default (Link)]}
+        - {from: next/navigation, items: [useParams, useRouter]}
+        - {from: next/image, items: [default (Image)]}
+        - {from: lucide-react, items: [DollarSign, User, Calendar, ChevronLeft, ChevronRight, X, Wallet, Receipt]}
+      internal:
+        - {file: "frontend/lib/api.ts", items: [fundAPI, "types: FundBalance, Expense"], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    i18n_namespace: "expenses"
+    needed_by: []
 
-  "frontend/components/admin/AdminTable.tsx":
+  "frontend/app/[locale]/contribute/page.tsx":
     status: done
-    kind: component
-    exports: [default, AdminTableColumn<T>, PaginationState]
-    note: "generic admin data table — skeleton-row loading state, dimmed-LionAndSun empty state, prev/next pagination footer matching public posts page styling"
+    kind: page
+    route: "/{locale}/contribute"
+    note: "4-step wizard — paymentsAPI.getMethods → {methods}; paymentsAPI.initiate → {is_available, contribution_id, instructions, ...}; paymentsAPI.uploadReceipt (multipart, field=receipt_image)"
+    imports:
+      external:
+        - {from: react, items: [useState, useEffect, useRef]}
+        - {from: next-intl, items: [useTranslations]}
+        - {from: next/navigation, items: [useParams, useRouter]}
+        - {from: lucide-react, items: [CheckCircle, Copy, CreditCard, Upload, ChevronRight, ChevronLeft, AlertTriangle, Building2, Check]}
+      internal:
+        - {file: "frontend/lib/api.ts", items: [paymentsAPI], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    i18n_namespace: "none (root translator, multi-namespace: contribute)"
+    needed_by: []
 
-  "frontend/components/admin/fields/AdminInput.tsx":
+  "frontend/app/[locale]/profile/page.tsx":
     status: done
-    kind: component
-  "frontend/components/admin/fields/AdminSelect.tsx":
-    status: done
-    kind: component
-  "frontend/components/admin/fields/AdminTextarea.tsx":
-    status: done
-    kind: component
-  "frontend/components/admin/fields/AdminToggle.tsx":
-    status: done
-    kind: component
-  "frontend/components/admin/fields/AdminFileUpload.tsx":
-    status: done
-    kind: component
-    note: "drag-and-drop zone, image previews via URL.createObjectURL, file chips, Clear button"
-  "frontend/components/admin/fields/AdminPermissionCheckbox.tsx":
-    status: done
-    kind: component
-    exports: [default, PermissionOption]
-    note: "permission grid with locked always-on entries (can_contribute/can_comment, force-included by backend regardless)"
+    kind: page
+    route: "/{locale}/profile"
+    note: "membersAPI.updateProfile → Member; membersAPI.changePassword"
+    imports:
+      external:
+        - {from: react, items: [useState, useEffect]}
+        - {from: next-intl, items: [useTranslations]}
+        - {from: next/navigation, items: [useParams, useRouter]}
+        - {from: lucide-react, items: [User, Edit2, Save, X, Lock, Eye, EyeOff, CheckCircle, AlertTriangle]}
+      internal:
+        - {file: "frontend/lib/api.ts", items: [membersAPI], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore, "types: Member"], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    i18n_namespace: "profile"
+    needed_by: []
 
-  "frontend/components/layout/AdminSidebar.tsx":
+  "frontend/app/[locale]/contact/page.tsx":
     status: done
-    kind: component
-    note: "260px/64px collapsible (framer-motion width transition) + mobile drawer w/ overlay; nav items Dashboard/Members/Groups/Contributions/Expenses/Posts/Comments(badge)/Payments/Settings/divider/Activity Log/System Log(superuser-only); visibility via authStore.hasPermission() + is_superuser bypass; active state via .admin-nav-item.active"
+    kind: page
+    route: "/{locale}/contact"
+    note: "settingsAPI.getPublicSettings (graceful null on error/403) for contact_email/contact_phone; mailto: form fallback"
+    imports:
+      external:
+        - {from: react, items: [useState, useEffect]}
+        - {from: next-intl, items: [useTranslations]}
+        - {from: lucide-react, items: [Mail, Phone, Send, CheckCircle]}
+      internal:
+        - {file: "frontend/lib/api.ts", items: [settingsAPI], status: available}
+        - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    i18n_namespace: "contact"
+    needed_by: []
 
-  "frontend/components/layout/AdminTopBar.tsx":
+  "frontend/app/[locale]/help/page.tsx":
     status: done
-    kind: component
-    note: "fixed 56px bar — hamburger, LionAndSun+'Admin Panel', language switcher (mirrors Navbar handleLanguageSwitch), notification bell→pending-comment badge, profile dropdown (View Profile/Back to Site/Logout, mirrors Navbar handleLogout/getInitials)"
+    kind: page
+    route: "/{locale}/help"
+    note: "site guide using useTranslations('help') (new i18n namespace in messages/en.json + fa.json) + same glass-morphism theme as /contact (LionAndSun, cyan/gold accents). Sections grouped guest/member/admin and gated via useAuthStore (member, hasPermission, is_superuser) with the same permission→section mapping as AdminSidebar (can_view_dashboard, can_manage_permissions, can_view_balance, can_post, can_approve_comments, superuser-only system_log) — only sections relevant to the visitor's access level are rendered. Linked from Navbar + Footer (nav.help / messages help namespace)."
+    imports:
+      external:
+        - {from: react, items: [useState, useEffect]}
+        - {from: next-intl, items: [useTranslations]}
+        - {from: next/navigation, items: [useParams]}
+      internal:
+        - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    i18n_namespace: "help"
+    needed_by: []
 
-  "frontend/components/layout/AdminLayout.tsx":
+  "frontend/app/[locale]/forbidden/page.tsx":
     status: done
-    kind: component
-    note: "composes AdminTopBar + AdminSidebar + scrollable main + AdminToastContainer; owns collapsed/mobileOpen state, fetches dashboardAPI.getStats() once for the pending-comments badge count"
+    kind: page
+    route: "/{locale}/forbidden"
+    note: "target of axios interceptor 403 redirect; errors.forbidden_* translation keys"
+    imports:
+      external:
+        - {from: next-intl, items: [useTranslations]}
+        - {from: next/navigation, items: [useParams]}
+        - {from: next/link, items: [default (Link)]}
+        - {from: lucide-react, items: [Lock, Home]}
+      internal: []
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    i18n_namespace: "errors"
+    needed_by: []
+
+  "frontend/app/[locale]/unavailable/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/unavailable"
+    note: "target of axios interceptor 503 redirect; errors.unavailable_* translation keys"
+    imports:
+      external:
+        - {from: next-intl, items: [useTranslations]}
+        - {from: next/navigation, items: [useParams]}
+        - {from: next/link, items: [default (Link)]}
+        - {from: lucide-react, items: [WifiOff, Home]}
+      internal: []
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    i18n_namespace: "errors"
+    needed_by: []
+
+  "frontend/app/[locale]/not-found/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/not-found"
+    note: "target of axios interceptor 404 redirect; errors.not_found_* translation keys"
+    imports:
+      external:
+        - {from: next-intl, items: [useTranslations]}
+        - {from: next/navigation, items: [useParams]}
+        - {from: next/link, items: [default (Link)]}
+        - {from: lucide-react, items: [SearchX, Home]}
+      internal: []
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    i18n_namespace: "errors"
+    needed_by: []
+  # ─── FRONTEND — Admin pages + admin layout (pass 2) ─────────────────────
 
   "frontend/app/[locale]/admin/layout.tsx":
     status: done
     kind: component
     note: "ROUTE PROTECTION — redirects to /login if unauthenticated, /forbidden if member lacks all of [can_manage_permissions, can_post, can_expense, can_approve_comments, can_view_dashboard] (is_superuser bypasses); shows LionAndSun spinner while checking; imports styles/admin.css; wraps children in AdminLayout"
+    imports:
+      external:
+        - {from: next/navigation, items: [useParams, useRouter]}
+        - {from: react, items: [useEffect, useState]}
+      internal:
+        - {file: "frontend/components/layout/AdminLayout.tsx", items: [default], status: available}
+        - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+        - {file: "frontend/styles/admin.css", items: ["(side-effect import — admin theme CSS)"], status: available}
+    exports:
+      - {name: AdminRootLayout, kind: function, type: "React Server/Client Component (layout) — default export, props {children: React.ReactNode}"}
+    notes_extra: "useAuthStore usage: hasHydrated (waits for persisted state before redirecting), isAuthenticated, member, member.is_superuser, member.group_permissions (checked against ADMIN_PERMISSIONS = [can_manage_permissions, can_post, can_expense, can_approve_comments, can_view_dashboard]). Does NOT use useToastStore (only the 12 page.tsx files do)."
+    i18n_namespace: "none — admin panel uses inline bilingual strings (isRTL ternary), not messages/*.json (here just the loading spinner has no text at all)"
+    needed_by: []
 
   "frontend/app/[locale]/admin/page.tsx":
     status: done
     kind: page
     route: "/{locale}/admin"
     note: "Dashboard — dashboardAPI.getStats(): 4 AdminStatCards (balance/contributions/expenses/members), recharts BarChart (contributions vs expenses this month), 4 RecentCard grids (contributions/expenses/posts/pending_comments). Gated on can_view_dashboard"
+    imports:
+      external:
+        - {from: react, items: [useEffect, useState]}
+        - {from: next/navigation, items: [useParams]}
+        - {from: next/link, items: [default (Link)]}
+        - {from: lucide-react, items: [Wallet, TrendingUp, TrendingDown, Users, MessageSquare, ArrowUpRight]}
+        - {from: recharts, items: [ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend]}
+      internal:
+        - {file: "frontend/components/admin/AdminStatCard.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/AdminBadge.tsx", items: [default], status: available}
+        - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+        - {file: "frontend/store/toastStore.ts", items: [useToastStore], status: available}
+        - {file: "frontend/lib/api.ts", items: [dashboardAPI, "types: DashboardData"], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    notes_extra: "useAuthStore usage: hasPermission('can_view_dashboard'), member (display_name/full_name greeting + is_superuser bypass for canViewDashboard). useToastStore usage: show('error', ...) on dashboardAPI.getStats() failure."
+    i18n_namespace: "none — admin panel uses inline bilingual strings (isRTL ternary), not messages/*.json"
+    needed_by: []
 
   "frontend/app/[locale]/admin/members/page.tsx":
     status: done
     kind: page
     route: "/{locale}/admin/members"
     note: "membersAPI.getList(page,{search,group,is_active}) + groupsAPI.getList() for filter options; AdminTable w/ search+group+status filters, links to detail page. Gated on can_manage_permissions"
+    imports:
+      external:
+        - {from: react, items: [useEffect, useState]}
+        - {from: next/navigation, items: [useParams, useRouter]}
+        - {from: lucide-react, items: [Search, Eye]}
+      internal:
+        - {file: "frontend/components/admin/AdminTable.tsx", items: [default, AdminTableColumn], status: available}
+        - {file: "frontend/components/admin/AdminBadge.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminInput.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminSelect.tsx", items: [default], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+        - {file: "frontend/store/toastStore.ts", items: [useToastStore], status: available}
+        - {file: "frontend/lib/api.ts", items: [membersAPI, groupsAPI, "types: MemberListItem, AccessGroup, Paginated"], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    notes_extra: "useAuthStore usage: hasPermission('can_manage_permissions'), member (is_superuser bypass for canManage). useToastStore usage: show('error', ...) on membersAPI.getList() failure."
+    i18n_namespace: "none — admin panel uses inline bilingual strings (isRTL ternary), not messages/*.json"
+    needed_by: []
 
   "frontend/app/[locale]/admin/members/[id]/page.tsx":
     status: done
     kind: page
     route: "/{locale}/admin/members/{id}"
     note: "membersAPI.getProfile/updateProfile/changeGroup/changePassword/toggleActive/delete — profile edit form, group-change form, password-change form (gated can_change_any_password), danger zone (deactivate via AdminConfirmDialog, delete gated can_delete_member)"
+    imports:
+      external:
+        - {from: react, items: [useEffect, useState]}
+        - {from: next/navigation, items: [useParams, useRouter]}
+        - {from: lucide-react, items: [ArrowLeft, Save, KeyRound, ShieldCheck, Trash2, Power]}
+      internal:
+        - {file: "frontend/components/admin/AdminBadge.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminInput.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminSelect.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/AdminConfirmDialog.tsx", items: [default], status: available}
+        - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+        - {file: "frontend/store/toastStore.ts", items: [useToastStore], status: available}
+        - {file: "frontend/lib/api.ts", items: [membersAPI, groupsAPI, "types: MemberDetail, AccessGroup"], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    notes_extra: "useAuthStore usage: hasPermission('can_manage_permissions'/'can_delete_member'/'can_change_any_password'), member.is_superuser bypass for canManage/canDelete/canChangeAnyPassword. useToastStore usage: show(...) on every profile/group/password/toggle-active/delete success+error path."
+    i18n_namespace: "none — admin panel uses inline bilingual strings (isRTL ternary), not messages/*.json"
+    needed_by: []
 
   "frontend/app/[locale]/admin/groups/page.tsx":
     status: done
     kind: page
     route: "/{locale}/admin/groups"
     note: "groupsAPI CRUD — card grid (name/description/member_count/permission chips/is_default star), create/edit AdminModal w/ AdminPermissionCheckbox, set-default + delete (superuser-only, AdminConfirmDialog). KNOWN LIMITATION: permission grid options are derived as the union of permissions already attached to existing groups (workaround — see note at bottom of file)"
+    imports:
+      external:
+        - {from: react, items: [useEffect, useState]}
+        - {from: next/navigation, items: [useParams]}
+        - {from: lucide-react, items: [Plus, Edit2, Star, Trash2, Users, ShieldCheck]}
+      internal:
+        - {file: "frontend/components/admin/AdminModal.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/AdminConfirmDialog.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminInput.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminTextarea.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminPermissionCheckbox.tsx", items: [default, PermissionOption], status: available}
+        - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+        - {file: "frontend/store/toastStore.ts", items: [useToastStore], status: available}
+        - {file: "frontend/lib/api.ts", items: [groupsAPI, permissionsAPI, "types: AccessGroup, Permission"], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    notes_extra: "useAuthStore usage: hasPermission('can_manage_permissions'), member.is_superuser (canManage bypass AND gates Set-Default/Delete buttons, isSuperuser flag). useToastStore usage: show(...) on load/loadPermissions/create/update/setDefault/delete success+error paths. permissionsAPI.getList() result is cast to Permission[] but assigned into a PermissionOption[] state (allPermissions) — feeds AdminPermissionCheckbox."
+    i18n_namespace: "none — admin panel uses inline bilingual strings (isRTL ternary), not messages/*.json"
+    needed_by: []
 
   "frontend/app/[locale]/admin/contributions/page.tsx":
     status: done
     kind: page
     route: "/{locale}/admin/contributions"
     note: "fundAPI.getContributions(page,{status,payment_method}) — AdminTable w/ status/method filters, approve→status=completed / reject→status=failed (no 'rejected' status exists on backend) via AdminConfirmDialog, superuser-only delete. Gated on can_view_balance"
+    imports:
+      external:
+        - {from: react, items: [useEffect, useState]}
+        - {from: next/navigation, items: [useParams]}
+        - {from: lucide-react, items: [Check, X, Trash2]}
+      internal:
+        - {file: "frontend/components/admin/AdminTable.tsx", items: [default, AdminTableColumn], status: available}
+        - {file: "frontend/components/admin/AdminBadge.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminSelect.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/AdminConfirmDialog.tsx", items: [default], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+        - {file: "frontend/store/toastStore.ts", items: [useToastStore], status: available}
+        - {file: "frontend/lib/api.ts", items: [fundAPI, "types: Contribution, Paginated"], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    notes_extra: "useAuthStore usage: hasPermission('can_view_balance'/'can_manage_permissions'), member.is_superuser (canView bypass, canManage bypass for approve/reject buttons, isSuperuser gates the delete button). useToastStore usage: show(...) on load failure and on approve/reject/delete success+error."
+    i18n_namespace: "none — admin panel uses inline bilingual strings (isRTL ternary), not messages/*.json"
+    needed_by: []
 
   "frontend/app/[locale]/admin/expenses/page.tsx":
     status: done
     kind: page
     route: "/{locale}/admin/expenses"
     note: "fundAPI.getExpenses/createExpense(multipart receipt_image)/deleteExpense — AdminTable + 'Add Expense' AdminModal (AdminFileUpload for receipt). Create gated can_expense, delete gated can_manage_permissions, view gated can_view_balance"
+    imports:
+      external:
+        - {from: react, items: [useEffect, useState]}
+        - {from: next/navigation, items: [useParams]}
+        - {from: lucide-react, items: [Plus, Trash2, "Receipt (aliased ReceiptIcon)"]}
+      internal:
+        - {file: "frontend/components/admin/AdminTable.tsx", items: [default, AdminTableColumn], status: available}
+        - {file: "frontend/components/admin/AdminModal.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/AdminConfirmDialog.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminInput.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminTextarea.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminFileUpload.tsx", items: [default], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+        - {file: "frontend/store/toastStore.ts", items: [useToastStore], status: available}
+        - {file: "frontend/lib/api.ts", items: [fundAPI, "types: Expense, Paginated"], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    notes_extra: "useAuthStore usage: hasPermission('can_view_balance'/'can_expense'/'can_manage_permissions'), member.is_superuser bypass for canView/canCreate/canDelete (canDelete gates the actions column entirely, built conditionally via array spread). useToastStore usage: show(...) on load failure, create-expense success/error (amount validation uses 'warning'), delete success/error."
+    i18n_namespace: "none — admin panel uses inline bilingual strings (isRTL ternary), not messages/*.json"
+    needed_by: []
 
   "frontend/app/[locale]/admin/posts/page.tsx":
     status: done
     kind: page
     route: "/{locale}/admin/posts"
     note: "postsAPI CRUD incl. multipart create/uploadImages/deleteImage — AdminTable + create/edit AdminModal (AdminFileUpload multi-image, existing-image removal grid). Gated on can_post"
+    imports:
+      external:
+        - {from: react, items: [useEffect, useState]}
+        - {from: next/navigation, items: [useParams]}
+        - {from: lucide-react, items: [Plus, Edit2, Trash2, "Image (aliased ImageIcon)", X]}
+      internal:
+        - {file: "frontend/components/admin/AdminTable.tsx", items: [default, AdminTableColumn], status: available}
+        - {file: "frontend/components/admin/AdminModal.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/AdminConfirmDialog.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminInput.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminTextarea.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminFileUpload.tsx", items: [default], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+        - {file: "frontend/store/toastStore.ts", items: [useToastStore], status: available}
+        - {file: "frontend/lib/api.ts", items: [postsAPI, "types: PostSummary, PostDetail, Paginated"], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    notes_extra: "useAuthStore usage: hasPermission('can_post'), member.is_superuser bypass for canPost (the only gate — single permission level). useToastStore usage: show(...) on load/openEdit/submit (create or update + uploadImages)/delete/deleteImage success+error paths. Renders raw <img> (eslint-disable @next/next/no-img-element) for existing post images, not next/image."
+    i18n_namespace: "none — admin panel uses inline bilingual strings (isRTL ternary), not messages/*.json"
+    needed_by: []
 
   "frontend/app/[locale]/admin/comments/page.tsx":
     status: done
     kind: page
     route: "/{locale}/admin/comments"
-    note: "DEGRADED — see 'BACKEND GAPS' below. Sources data from dashboardAPI.getStats().pending_comments (max 5, no pagination/filtering); approve/delete wired to real commentsAPI.approve/delete. Visible AlertTriangle banner explains the limitation to admins (en+fa). Gated on can_approve_comments (delete additionally gated can_manage_permissions)"
+    note: "commentsAPI.getList(page,{search,is_approved,target_type}) — AdminTable w/ search+status+target_type filter form (Search/Status/Target Type AdminSelect+AdminInput), approve→commentsAPI.approve / delete→commentsAPI.delete via AdminConfirmDialog. Gated on can_approve_comments (delete additionally gated can_manage_permissions)"
+    imports:
+      external:
+        - {from: react, items: [useEffect, useState]}
+        - {from: next/navigation, items: [useParams]}
+        - {from: lucide-react, items: [Check, Trash2, Star]}
+      internal:
+        - {file: "frontend/components/admin/AdminTable.tsx", items: [default, AdminTableColumn], status: available}
+        - {file: "frontend/components/admin/AdminConfirmDialog.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/AdminBadge.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminInput.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminSelect.tsx", items: [default], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+        - {file: "frontend/store/toastStore.ts", items: [useToastStore], status: available}
+        - {file: "frontend/lib/api.ts", items: [commentsAPI, "types: Comment, Paginated"], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    notes_extra: "useAuthStore usage: hasPermission('can_approve_comments'/'can_manage_permissions'), member.is_superuser bypass for canApprove (page-level gate) and canDelete (gates delete button + AdminConfirmDialog branch). useToastStore usage: show(...) on load failure and approve/delete success+error. NOTE: this entry SUPERSEDES the old all.yaml note describing a 'DEGRADED' dashboardAPI-sourced implementation — the current source uses the real commentsAPI.getList() with full pagination/filtering (Phase 7B gap #1 already resolved per the KNOWN BACKEND GAPS section at end of file)."
+    i18n_namespace: "none — admin panel uses inline bilingual strings (isRTL ternary), not messages/*.json"
+    needed_by: []
 
   "frontend/app/[locale]/admin/payments/page.tsx":
     status: done
     kind: page
     route: "/{locale}/admin/payments"
     note: "settingsAPI.getAll/update — manual bank transfer + PayPal sections (AdminToggle for *_enabled, per-field save buttons incl. AdminFileUpload-free text fields + instructions textarea). Superuser-only"
+    imports:
+      external:
+        - {from: react, items: [useEffect, useMemo, useState]}
+        - {from: next/navigation, items: [useParams]}
+        - {from: lucide-react, items: [Save, Wallet, Banknote]}
+      internal:
+        - {file: "frontend/components/admin/fields/AdminInput.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminTextarea.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminToggle.tsx", items: [default], status: available}
+        - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+        - {file: "frontend/store/toastStore.ts", items: [useToastStore], status: available}
+        - {file: "frontend/lib/api.ts", items: [settingsAPI, "types: DefaultSettingItem"], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    notes_extra: "useAuthStore usage: member.is_superuser only (isSuperuser — sole gate, no hasPermission calls). useToastStore usage: show(...) on settingsAPI.getAll() failure and on every per-field/per-toggle settingsAPI.update() success+error. Local constants MANUAL_FIELDS (5 payment_manual_* keys) and PAYPAL_FIELDS (2 payment_paypal_* keys) drive which DefaultSettingItem rows render here vs on /admin/settings (PAYMENT_PREFIXES exclusion in that page)."
+    i18n_namespace: "none — admin panel uses inline bilingual strings (isRTL ternary), not messages/*.json"
+    needed_by: []
 
   "frontend/app/[locale]/admin/settings/page.tsx":
     status: done
     kind: page
     route: "/{locale}/admin/settings"
     note: "settingsAPI.getAll/update — generic key/value editor for all non-payment DefaultSetting rows (default_group, default_currency, require_comment_approval, max_receipt_image_size_mb, *_visibility, etc.), per-field save. Superuser-only"
+    imports:
+      external:
+        - {from: react, items: [useEffect, useState]}
+        - {from: next/navigation, items: [useParams]}
+        - {from: lucide-react, items: [Save, "Settings (aliased SettingsIcon)"]}
+      internal:
+        - {file: "frontend/components/admin/fields/AdminInput.tsx", items: [default], status: available}
+        - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+        - {file: "frontend/store/toastStore.ts", items: [useToastStore], status: available}
+        - {file: "frontend/lib/api.ts", items: [settingsAPI, "types: DefaultSettingItem"], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    notes_extra: "useAuthStore usage: member.is_superuser only (isSuperuser — sole gate, no hasPermission calls). useToastStore usage: show(...) on settingsAPI.getAll() failure and on each per-field settingsAPI.update() success+error. Local constant PAYMENT_PREFIXES (payment_manual_/payment_paypal_/payment_stripe_/payment_google_pay_) filters OUT payment-related DefaultSetting rows (those are edited on /admin/payments instead) — 'general' = settings.filter(s => !PAYMENT_PREFIXES.some(p => s.key.startsWith(p)))."
+    i18n_namespace: "none — admin panel uses inline bilingual strings (isRTL ternary), not messages/*.json"
+    needed_by: []
 
   "frontend/app/[locale]/admin/logs/activity/page.tsx":
     status: done
     kind: page
     route: "/{locale}/admin/logs/activity"
     note: "logsAPI.getActivity(page,{actor,action,date_from,date_to}) — read-only AdminTable w/ filter form + detail AdminModal (pretty-printed extra_data JSON). Gated on can_manage_permissions"
+    imports:
+      external:
+        - {from: react, items: [useEffect, useState]}
+        - {from: next/navigation, items: [useParams]}
+        - {from: lucide-react, items: [Eye]}
+      internal:
+        - {file: "frontend/components/admin/AdminTable.tsx", items: [default, AdminTableColumn], status: available}
+        - {file: "frontend/components/admin/AdminModal.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminInput.tsx", items: [default], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+        - {file: "frontend/store/toastStore.ts", items: [useToastStore], status: available}
+        - {file: "frontend/lib/api.ts", items: [logsAPI, "types: ActivityLogEntry, Paginated"], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    notes_extra: "useAuthStore usage: hasPermission('can_manage_permissions'), member.is_superuser bypass for canView (sole gate). useToastStore usage: show('error', ...) on logsAPI.getActivity() failure only (read-only page, no mutations). Filter form fields (Actor/Action/Date From/Date To) all use AdminInput — no AdminSelect on this page. Detail AdminModal renders extra_data via JSON.stringify(..., null, 2) in a <pre> block."
+    i18n_namespace: "none — admin panel uses inline bilingual strings (isRTL ternary), not messages/*.json"
+    needed_by: []
 
   "frontend/app/[locale]/admin/logs/system/page.tsx":
     status: done
     kind: page
     route: "/{locale}/admin/logs/system"
     note: "logsAPI.getSystem(page,{level,source,date_from,date_to}) — read-only AdminTable (level→AdminBadge color) w/ filter form + detail AdminModal. Superuser-only"
+    imports:
+      external:
+        - {from: react, items: [useEffect, useState]}
+        - {from: next/navigation, items: [useParams]}
+        - {from: lucide-react, items: [Eye]}
+      internal:
+        - {file: "frontend/components/admin/AdminTable.tsx", items: [default, AdminTableColumn], status: available}
+        - {file: "frontend/components/admin/AdminModal.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/AdminBadge.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminInput.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminSelect.tsx", items: [default], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+        - {file: "frontend/store/toastStore.ts", items: [useToastStore], status: available}
+        - {file: "frontend/lib/api.ts", items: [logsAPI, "types: SystemLogEntry, Paginated"], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    notes_extra: "useAuthStore usage: member.is_superuser only (isSuperuser — sole gate, no hasPermission calls). useToastStore usage: show('error', ...) on logsAPI.getSystem() failure only (read-only page, no mutations). Local constant LEVEL_STATUS maps log level (info/warning/error/critical) → AdminBadge status (active/pending/failed/failed) for the level column; AdminBadge also receives an explicit label={l.level} override. Filter form: Level (AdminSelect) + Source (AdminInput) + Date From/To (AdminInput type=date)."
+    i18n_namespace: "none — admin panel uses inline bilingual strings (isRTL ternary), not messages/*.json"
+    needed_by: []
+  # ─── FRONTEND — Layout + animation components (pass 3) ───────────────────
 
+  "frontend/app/[locale]/ClientLayout.tsx":
+    status: done
+    kind: component
+    note: "renders SplashScreen → Navbar → main → Footer. MODIFIED in Phase 7B (small addition, not a rewrite): detects /admin routes via usePathname() and skips the public Navbar/Footer there, since AdminLayout renders its own AdminTopBar/AdminSidebar shell — prevents double navigation chrome on admin pages. Public routes render exactly as before."
+    imports:
+      external: [{from: react, items: [useState, useEffect]}, {from: next/navigation, items: [usePathname]}]
+      internal:
+        - {file: "frontend/components/layout/Navbar.tsx", items: [default], status: available}
+        - {file: "frontend/components/layout/Footer.tsx", items: [default], status: available}
+        - {file: "frontend/components/animations/SplashScreen.tsx", items: [default], status: available}
+        - {file: "frontend/store/langStore.ts", items: [useLangStore], status: available}
+    exports: [{name: default, kind: function, type: "React component", props: "ClientLayoutProps {children, locale: 'en'|'fa'}"}]
+    needed_by:
+      - {file: "frontend/app/[locale]/layout.tsx", status: available}
+
+  "frontend/components/layout/Navbar.tsx":
+    status: done
+    kind: component
+    note: "glassmorphism nav — mobile drawer, language switcher, auth dropdown (login/register/profile/logout via authStore). Fixed/sticky header (height 64px, ClientLayout adds pt-16 to <main> for public routes). Active-link underline via path-prefix matching; mobile drawer is a SEPARATE block with its own copy of nav links/auth/language-switcher markup — any nav-link or auth-UI change must be applied to BOTH the desktop <ul> and the mobile drawer <nav>."
+    imports:
+      external: [{from: next/link, items: [Link]}, {from: next/navigation, items: [usePathname, useRouter]}, {from: next-intl, items: [useTranslations]}, {from: lucide-react, items: [Menu, X, User, LogOut, ChevronDown]}, {from: framer-motion, items: [motion, AnimatePresence]}]
+      internal:
+        - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+        - {file: "frontend/store/langStore.ts", items: [useLangStore], status: available}
+        - {file: "frontend/lib/api.ts", items: [authAPI], status: available}
+    exports: [{name: default, kind: function, type: "React component", props: "NavbarProps {locale: 'en'|'fa'}"}]
+    i18n_namespace: nav
+    needed_by:
+      - {file: "frontend/app/[locale]/ClientLayout.tsx", status: available}
+
+  "frontend/components/layout/Footer.tsx":
+    status: done
+    kind: component
+    note: "added a small dedication line below the copyright notice (footer.dedication i18n key, en.json/fa.json): 'This site was made in memory of Iran's eternal heroes, by arta' / 'این سایت ساخته شده به یاد جاویدنامان ایران، توسط arta', same fontFamily/center alignment as the copyright line but dimmer (rgba(255,255,255,0.25), 0.7rem). Also renders an animated LionAndSun (size 48) and 4 nav links (posts/expenses/help/contact) sourced from the 'nav' namespace via a second useTranslations('nav') call."
+    imports:
+      external: [{from: next/link, items: [Link]}, {from: next-intl, items: [useTranslations]}]
+      internal:
+        - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun], status: available}
+    exports: [{name: default, kind: function, type: "React component", props: "FooterProps {locale: 'en'|'fa'}"}]
+    i18n_namespace: "footer (primary: slogan, copyright, dedication) + nav (4 link labels: posts, expenses, help, contact)"
+    needed_by:
+      - {file: "frontend/app/[locale]/ClientLayout.tsx", status: available}
+
+  "frontend/components/layout/AdminLayout.tsx":
+    status: done
+    kind: component
+    note: "composes AdminTopBar + AdminSidebar + scrollable main + AdminToastContainer; owns collapsed/mobileOpen state, fetches dashboardAPI.getStats() once on mount for the pending-comments badge count (passed down to both AdminTopBar and AdminSidebar). toggleSidebar() collapses the desktop sidebar (width var --admin-sidebar-collapsed) on screens >=768px, or opens the mobile drawer below that. <main> padding-inline-start is a CSS calc() driven by --admin-sidebar-width/--admin-sidebar-collapsed (defined in frontend/styles/admin.css) so content reflows when the sidebar collapses."
+    imports:
+      external: [{from: react, items: [useEffect, useState]}, {from: next/navigation, items: [usePathname]}]
+      internal:
+        - {file: "frontend/components/layout/AdminTopBar.tsx", items: [default], status: available}
+        - {file: "frontend/components/layout/AdminSidebar.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/AdminToastContainer.tsx", items: [default], status: available}
+        - {file: "frontend/lib/api.ts", items: [dashboardAPI, "types: DashboardData"], status: available}
+    exports: [{name: default, kind: function, type: "React component", props: "AdminLayoutProps {locale: 'en'|'fa', children}"}]
+    needed_by:
+      - {file: "frontend/app/[locale]/admin/layout.tsx", status: available}
+
+  "frontend/components/layout/AdminSidebar.tsx":
+    status: done
+    kind: component
+    note: "260px/64px collapsible (framer-motion width transition) + mobile drawer w/ overlay; nav items Dashboard/Members/Groups/Contributions/Expenses/Posts/Comments(badge)/Payments/Settings/divider/Activity Log/System Log(superuser-only); visibility via authStore.hasPermission() + is_superuser bypass; active state via .admin-nav-item.active (defined in frontend/styles/admin.css). Comments item shows pendingCommentCount as a badge (99+ cap). NAV ITEM LIST IS HARDCODED here (`items: NavItem[]`) — adding a new admin section (route + sidebar entry) requires editing this array AND creating the corresponding frontend/app/[locale]/admin/<section>/page.tsx (see roadmap.add_admin_page_or_feature)."
+    imports:
+      external: [{from: next/link, items: [Link]}, {from: next/navigation, items: [usePathname]}, {from: framer-motion, items: [motion, AnimatePresence]}, {from: lucide-react, items: [LayoutDashboard, Users, ShieldCheck, HandCoins, Receipt, Newspaper, MessageSquare, Wallet, Settings, ScrollText, Terminal, X]}]
+      internal:
+        - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+    exports: [{name: default, kind: function, type: "React component", props: "AdminSidebarProps {locale: 'en'|'fa', collapsed, mobileOpen, onMobileClose, pendingCommentCount?}"}]
+    needed_by:
+      - {file: "frontend/components/layout/AdminLayout.tsx", status: available}
+
+  "frontend/components/layout/AdminTopBar.tsx":
+    status: done
+    kind: component
+    note: "fixed 56px bar — hamburger (calls onToggleSidebar from AdminLayout), LionAndSun+'Admin Panel', language switcher (mirrors Navbar.handleLanguageSwitch — replaces the locale segment in the current pathname and router.push), notification bell→/admin/comments with pendingCommentCount badge, profile dropdown (View Profile/Back to Site/Logout, mirrors Navbar.handleLogout/getInitials). All non-nav strings are inline bilingual (isRTL ? '...' : '...') per admin_panel_i18n_policy."
+    imports:
+      external: [{from: react, items: [useEffect, useRef, useState]}, {from: next/link, items: [Link]}, {from: next/navigation, items: [usePathname, useRouter]}, {from: framer-motion, items: [motion, AnimatePresence]}, {from: lucide-react, items: [Menu, Bell, User, Home, LogOut, ChevronDown]}]
+      internal:
+        - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+        - {file: "frontend/store/langStore.ts", items: [useLangStore], status: available}
+        - {file: "frontend/lib/api.ts", items: [authAPI], status: available}
+    exports: [{name: default, kind: function, type: "React component", props: "AdminTopBarProps {locale: 'en'|'fa', onToggleSidebar, pendingCommentCount?}"}]
+    needed_by:
+      - {file: "frontend/components/layout/AdminLayout.tsx", status: available}
+
+  "frontend/components/animations/IranianSymbols.tsx":
+    status: done
+    kind: component
+    note: "LionAndSun reimplemented (replacing the previous hand-drawn SVG, which was repeatedly rejected as 'ugly/childish' with no internet/image-gen available to source real artwork) on top of a new shared CulturalEmblem({emoji, size, color, animated}) component: a circular 'medallion' div (radial-gradient background tinted by color, 2px solid border) centered on a native full-color emoji glyph (professionally designed by Apple/Google/Microsoft, not hand-drawn) — optionally wrapped in the existing motion.div drop-shadow glow-pulse. LionAndSun = CulturalEmblem(emoji='🦁', color='#fbbf24') plus a small absolutely-positioned ☀️ badge in the top-right corner (the 'Lion and Sun' pairing); same size/className/animated prop signature as before, so every call site (Navbar, Footer, login, register, landing hero/CTA) needed no changes. CulturalEmblem is reused by the new 'Iranian Heritage' section on the landing page (5 items: persepolis 🏛️, pasargadae 🪦, naqshe_rostam 🗿, hafez 📜, saadi 📖). FaravaharSimple/GeometricPattern unchanged (hand-drawn SVG, viewBox 200x80 and 100x100 respectively)."
+    imports:
+      external: [{from: framer-motion, items: [motion]}]
+    exports:
+      - {name: CulturalEmblem, kind: function, type: "React component", props: "CulturalEmblemProps {emoji, size?=64, color?='#fbbf24', animated?=false, className?} — circular medallion (radial-gradient + 2px border) around an emoji glyph; animated wraps in motion.div drop-shadow glow-pulse (2s loop)"}
+      - {name: LionAndSun, kind: function, type: "React component", props: "SymbolProps {size?=100, className?, animated?=false} — CulturalEmblem(emoji='🦁', color='#fbbf24', size) + absolutely-positioned ☀️ badge (top-right, ~32% size)"}
+      - {name: FaravaharSimple, kind: function, type: "React component", props: "SymbolProps — hand-drawn SVG Faravahar (viewBox 0 0 200 80, currentColor strokes), animated wraps in glow-pulse motion.div"}
+      - {name: GeometricPattern, kind: function, type: "React component", props: "SymbolProps — hand-drawn SVG 8-point geometric rosette (viewBox 0 0 100 100, currentColor strokes); animated = continuous 360° rotation over 20s"}
+    needed_by: "see shared_components.IranianSymbols for the full per-export consumer lists (LionAndSun: 17 files; CulturalEmblem/FaravaharSimple/GeometricPattern: frontend/app/[locale]/page.tsx ONLY)"
+
+  "frontend/components/animations/PageTransition.tsx":
+    status: done
+    kind: component
+    note: "ORPHANED — zero importers anywhere in the project (verified via grep for 'PageTransition'). SplashScreen.tsx is the actual full-screen intro animation that IS used (via ClientLayout). PageTransition appears to be an earlier/alternative per-route fade+slide transition wrapper — AnimatePresence mode='wait' keyed on usePathname(), fades+slides {children} on route change, and briefly shows a spinning LionAndSun + 'Long Live Iran'/'پاینده ایران' overlay during the exit animation. Superseded but never deleted; safe to remove, or could be wired into ClientLayout.tsx (wrap {children} between Navbar and Footer) if route-transition animation is desired — but doing so would need locale plumbed through (ClientLayout already has `locale` in scope)."
+    imports:
+      external: [{from: react, items: [useState]}, {from: next/navigation, items: [usePathname]}, {from: framer-motion, items: [motion, AnimatePresence]}]
+      internal:
+        - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun], status: available}
+    exports: [{name: default, kind: function, type: "React component", props: "PageTransitionProps {children, locale: 'en'|'fa'}"}]
+    needed_by: []
+
+  "frontend/components/animations/SplashScreen.tsx":
+    status: done
+    kind: component
+    note: "full-screen intro animation shown once per browser session (localStorage 'splashShown' flag — if set, calls onComplete() immediately and renders nothing). 6-step timed sequence over ~3.8s: step1 background fade-in (300ms) → step2 LionAndSun spring scale-in with glow-pulse (1000ms, size 140) → step3 typewriter text lines via internal SplashTextLine helper ('Long Live the King'/'جاوید شاه' + 'Long Live Iran'/'پاینده ایران', per-character stagger, 2000ms) → step4 GeometricPattern radiates+fades outward (2800ms, scale 0.5→2.5) → step5 whole overlay fades out (3300ms) → step6 unmount + localStorage.setItem('splashShown','1') + onComplete() (3800ms). SplashTextLine is an internal (non-exported) helper component."
+    imports:
+      external: [{from: react, items: [useEffect, useState]}, {from: framer-motion, items: [motion, AnimatePresence]}]
+      internal:
+        - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun, GeometricPattern], status: available}
+    exports: [{name: default, kind: function, type: "React component", props: "SplashScreenProps {locale: 'en'|'fa', onComplete: () => void}"}]
+    needed_by:
+      - {file: "frontend/app/[locale]/ClientLayout.tsx", status: available}
+  # ─── FRONTEND — Admin component library (pass 4) ────────────────────────
+  "frontend/components/admin/AdminTable.tsx":
+    status: done
+    kind: component
+    note: "generic admin data table — skeleton-row loading state, dimmed-LionAndSun empty state, prev/next pagination footer matching public posts page styling"
+    imports:
+      external: [{from: lucide-react, items: [ChevronLeft, ChevronRight]}]
+      internal:
+        - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun], status: available}
+    exports: [default, AdminTableColumn<T>, PaginationState]
+    needed_by: "see shared_components.admin_component_library.components.AdminTable for the full per-admin-page consumer list"
+
+  "frontend/components/admin/AdminModal.tsx":
+    status: done
+    kind: component
+    note: "centered overlay glass-card modal; backdrop click + X to close; framer-motion fade+scale; configurable maxWidth"
+    imports:
+      external: [{from: framer-motion, items: [AnimatePresence, motion]}, {from: lucide-react, items: [X]}]
+    exports: [{name: default, kind: function, type: "React component", props: "AdminModalProps {isOpen, onClose, title, children, maxWidth?}"}]
+    needed_by: "see shared_components.admin_component_library.components.AdminModal for the full per-admin-page consumer list"
+
+  "frontend/components/admin/AdminConfirmDialog.tsx":
+    status: done
+    kind: component
+    note: "destructive-action confirmation — AlertTriangle icon, red confirm + neutral cancel, loading state; role=alertdialog + aria-label for accessibility"
+    imports:
+      external: [{from: framer-motion, items: [AnimatePresence, motion]}, {from: lucide-react, items: [AlertTriangle]}]
+    exports: [{name: default, kind: function, type: "React component", props: "AdminConfirmDialogProps {isOpen, onClose, onConfirm, title, message, confirmLabel?, cancelLabel?, loading?}"}]
+    needed_by: "see shared_components.admin_component_library.components.AdminConfirmDialog for the full per-admin-page consumer list"
+
+  "frontend/components/admin/AdminStatCard.tsx":
+    status: done
+    kind: component
+    note: "dashboard stat card with animated count-up (useMotionValue+animate), trend indicator (up/down/neutral), prefix/suffix/decimals"
+    imports:
+      external: [{from: react, items: [useEffect, useState]}, {from: framer-motion, items: [motion, useMotionValue, animate]}, {from: lucide-react, items: [TrendingUp, TrendingDown, Minus, LucideIcon]}]
+    exports: [{name: default, kind: function, type: "React component", props: "AdminStatCardProps {title, value, icon: LucideIcon, color?, prefix?, suffix?, trend?, decimals?}"}]
+    needed_by: "see shared_components.admin_component_library.components.AdminStatCard for the full per-admin-page consumer list"
+
+  "frontend/components/admin/AdminBadge.tsx":
+    status: done
+    kind: component
+    note: "status→color badge (pending/pending_review→amber, completed/approved/active→green, failed/rejected/inactive→red, fallback cyan); optional `label` override; no internal imports"
+    exports: [{name: default, kind: function, type: "React component", props: "AdminBadgeProps {status, label?}"}, {name: AdminBadgeStatus, kind: type}]
+    needed_by: "see shared_components.admin_component_library.components.AdminBadge for the full per-admin-page consumer list"
+
+  "frontend/components/admin/AdminToastContainer.tsx":
+    status: done
+    kind: component
+    note: "fixed top-end toast stack consuming toastStore; color-coded by type (success=green/error=red/warning=amber/info=cyan) with framer-motion enter/exit"
+    imports:
+      external: [{from: framer-motion, items: [AnimatePresence, motion]}, {from: lucide-react, items: [CheckCircle, XCircle, AlertTriangle, Info, X]}]
+      internal:
+        - {file: "frontend/store/toastStore.ts", items: [useToastStore, ToastType], status: available}
+    exports: [{name: default, kind: function, type: "React component"}]
+    needed_by: "see shared_components.useToastStore for the full consumer list (mounted once via AdminLayout.tsx)"
+
+  "frontend/components/admin/fields/AdminInput.tsx":
+    status: done
+    kind: component
+    note: "forwardRef text input wrapper — optional label + error message, neon-cyan focus ring via onFocus/onBlur style toggling; no internal imports"
+    imports:
+      external: [{from: react, items: [forwardRef]}]
+    exports: [{name: default, kind: function, type: "React component (forwardRef<HTMLInputElement>)", props: "AdminInputProps extends React.InputHTMLAttributes<HTMLInputElement> {label?, error?}"}]
+    needed_by: "see shared_components.admin_component_library.fields.AdminInput for the full per-admin-page consumer list"
+
+  "frontend/components/admin/fields/AdminSelect.tsx":
+    status: done
+    kind: component
+    note: "forwardRef select wrapper — optional label/error/placeholder, custom ChevronDown indicator (appearance-none native select); no internal imports"
+    imports:
+      external: [{from: react, items: [forwardRef]}, {from: lucide-react, items: [ChevronDown]}]
+    exports: [{name: default, kind: function, type: "React component (forwardRef<HTMLSelectElement>)", props: "AdminSelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>,'children'> {label?, error?, options: AdminSelectOption[], placeholder?}"}, {name: AdminSelectOption, kind: type}]
+    needed_by: "see shared_components.admin_component_library.fields.AdminSelect for the full per-admin-page consumer list"
+
+  "frontend/components/admin/fields/AdminTextarea.tsx":
+    status: done
+    kind: component
+    note: "forwardRef textarea wrapper — optional label + error message, neon-cyan focus ring via onFocus/onBlur style toggling, default rows=4, resize-none; no internal imports"
+    imports:
+      external: [{from: react, items: [forwardRef]}]
+    exports: [{name: default, kind: function, type: "React component (forwardRef<HTMLTextAreaElement>)", props: "AdminTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {label?, error?}"}]
+    needed_by: "see shared_components.admin_component_library.fields.AdminTextarea for the full per-admin-page consumer list"
+
+  "frontend/components/admin/fields/AdminToggle.tsx":
+    status: done
+    kind: component
+    note: "controlled on/off switch (role=switch, aria-checked) — props {checked, onChange, label?, description?, disabled?}; no internal imports"
+    exports: [{name: default, kind: function, type: "React component"}]
+    needed_by: "see shared_components.admin_component_library.fields.AdminToggle for the full per-admin-page consumer list"
+
+  "frontend/components/admin/fields/AdminFileUpload.tsx":
+    status: done
+    kind: component
+    note: "drag-and-drop zone, image previews via URL.createObjectURL, file chips, Clear button; no internal imports"
+    imports:
+      external: [{from: react, items: [useRef, useState]}, {from: lucide-react, items: [UploadCloud, X, FileText]}]
+    exports: [{name: default, kind: function, type: "React component", props: "AdminFileUploadProps {label?, accept?, multiple?, onChange: (files: File[]) => void, hint?}"}]
+    needed_by: "see shared_components.admin_component_library.fields.AdminFileUpload for the full per-admin-page consumer list"
+
+  "frontend/components/admin/fields/AdminPermissionCheckbox.tsx":
+    status: done
+    kind: component
+    note: "permission grid with locked always-on entries (can_contribute/can_comment, force-included by backend regardless); no internal imports"
+    imports:
+      external: [{from: lucide-react, items: [Check]}]
+    exports: [default, PermissionOption]
+    needed_by: "see shared_components.admin_component_library.fields.AdminPermissionCheckbox for the full per-admin-page consumer list"
+  # ─── FRONTEND — Stores, lib, messages, new config files (pass 5) ─────────
+  "frontend/store/authStore.ts":
+    status: done
+    kind: module
+    note: "zustand + persist; holds member, accessToken, refreshToken, isAuthenticated, hasPermission(codename); login/logout/setTokens"
+    exports:
+      - {name: "default (useAuthStore hook)", kind: function, type: "zustand store hook (persist middleware, localStorage key 'groupfund-auth')"}
+      - {name: Member, kind: type, type: "interface { id, full_name, display_name, email, phone, group_name, group_permissions[], is_active, is_superuser, created_at }"}
+    needed_by: "see shared_components.useAuthStore"
+
+  "frontend/store/langStore.ts":
+    status: done
+    kind: module
+    note: "zustand + persist; holds locale (en/fa), setLocale, syncs with localStorage 'lang' read by lib/api.ts getLocalePrefix()"
+    exports:
+      - {name: "default (useLangStore hook)", kind: function, type: "zustand store hook (persist middleware, localStorage key 'groupfund-lang')"}
+      - {name: Locale, kind: type, type: "'en' | 'fa'"}
+    needed_by: "see shared_components.useLangStore"
+
+  "frontend/store/toastStore.ts":
+    status: done
+    kind: module
+    note: "zustand store backing the custom toast notification system (no 3rd-party toast lib in the project); show(type, message) auto-dismisses after 4s, dismiss(id)"
+    exports:
+      - {name: "default (useToastStore hook)", kind: function, type: "zustand store hook (no persist middleware)"}
+      - {name: Toast, kind: type, type: "interface { id: number, type: ToastType, message: string }"}
+      - {name: ToastType, kind: type, type: "'success' | 'error' | 'warning' | 'info'"}
+    needed_by: "see shared_components.useToastStore"
+
+  "frontend/lib/i18n.ts":
+    status: done
+    kind: module
+    note: "next-intl request config — loads messages/{locale}.json, notFound() on unsupported locale"
+    exports:
+      - {name: default, kind: function, type: "getRequestConfig(async ({ requestLocale }) => { locale, messages, timeZone: 'Asia/Tehran' }) handler"}
+      - {name: Locale, kind: type, type: "'en' | 'fa' (derived from readonly locales tuple ['en','fa'])"}
+    needed_by:
+      - {file: "frontend/next.config.mjs", items: ["createNextIntlPlugin('./lib/i18n.ts') entry point"], status: available}
+
+  "frontend/lib/auth.ts":
+    status: done
+    kind: module
+    note: "DEAD CODE — zero importers anywhere in the project (verified via grep). frontend/lib/api.ts has its own internal duplicate getLocalePrefix(). Candidate for removal or for lib/api.ts to import from here instead (de-dup)."
+    exports:
+      - {name: getLocalePrefix, kind: function, type: "() => string — reads localStorage 'lang' (default 'en'), returns '/{lang}'; falls back to '/en' when window is undefined (SSR)"}
+      - {name: decodeJWT, kind: function, type: "(token: string) => Record<string, unknown> | null — decodes JWT payload (base64url) without signature verification, browser-only"}
+      - {name: isTokenExpired, kind: function, type: "(token: string) => boolean — true if decodeJWT fails or payload.exp (with 10s clock-skew buffer) is in the past"}
+    needed_by: []
+
+  "frontend/messages/en.json":
+    status: done
+    kind: data
+    note: "13 top-level namespaces (nav, landing, heritage, auth, posts, expenses, contribute, profile, contact, help, errors, footer, common) — see top-level `i18n:` section for full namespace→keys→consumer map. EN is source-of-truth; fa.json MUST mirror its key structure exactly (see i18n.invariant)."
+    exports: "see i18n: section"
+    needed_by: "see i18n: section .namespaces.*.used_by"
+
+  "frontend/messages/fa.json":
+    status: done
+    kind: data
+    note: "Persian mirror of en.json — RTL phrasing (not literal translation where idiom differs), MUST have identical key structure to en.json (verified currently true — 13 matching top-level keys, see top-level `i18n:` section). See frontend/messages/en.json for the full namespace→keys→consumer map."
+    exports: "see frontend/messages/en.json"
+    needed_by: "see frontend/messages/en.json"
+
+  "frontend/package.json":
+    status: done
+    kind: config
+    note: "groupfund-frontend v0.1.0 (private). Next.js 14.2.35 + React ^18 + TypeScript ^5 + next-intl ^3.17.2 + zustand ^4.5.4 + axios ^1.7.2 + framer-motion ^11.3.2 + recharts ^3.8.1 + lucide-react ^0.414.0 + tailwindcss ^3.4.1 (+ @tailwindcss/typography ^0.5.13, autoprefixer ^10.0.1). Scripts: dev (next dev), build (next build), start (next start), lint (next lint)."
+    key_settings:
+      scripts: {dev: "next dev", build: "next build", start: "next start", lint: "next lint"}
+      dependencies:
+        - "axios: ^1.7.2"
+        - "framer-motion: ^11.3.2"
+        - "lucide-react: ^0.414.0"
+        - "next: 14.2.35"
+        - "next-intl: ^3.17.2"
+        - "react: ^18"
+        - "react-dom: ^18"
+        - "recharts: ^3.8.1"
+        - "zustand: ^4.5.4"
+      devDependencies:
+        - "@tailwindcss/typography: ^0.5.13"
+        - "@types/node: ^20"
+        - "@types/react: ^18"
+        - "@types/react-dom: ^18"
+        - "autoprefixer: ^10.0.1"
+        - "eslint: ^8"
+        - "eslint-config-next: 14.2.35"
+        - "postcss: ^8"
+        - "tailwindcss: ^3.4.1"
+        - "typescript: ^5"
+    needed_by: []
+
+  "frontend/tsconfig.json":
+    status: done
+    kind: config
+    note: "strict TS (strict: true), target lib dom/dom.iterable/esnext, module esnext with moduleResolution bundler, jsx preserve, incremental builds, next plugin. Path alias '@/*' → './*' (frontend root), so '@/components/...', '@/lib/...', '@/store/...' resolve to frontend/components, frontend/lib, frontend/store. Includes next-env.d.ts, **/*.ts, **/*.tsx, .next/types/**/*.ts; excludes node_modules."
+    key_settings:
+      strict: true
+      moduleResolution: bundler
+      resolveJsonModule: true
+      isolatedModules: true
+      jsx: preserve
+      paths: {"@/*": ["./*"]}
+    needed_by: []
+
+  "frontend/tailwind.config.ts":
+    status: done
+    kind: config
+    note: "content globs: ./pages/**/*.{js,ts,jsx,tsx,mdx}, ./components/**/*.{js,ts,jsx,tsx,mdx}, ./app/**/*.{js,ts,jsx,tsx,mdx}. Custom theme.extend.colors: neon-cyan(#00ffff), neon-violet(#8b5cf6), neon-gold(#fbbf24), neon-green(#10b981), neon-red(#ef4444), neon-amber(#f59e0b), dark-bg(#0a0a0f), dark-surface(#111118). fontFamily: vazir → ['Vazirmatn','sans-serif'], inter → ['Inter','sans-serif']. backdropBlur.glass: 20px. Custom animations: glow-pulse (glowPulse 2s ease-in-out infinite), float (float 3s ease-in-out infinite), spin-slow (spin 3s linear infinite); keyframes defined for glowPulse and float (spin-slow reuses Tailwind's built-in spin keyframes). Plugin: @tailwindcss/typography."
+    key_settings:
+      content:
+        - "./pages/**/*.{js,ts,jsx,tsx,mdx}"
+        - "./components/**/*.{js,ts,jsx,tsx,mdx}"
+        - "./app/**/*.{js,ts,jsx,tsx,mdx}"
+      colors: ["neon-cyan", "neon-violet", "neon-gold", "neon-green", "neon-red", "neon-amber", "dark-bg", "dark-surface"]
+      fontFamily: {vazir: "Vazirmatn", inter: "Inter"}
+      animations: ["glow-pulse", "float", "spin-slow"]
+      plugins: ["@tailwindcss/typography"]
+    needed_by: []
+
+  "frontend/postcss.config.js":
+    status: done
+    kind: config
+    note: "standard Next.js PostCSS pipeline — two plugins, both with empty config objects: tailwindcss, autoprefixer."
+    key_settings:
+      plugins: ["tailwindcss", "autoprefixer"]
+    needed_by: []
+
+  "frontend/.env.example":
+    status: done
+    kind: config
+    note: "Three env vars, all NEXT_PUBLIC_ (exposed to browser bundle). NEXT_PUBLIC_API_URL=http://localhost:8000 (backend base URL, consumed by frontend/lib/api.ts axios client). NEXT_PUBLIC_SITE_NAME='Group Fund' (display name). NEXT_PUBLIC_MEDIA_URL= (empty by default; only set in production when the backend stores media in an S3-compatible bucket/CDN — must match backend AWS_STORAGE_BUCKET_NAME's public origin so next/image is allowed to load from it via next.config.mjs remotePatterns; leave unset when backend serves media locally via MEDIA_URL=/media/)."
+    key_settings:
+      vars:
+        - {name: NEXT_PUBLIC_API_URL, default: "http://localhost:8000", purpose: "backend API base URL"}
+        - {name: NEXT_PUBLIC_SITE_NAME, default: "Group Fund", purpose: "site display name"}
+        - {name: NEXT_PUBLIC_MEDIA_URL, default: "(empty)", purpose: "optional S3/CDN media origin for next/image remotePatterns; production-only"}
+    needed_by: []
+
+  "frontend/.gitignore":
+    status: done
+    kind: config
+    note: "standard Next.js gitignore. Excludes: /node_modules (dependencies); /.next/ and /out/ (Next.js build output); /build (production build); .DS_Store and *.pem (misc/OS); npm-debug.log*, yarn-debug.log*, yarn-error.log* (debug logs); .env*.local (local env overrides — frontend/.env.example itself IS tracked); *.tsbuildinfo and next-env.d.ts (TypeScript build artifacts — next-env.d.ts is regenerated by `next dev`/`next build`, confirmed NOT tracked in git)."
+    needed_by: []
+
+  "frontend/next-env.d.ts":
+    status: done
+    kind: config
+    note: "auto-generated by Next.js (DO NOT EDIT) — TS triple-slash-reference directives for 'next' and 'next/image-types/global'; regenerated automatically by `next dev`/`next build` and excluded via .gitignore (not tracked in git)."
+    needed_by: []
+
+  "frontend/public/.gitkeep":
+    status: done
+    kind: config
+    note: "EMPTY placeholder — frontend/public/ contains NO image/icon/font assets anywhere in the project; exists so 'COPY --from=builder /frontend/public' succeeds in Docker builds (see Dockerfile.railway / frontend/Dockerfile)."
+    needed_by: []
   # ─── PHASE 7B — KNOWN BACKEND GAPS — RESOLVED ─────────────────────────────────
   # 1. RESOLVED: added `CommentGlobalListView` (GET /api/posts/comments/) in
   #    backend/posts/views.py — paginated via `_paginate()`, filterable by
