@@ -36,8 +36,7 @@ function PostCard({ post, locale, index }: { post: PostSummary; locale: string; 
 
   return (
     <motion.div
-      className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 flex flex-col gap-3 h-full transition-all duration-200"
-      style={{ cursor: 'default' }}
+      className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl h-full transition-all duration-200"
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: index * 0.06 }}
@@ -48,64 +47,54 @@ function PostCard({ post, locale, index }: { post: PostSummary; locale: string; 
         (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.1)';
       }}
     >
-      {/* Thumbnail */}
-      {post.images && post.images.length > 0 && (
-        <div
-          className="w-full h-32 rounded-xl overflow-hidden mb-1"
-          style={{ background: 'rgba(255,255,255,0.05)' }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={post.images[0].image}
-            alt=""
-            className="w-full h-full object-cover"
-          />
-        </div>
-      )}
+      <Link href={`/${locale}/posts/${post.id}`} className="flex flex-col gap-3 h-full p-6">
+        {/* Thumbnail */}
+        {post.images && post.images.length > 0 && (
+          <div
+            className="w-full h-32 rounded-xl overflow-hidden mb-1"
+            style={{ background: 'rgba(255,255,255,0.05)' }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={post.images[0].image}
+              alt=""
+              className="w-full h-full object-cover"
+            />
+          </div>
+        )}
 
-      {/* Title */}
-      <h2
-        className="font-bold text-white text-lg leading-snug"
-        style={{
-          display: '-webkit-box',
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: 'vertical',
-          overflow: 'hidden',
-        }}
-      >
-        {post.title}
-      </h2>
-
-      {/* Meta */}
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center gap-1.5 text-sm" style={{ color: '#00ffff' }}>
-          <User size={13} />
-          <span className="truncate">{post.author?.display_name || '—'}</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-white/50">
-          <Calendar size={12} />
-          <span>{formatDate(post.created_at)}</span>
-        </div>
-      </div>
-
-      {/* Read more */}
-      <div className="mt-auto pt-1">
-        <Link
-          href={`/${locale}/posts/${post.id}`}
-          className="inline-flex items-center gap-1 text-sm font-medium transition-all duration-200"
-          style={{ color: '#00ffff' }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.textShadow = '0 0 8px #00ffff';
-            e.currentTarget.style.gap = '6px';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.textShadow = 'none';
-            e.currentTarget.style.gap = '4px';
+        {/* Title */}
+        <h2
+          className="font-bold text-white text-lg leading-snug"
+          style={{
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
           }}
         >
-          <ArrowRight size={14} />
-        </Link>
-      </div>
+          {post.title}
+        </h2>
+
+        {/* Meta */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-1.5 text-sm" style={{ color: '#00ffff' }}>
+            <User size={13} />
+            <span className="truncate">{post.author?.display_name || post.author?.full_name || '—'}</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-white/50">
+            <Calendar size={12} />
+            <span>{formatDate(post.created_at)}</span>
+          </div>
+        </div>
+
+        {/* Read more */}
+        <div className="mt-auto pt-1">
+          <span className="inline-flex items-center gap-1 text-sm font-medium" style={{ color: '#00ffff' }}>
+            <ArrowRight size={14} />
+          </span>
+        </div>
+      </Link>
     </motion.div>
   );
 }
