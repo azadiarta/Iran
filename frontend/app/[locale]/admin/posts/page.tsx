@@ -70,7 +70,7 @@ export default function AdminPostsPage() {
   async function openEdit(summary: PostSummary) {
     try {
       const res = await postsAPI.getDetail(summary.id);
-      const detail = res.data as unknown as PostDetail;
+      const detail = (res.data as unknown as { post: PostDetail }).post;
       setEditing(detail);
       setTitle(detail.title);
       setBody(detail.body);
@@ -144,7 +144,7 @@ export default function AdminPostsPage() {
 
   const columns: AdminTableColumn<PostSummary>[] = [
     { key: 'title', header: isRTL ? 'عنوان' : 'Title', render: (p) => <span className="text-white/80">{p.title}</span> },
-    { key: 'author', header: isRTL ? 'نویسنده' : 'Author', render: (p) => <span className="text-white/60">{p.author?.display_name || '—'}</span> },
+    { key: 'author', header: isRTL ? 'نویسنده' : 'Author', render: (p) => <span className="text-white/60">{p.author?.display_name || p.author?.full_name || '—'}</span> },
     {
       key: 'images',
       header: isRTL ? 'تصاویر' : 'Images',
@@ -239,7 +239,7 @@ export default function AdminPostsPage() {
                       onClick={() => setConfirmDeleteImage({ id: img.id })}
                       className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center"
                       style={{ backgroundColor: '#ef4444', color: '#fff' }}
-                      aria-label="Remove image"
+                      aria-label={isRTL ? 'حذف تصویر' : 'Remove image'}
                     >
                       <X className="w-3 h-3" />
                     </button>
