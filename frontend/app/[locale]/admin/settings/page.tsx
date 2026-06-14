@@ -3,10 +3,13 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Save, Settings as SettingsIcon } from 'lucide-react';
 import AdminInput from '@/components/admin/fields/AdminInput';
+import AdminToggle from '@/components/admin/fields/AdminToggle';
+import AdminSelectWithDescription from '@/components/admin/fields/AdminSelectWithDescription';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
 import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
-import { settingsAPI, DefaultSettingItem } from '@/lib/api';
+import { settingsAPI, groupsAPI, DefaultSettingItem, AccessGroup } from '@/lib/api';
+import { SETTINGS_META } from '@/lib/settingsMeta';
 
 const PAYMENT_PREFIXES = ['payment_manual_', 'payment_paypal_', 'payment_stripe_', 'payment_google_pay_'];
 
@@ -20,6 +23,7 @@ export default function AdminSettingsPage() {
   const isSuperuser = !!currentMember?.is_superuser;
 
   const [settings, setSettings] = useState<DefaultSettingItem[]>([]);
+  const [groups, setGroups] = useState<AccessGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [values, setValues] = useState<Record<string, string>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -40,6 +44,10 @@ export default function AdminSettingsPage() {
       })
       .catch(() => showToast('error', isRTL ? 'بارگذاری تنظیمات ناموفق بود' : 'Failed to load settings'))
       .finally(() => setLoading(false));
+    groupsAPI
+      .getList()
+      .then((res) => setGroups(res.data as unknown as AccessGroup[]))
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSuperuser]);
 
@@ -95,30 +103,90 @@ export default function AdminSettingsPage() {
           <p className="text-sm text-white/30 py-6 text-center">{isRTL ? 'تنظیماتی یافت نشد' : 'No settings found'}</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {general.map((s) => (
-              <div key={s.key} className="flex items-end gap-2">
-                <div className="flex-1">
-                  <AdminInput
-                    label={s.description || s.key}
-                    value={values[s.key] ?? ''}
-                    onChange={(e) => set(s.key, e.target.value)}
-                  />
-                  <p className="mt-1 text-[10px] text-white/25 font-mono">{s.key}</p>
+            {general.map((s) => {
+              const meta = SETTINGS_META[s.key];
+
+              if (meta?.type === 'select') {
+                const options =
+                  s.key === 'default_group'
+                    ? groups.map((g) => ({ value: g.id, label: g.name, description: g.description }))
+                    : (meta.options || []).map((o) => ({
+                        value: o.value,
+                        label: isRTL ? o.label.fa : o.label.en,
+                        description: isRTL ? o.description.fa : o.description.en,
+                      }));
+                return (
+                  <div key={s.key} className="flex items-end gap-2">
+                    <div className="flex-1 min-w-0">
+                      <AdminSelectWithDescription
+                        label={isRTL ? meta.label.fa : meta.label.en}
+                        value={values[s.key] ?? ''}
+                        onChange={(v) => set(s.key, v)}
+                        options={options}
+                        placeholder={isRTL ? 'انتخاب کنید...' : 'Select...'}
+                      />
+                      <p className="mt-1.5 text-xs text-white/40">{isRTL ? meta.description.fa : meta.description.en}</p>
+                      <p className="mt-1 text-[10px] text-white/25 font-mono">{s.key}</p>
+                    </div>
+                    <SaveButton onClick={() => save(s.key)} loading={savingKey === s.key} isRTL={isRTL} />
+                  </div>
+                );
+              }
+
+              if (meta?.type === 'toggle') {
+                return (
+                  <div
+                    key={s.key}
+                    className="flex items-center gap-2 rounded-xl px-4 py-3"
+                    style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <AdminToggle
+                        checked={values[s.key] === 'true'}
+                        onChange={(checked) => set(s.key, checked ? 'true' : 'false')}
+                        label={isRTL ? meta.label.fa : meta.label.en}
+                        description={isRTL ? meta.description.fa : meta.description.en}
+                      />
+                      <p className="mt-1.5 text-[10px] text-white/25 font-mono">{s.key}</p>
+                    </div>
+                    <SaveButton onClick={() => save(s.key)} loading={savingKey === s.key} isRTL={isRTL} />
+                  </div>
+                );
+              }
+
+              return (
+                <div key={s.key} className="flex items-end gap-2">
+                  <div className="flex-1 min-w-0">
+                    <AdminInput
+                      label={meta ? (isRTL ? meta.label.fa : meta.label.en) : s.description || s.key}
+                      type={meta?.type === 'number' ? 'number' : 'text'}
+                      value={values[s.key] ?? ''}
+                      onChange={(e) => set(s.key, e.target.value)}
+                    />
+                    {meta && <p className="mt-1.5 text-xs text-white/40">{isRTL ? meta.description.fa : meta.description.en}</p>}
+                    <p className="mt-1 text-[10px] text-white/25 font-mono">{s.key}</p>
+                  </div>
+                  <SaveButton onClick={() => save(s.key)} loading={savingKey === s.key} isRTL={isRTL} />
                 </div>
-                <button
-                  onClick={() => save(s.key)}
-                  disabled={savingKey === s.key}
-                  className="flex-shrink-0 flex items-center justify-center rounded-xl px-3 py-2.5 transition-all disabled:opacity-50"
-                  style={{ border: '1px solid rgba(0,255,255,0.3)', color: '#00ffff', backgroundColor: 'rgba(0,255,255,0.05)' }}
-                  aria-label="Save"
-                >
-                  <Save className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+function SaveButton({ onClick, loading, isRTL }: { onClick: () => void; loading: boolean; isRTL: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={loading}
+      className="flex-shrink-0 flex items-center justify-center rounded-xl px-3 py-2.5 transition-all disabled:opacity-50"
+      style={{ border: '1px solid rgba(0,255,255,0.3)', color: '#00ffff', backgroundColor: 'rgba(0,255,255,0.05)' }}
+      aria-label={isRTL ? 'ذخیره' : 'Save'}
+    >
+      <Save className="w-4 h-4" />
+    </button>
   );
 }
