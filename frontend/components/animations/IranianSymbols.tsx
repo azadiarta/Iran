@@ -7,27 +7,37 @@ interface SymbolProps {
   animated?: boolean;
 }
 
-/* ─── CulturalEmblem ─────────────────────────────────────────────────────── */
-// Generic "medallion" badge: a circular glow-ring frame around a large emoji
-// glyph. Emoji are professionally designed full-color icons (Apple/Google/
-// Microsoft type foundries) — used here instead of hand-drawn SVG art for
-// LionAndSun and the Iranian Cultural Heritage symbols below.
+/* ─── GlowPulse ──────────────────────────────────────────────────────────── */
+// Shared 2s glow-pulse wrapper used by the `animated` variant of the symbols
+// below. The drop-shadow color follows `currentColor` from the parent.
 
-interface CulturalEmblemProps {
-  emoji: string;
-  size?: number;
-  color?: string;
-  animated?: boolean;
-  className?: string;
+function GlowPulse({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.div
+      animate={{
+        filter: [
+          'drop-shadow(0 0 6px currentColor)',
+          'drop-shadow(0 0 18px currentColor)',
+          'drop-shadow(0 0 6px currentColor)',
+        ],
+      }}
+      transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+      style={{ display: 'inline-flex' }}
+    >
+      {children}
+    </motion.div>
+  );
 }
 
-export function CulturalEmblem({
-  emoji,
-  size = 64,
-  color = '#fbbf24',
-  animated = false,
-  className = '',
-}: CulturalEmblemProps) {
+/* ─── LionAndSun ─────────────────────────────────────────────────────────── */
+// Iran's official historical "Lion and Sun" emblem (شیر و خورشید), rendered
+// from a Public Domain SVG (frontend/public/symbols/lion-and-sun.svg).
+
+const LION_AND_SUN_RATIO = 270.00001 / 194.99977; // ~1.385
+
+export function LionAndSun({ size = 100, className = '', animated = false }: SymbolProps) {
+  const imgHeight = size / LION_AND_SUN_RATIO;
+
   const content = (
     <div
       className={className}
@@ -35,216 +45,54 @@ export function CulturalEmblem({
       style={{
         width: size,
         height: size,
-        borderRadius: '50%',
-        display: 'flex',
+        display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: `radial-gradient(circle, ${color}33 0%, ${color}0d 70%)`,
-        border: `2px solid ${color}`,
-        fontSize: size * 0.55,
-        lineHeight: 1,
       }}
     >
-      <span>{emoji}</span>
+      <img
+        src="/symbols/lion-and-sun.svg"
+        alt=""
+        width={size}
+        height={imgHeight}
+        style={{ width: size, height: imgHeight, display: 'block' }}
+      />
     </div>
   );
 
   if (animated) {
-    return (
-      <motion.div
-        animate={{
-          filter: [
-            'drop-shadow(0 0 6px currentColor)',
-            'drop-shadow(0 0 18px currentColor)',
-            'drop-shadow(0 0 6px currentColor)',
-          ],
-        }}
-        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-        style={{ display: 'inline-flex', color }}
-      >
-        {content}
-      </motion.div>
-    );
-  }
-
-  return content;
-}
-
-/* ─── LionAndSun ─────────────────────────────────────────────────────────── */
-// Iran's "Lion and Sun" emblem (شیر و خورشید): a gold medallion with the lion
-// face emoji and a small sun badge.
-
-export function LionAndSun({ size = 100, className = '', animated = false }: SymbolProps) {
-  const content = (
-    <div
-      className={className}
-      aria-hidden="true"
-      style={{ position: 'relative', display: 'inline-flex', width: size, height: size }}
-    >
-      <CulturalEmblem emoji="🦁" color="#fbbf24" size={size} />
-      <span
-        style={{
-          position: 'absolute',
-          top: '-6%',
-          insetInlineEnd: '-6%',
-          fontSize: size * 0.32,
-          lineHeight: 1,
-        }}
-      >
-        ☀️
-      </span>
-    </div>
-  );
-
-  if (animated) {
-    return (
-      <motion.div
-        animate={{
-          filter: [
-            'drop-shadow(0 0 6px currentColor)',
-            'drop-shadow(0 0 18px currentColor)',
-            'drop-shadow(0 0 6px currentColor)',
-          ],
-        }}
-        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-        style={{ display: 'inline-flex' }}
-      >
-        {content}
-      </motion.div>
-    );
+    return <GlowPulse>{content}</GlowPulse>;
   }
 
   return content;
 }
 
 /* ─── FaravaharSimple ────────────────────────────────────────────────────── */
+// The Faravahar (فروهر), rendered from a Public Domain SVG
+// (frontend/public/symbols/faravahar.svg).
+
+const FARAVAHAR_RATIO = 529.9035 / 249.62308; // ~2.123
 
 export function FaravaharSimple({ size = 100, className = '', animated = false }: SymbolProps) {
-  // Aspect: viewBox 200x80, so height = size * 80/200
-  const height = (size * 80) / 200;
+  const height = size / FARAVAHAR_RATIO;
 
-  const svgContent = (
-    <svg
+  const content = (
+    <img
+      src="/symbols/faravahar.svg"
+      alt=""
       width={size}
       height={height}
-      viewBox="0 0 200 80"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
       className={className}
       aria-hidden="true"
-    >
-      {/* Central disc */}
-      <circle cx="100" cy="40" r="15" stroke="currentColor" strokeWidth="2" />
-
-      {/* Simple human figure in disc center */}
-      {/* Head */}
-      <circle cx="100" cy="31" r="4" fill="none" stroke="currentColor" strokeWidth="1.5" />
-      {/* Body */}
-      <line x1="100" y1="35" x2="100" y2="47" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      {/* Right arm reaching up */}
-      <line x1="100" y1="38" x2="108" y2="34" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      {/* Left arm */}
-      <line x1="100" y1="38" x2="92" y2="36" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-
-      {/* Right wing — arcing right with 3 feather lines */}
-      <path
-        d="M 115,40 C 130,32 155,28 185,30"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <path
-        d="M 115,40 C 128,38 150,36 178,38"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        opacity="0.8"
-      />
-      <path
-        d="M 115,40 C 128,44 148,45 172,46"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        opacity="0.6"
-      />
-      {/* Right wing fill */}
-      <path
-        d="M 115,40 C 140,20 170,22 185,30 C 170,34 140,38 115,40"
-        fill="currentColor"
-        opacity="0.15"
-      />
-
-      {/* Left wing — mirror of right wing */}
-      <path
-        d="M 85,40 C 70,32 45,28 15,30"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <path
-        d="M 85,40 C 72,38 50,36 22,38"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        opacity="0.8"
-      />
-      <path
-        d="M 85,40 C 72,44 52,45 28,46"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        opacity="0.6"
-      />
-      {/* Left wing fill */}
-      <path
-        d="M 85,40 C 60,20 30,22 15,30 C 30,34 60,38 85,40"
-        fill="currentColor"
-        opacity="0.15"
-      />
-
-      {/* Tail — two downward curved lines */}
-      <path
-        d="M 96,54 C 93,62 90,68 88,75"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-      <path
-        d="M 104,54 C 107,62 110,68 112,75"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
+      style={{ width: size, height, display: 'block' }}
+    />
   );
 
   if (animated) {
-    return (
-      <motion.div
-        animate={{
-          filter: [
-            'drop-shadow(0 0 6px currentColor)',
-            'drop-shadow(0 0 18px currentColor)',
-            'drop-shadow(0 0 6px currentColor)',
-          ],
-        }}
-        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-        style={{ display: 'inline-flex' }}
-      >
-        {svgContent}
-      </motion.div>
-    );
+    return <GlowPulse>{content}</GlowPulse>;
   }
 
-  return svgContent;
+  return content;
 }
 
 /* ─── GeometricPattern ───────────────────────────────────────────────────── */
@@ -334,6 +182,243 @@ export function GeometricPattern({ size = 100, className = '', animated = false 
         {svgContent}
       </motion.div>
     );
+  }
+
+  return svgContent;
+}
+
+/* ─── Heritage landmark icons ────────────────────────────────────────────── */
+// Flat, line-art `currentColor` icons representing five icons of Iranian
+// cultural heritage. Designed as tasteful background/decorative elements —
+// small or large, low-opacity — rather than page focal points.
+
+/* ─── PersepolisIcon ─────────────────────────────────────────────────────── */
+// Twin bull-headed ("Lamassu") columns from the Gate of All Nations.
+
+export function PersepolisIcon({ size = 100, className = '', animated = false }: SymbolProps) {
+  const svgContent = (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-hidden="true"
+    >
+      {/* Mountain backdrop */}
+      <path
+        d="M 4,58 L 22,38 L 38,50 L 56,30 L 74,46 L 96,40 L 96,62 L 4,62 Z"
+        fill="currentColor"
+        opacity="0.08"
+      />
+
+      {/* Platform */}
+      <rect x="6" y="86" width="88" height="4" fill="currentColor" opacity="0.5" />
+
+      {/* Left column shaft */}
+      <rect x="25" y="34" width="7" height="52" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <line x1="28.5" y1="37" x2="28.5" y2="83" stroke="currentColor" strokeWidth="0.5" opacity="0.4" />
+
+      {/* Right column shaft */}
+      <rect x="68" y="34" width="7" height="52" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <line x1="71.5" y1="37" x2="71.5" y2="83" stroke="currentColor" strokeWidth="0.5" opacity="0.4" />
+
+      {/* Lintel beam */}
+      <rect x="20" y="24" width="60" height="3" fill="currentColor" opacity="0.45" />
+
+      {/* Left bull-head capital (volute facing outward) */}
+      <circle cx="22" cy="29" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M 22,24.5 C 25,21.5 30,23 32,27" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <rect x="20" y="29" width="18" height="3.5" fill="currentColor" opacity="0.6" />
+
+      {/* Right bull-head capital (mirrored) */}
+      <circle cx="78" cy="29" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M 78,24.5 C 75,21.5 70,23 68,27" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <rect x="62" y="29" width="18" height="3.5" fill="currentColor" opacity="0.6" />
+    </svg>
+  );
+
+  if (animated) {
+    return <GlowPulse>{svgContent}</GlowPulse>;
+  }
+
+  return svgContent;
+}
+
+/* ─── PasargadaeIcon ─────────────────────────────────────────────────────── */
+// The Tomb of Cyrus the Great — a gabled stone chamber on a stepped plinth.
+
+export function PasargadaeIcon({ size = 100, className = '', animated = false }: SymbolProps) {
+  const svgContent = (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-hidden="true"
+    >
+      {/* Stepped plinth — six tiers, widest at the base */}
+      <rect x="15" y="80" width="70" height="6" fill="currentColor" opacity="0.3" />
+      <rect x="20" y="74" width="60" height="6" fill="currentColor" opacity="0.35" />
+      <rect x="25" y="68" width="50" height="6" fill="currentColor" opacity="0.4" />
+      <rect x="30" y="62" width="40" height="6" fill="currentColor" opacity="0.45" />
+      <rect x="35" y="56" width="30" height="6" fill="currentColor" opacity="0.5" />
+      <rect x="38" y="50" width="24" height="6" fill="currentColor" opacity="0.55" />
+
+      {/* Gabled chamber */}
+      <rect x="40" y="34" width="20" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M 37,34 L 50,21 L 63,34 Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <rect x="46" y="40" width="8" height="10" fill="currentColor" opacity="0.55" />
+    </svg>
+  );
+
+  if (animated) {
+    return <GlowPulse>{svgContent}</GlowPulse>;
+  }
+
+  return svgContent;
+}
+
+/* ─── NaqsheRostamIcon ───────────────────────────────────────────────────── */
+// Cross-shaped Achaemenid rock-cut tomb facade carved into a cliff face.
+
+export function NaqsheRostamIcon({ size = 100, className = '', animated = false }: SymbolProps) {
+  const svgContent = (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-hidden="true"
+    >
+      {/* Cliff backdrop */}
+      <path
+        d="M 2,95 L 2,38 L 16,22 L 32,34 L 48,12 L 64,30 L 80,10 L 96,28 L 98,38 L 98,95 Z"
+        fill="currentColor"
+        opacity="0.07"
+      />
+
+      {/* Cross shape — vertical bar */}
+      <rect x="38" y="18" width="24" height="68" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      {/* Cross shape — horizontal bar with engaged columns */}
+      <rect x="14" y="42" width="72" height="22" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <line x1="22" y1="45" x2="22" y2="61" stroke="currentColor" strokeWidth="1.5" />
+      <line x1="32" y1="45" x2="32" y2="61" stroke="currentColor" strokeWidth="1.5" />
+      <line x1="68" y1="45" x2="68" y2="61" stroke="currentColor" strokeWidth="1.5" />
+      <line x1="78" y1="45" x2="78" y2="61" stroke="currentColor" strokeWidth="1.5" />
+
+      {/* False door */}
+      <rect x="44" y="68" width="12" height="18" fill="currentColor" opacity="0.5" />
+
+      {/* Relief disc above the door */}
+      <circle cx="50" cy="26" r="4" fill="none" stroke="currentColor" strokeWidth="1.2" opacity="0.6" />
+    </svg>
+  );
+
+  if (animated) {
+    return <GlowPulse>{svgContent}</GlowPulse>;
+  }
+
+  return svgContent;
+}
+
+/* ─── HafezIcon ──────────────────────────────────────────────────────────── */
+// An open book topped by a singing nightingale — a recurring motif in
+// Hafez's ghazals (the nightingale and the rose).
+
+export function HafezIcon({ size = 100, className = '', animated = false }: SymbolProps) {
+  const svgContent = (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-hidden="true"
+    >
+      {/* Open book */}
+      <path d="M 50,30 L 50,75 L 15,82 L 15,38 Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M 50,30 L 50,75 L 85,82 L 85,38 Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+
+      {/* Page lines */}
+      <line x1="22" y1="48" x2="43" y2="44" stroke="currentColor" strokeWidth="0.75" opacity="0.5" />
+      <line x1="22" y1="56" x2="43" y2="52" stroke="currentColor" strokeWidth="0.75" opacity="0.5" />
+      <line x1="22" y1="64" x2="43" y2="60" stroke="currentColor" strokeWidth="0.75" opacity="0.5" />
+      <line x1="78" y1="48" x2="57" y2="44" stroke="currentColor" strokeWidth="0.75" opacity="0.5" />
+      <line x1="78" y1="56" x2="57" y2="52" stroke="currentColor" strokeWidth="0.75" opacity="0.5" />
+      <line x1="78" y1="64" x2="57" y2="60" stroke="currentColor" strokeWidth="0.75" opacity="0.5" />
+
+      {/* Nightingale perched on the spine */}
+      <g transform="translate(50,18)">
+        <ellipse cx="0" cy="4" rx="8" ry="5" fill="currentColor" opacity="0.6" />
+        <circle cx="-7" cy="-1" r="3.5" fill="currentColor" opacity="0.6" />
+        <path d="M -10,-1 L -14,0 L -10,1.5 Z" fill="currentColor" opacity="0.6" />
+        <path d="M 7,5 L 16,1 L 16,8 Z" fill="currentColor" opacity="0.6" />
+        <path d="M -2,1 C 2,0 6,2 5,6 C 0,7 -3,5 -2,1 Z" fill="currentColor" opacity="0.3" />
+      </g>
+
+      {/* Song notes */}
+      <circle cx="34" cy="9" r="1.5" fill="currentColor" opacity="0.4" />
+      <circle cx="41" cy="4" r="1.2" fill="currentColor" opacity="0.35" />
+    </svg>
+  );
+
+  if (animated) {
+    return <GlowPulse>{svgContent}</GlowPulse>;
+  }
+
+  return svgContent;
+}
+
+/* ─── SaadiIcon ──────────────────────────────────────────────────────────── */
+// An open book topped by a rose blossom — referencing Saadi's "Golestān"
+// ("The Rose Garden").
+
+export function SaadiIcon({ size = 100, className = '', animated = false }: SymbolProps) {
+  const svgContent = (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-hidden="true"
+    >
+      {/* Open book */}
+      <path d="M 50,30 L 50,75 L 15,82 L 15,38 Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M 50,30 L 50,75 L 85,82 L 85,38 Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+
+      {/* Page lines */}
+      <line x1="22" y1="48" x2="43" y2="44" stroke="currentColor" strokeWidth="0.75" opacity="0.5" />
+      <line x1="22" y1="56" x2="43" y2="52" stroke="currentColor" strokeWidth="0.75" opacity="0.5" />
+      <line x1="22" y1="64" x2="43" y2="60" stroke="currentColor" strokeWidth="0.75" opacity="0.5" />
+      <line x1="78" y1="48" x2="57" y2="44" stroke="currentColor" strokeWidth="0.75" opacity="0.5" />
+      <line x1="78" y1="56" x2="57" y2="52" stroke="currentColor" strokeWidth="0.75" opacity="0.5" />
+      <line x1="78" y1="64" x2="57" y2="60" stroke="currentColor" strokeWidth="0.75" opacity="0.5" />
+
+      {/* Rose blossom above the spine */}
+      <g transform="translate(50,15)">
+        <circle cx="0" cy="0" r="3" fill="currentColor" opacity="0.6" />
+        <circle cx="-4" cy="-2" r="3" fill="currentColor" opacity="0.5" />
+        <circle cx="4" cy="-2" r="3" fill="currentColor" opacity="0.5" />
+        <circle cx="-3" cy="3" r="3" fill="currentColor" opacity="0.5" />
+        <circle cx="3" cy="3" r="3" fill="currentColor" opacity="0.5" />
+        {/* Stem and leaf */}
+        <line x1="0" y1="3" x2="0" y2="14" stroke="currentColor" strokeWidth="1" />
+        <path d="M 0,9 C 4,8 6,10 5,13 C 2,13 0,11 0,9 Z" fill="currentColor" opacity="0.4" />
+      </g>
+    </svg>
+  );
+
+  if (animated) {
+    return <GlowPulse>{svgContent}</GlowPulse>;
   }
 
   return svgContent;
