@@ -85,4 +85,11 @@ export const PERMISSION_META: Record<string, PermissionMeta> = {
       fa: 'دسترسی کامل مدیریتی: اعضا، گروه‌ها، دسترسی‌ها، تنظیمات، پرداخت‌ها و نظارت بر محتوا.',
     },
   },
+  can_manage_env_vars: {
+    label: { en: 'Can Manage Environment Variables', fa: 'مدیریت متغیرهای محیطی' },
+    description: {
+      en: 'View and edit deployment/runtime configuration (environment variables) and reset them to auto-detected defaults.',
+      fa: 'مشاهده و ویرایش تنظیمات محیطی/زمان‌اجرا (متغیرهای محیطی) و بازنشانی آن‌ها به مقادیر پیش‌فرض شناسایی‌شده.',
+    },
+  },
 };

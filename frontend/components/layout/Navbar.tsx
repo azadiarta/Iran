@@ -3,12 +3,13 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Menu, X, User, LogOut, ChevronDown } from 'lucide-react';
+import { Menu, X, User, LogOut, ChevronDown, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
 import useAuthStore from '@/store/authStore';
 import useLangStore from '@/store/langStore';
 import { authAPI } from '@/lib/api';
+import { ADMIN_PERMISSIONS } from '@/lib/adminNav';
 
 interface NavbarProps {
   locale: 'en' | 'fa';
@@ -24,7 +25,7 @@ export default function Navbar({ locale }: NavbarProps) {
   const t = useTranslations('nav');
   const pathname = usePathname();
   const router = useRouter();
-  const { member, isAuthenticated, logout } = useAuthStore();
+  const { member, isAuthenticated, logout, hasPermission } = useAuthStore();
   const { setLocale } = useLangStore();
 
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -53,7 +54,7 @@ export default function Navbar({ locale }: NavbarProps) {
     setMobileOpen(false);
   }, [pathname]);
 
-  const navLinks: NavLink[] = [
+  const allNavLinks: NavLink[] = [
     { key: 'home', href: '', label: t('home') },
     { key: 'posts', href: 'posts', label: t('posts') },
     { key: 'expenses', href: 'expenses', label: t('expenses') },
@@ -61,6 +62,18 @@ export default function Navbar({ locale }: NavbarProps) {
     { key: 'help', href: 'help', label: t('help') },
     { key: 'contact', href: 'contact', label: t('contact') },
   ];
+
+  // Deactivated members can only reach Home + Contact (see DeactivatedGuard).
+  const isDeactivated = mounted && member?.is_active === false;
+  const navLinks: NavLink[] = isDeactivated
+    ? allNavLinks.filter((l) => l.key === 'home' || l.key === 'contact')
+    : allNavLinks;
+
+  const canAccessAdmin =
+    mounted &&
+    !!member &&
+    !isDeactivated &&
+    (member.is_superuser || ADMIN_PERMISSIONS.some((p) => hasPermission(p)));
 
   // Active detection: strip locale prefix
   const pathSegments = pathname.split('/').filter(Boolean);
@@ -273,6 +286,22 @@ export default function Navbar({ locale }: NavbarProps) {
                           {member.display_name || member.full_name}
                         </p>
                       </div>
+                      {canAccessAdmin && (
+                        <Link
+                          href={`/${locale}/admin`}
+                          className="flex items-center gap-2 px-4 py-2.5 text-sm transition-colors duration-150"
+                          style={{ color: 'rgba(255,255,255,0.7)' }}
+                          onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.color = '#00ffff')}
+                          onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.7)')}
+                          onClick={() => setUserDropOpen(false)}
+                          dir={isRTL ? 'rtl' : 'ltr'}
+                        >
+                          <ShieldCheck size={14} />
+                          <span style={{ fontFamily: isRTL ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }}>
+                            {t('admin_panel')}
+                          </span>
+                        </Link>
+                      )}
                       <Link
                         href={`/${locale}/profile`}
                         className="flex items-center gap-2 px-4 py-2.5 text-sm transition-colors duration-150"
@@ -481,6 +510,20 @@ export default function Navbar({ locale }: NavbarProps) {
                         {member.display_name || member.full_name}
                       </span>
                     </div>
+                    {canAccessAdmin && (
+                      <Link
+                        href={`/${locale}/admin`}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors duration-150"
+                        style={{
+                          color: 'rgba(255,255,255,0.7)',
+                          fontFamily: isRTL ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif',
+                        }}
+                        onClick={() => setMobileOpen(false)}
+                      >
+                        <ShieldCheck size={14} />
+                        {t('admin_panel')}
+                      </Link>
+                    )}
                     <Link
                       href={`/${locale}/profile`}
                       className="flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors duration-150"

@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { Mail, Phone, Send, CheckCircle } from 'lucide-react';
 import { settingsAPI } from '@/lib/api';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
+import useAuthStore from '@/store/authStore';
 
 interface ContactInfo {
   email: string | null;
@@ -12,10 +13,16 @@ interface ContactInfo {
 
 export default function ContactPage() {
   const t = useTranslations('contact');
+  const tCommon = useTranslations('common');
+  const { member } = useAuthStore();
 
   const [contactInfo, setContactInfo] = useState<ContactInfo>({ email: null, phone: null });
   const [formData, setFormData] = useState({ name: '', contact: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -59,6 +66,21 @@ export default function ContactPage() {
     <div className="min-h-screen bg-[#0a0a0f] text-white flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-lg">
         <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-8">
+          {/* Deactivated account banner */}
+          {mounted && member?.is_active === false && (
+            <div
+              className="rounded-xl border p-4 mb-6 text-sm text-center space-y-1"
+              style={{
+                borderColor: 'rgba(245,158,11,0.3)',
+                backgroundColor: 'rgba(245,158,11,0.08)',
+                color: '#f59e0b',
+              }}
+            >
+              <p className="font-semibold">{tCommon('deactivated_title')}</p>
+              <p>{tCommon('deactivated_message')}</p>
+            </div>
+          )}
+
           {/* Icon + title */}
           <div className="flex flex-col items-center gap-4 mb-8">
             <div style={{ color: '#fbbf24', filter: 'drop-shadow(0 0 16px rgba(251,191,36,0.5))' }}>

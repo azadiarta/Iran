@@ -168,6 +168,26 @@ export default function LandingPage() {
   return (
     <div style={{ background: '#0a0a0f', minHeight: '100vh' }}>
 
+      {/* ─── Deactivated account banner ───────────────────────────────────── */}
+      {mounted && member?.is_active === false && (
+        <div className="px-4 pt-4 relative z-10">
+          <div
+            className="max-w-3xl mx-auto rounded-xl border p-4 text-sm text-center space-y-1"
+            style={{
+              borderColor: 'rgba(245,158,11,0.3)',
+              backgroundColor: 'rgba(245,158,11,0.08)',
+              color: '#f59e0b',
+            }}
+          >
+            <p className="font-semibold">{t('common.deactivated_title')}</p>
+            <p>{t('common.deactivated_message')}</p>
+            <Link href={`/${locale}/contact`} className="underline inline-block">
+              {t('common.deactivated_contact_link')}
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* ─── Hero Section ─────────────────────────────────────────────────── */}
       <section
         className="relative flex flex-col items-center justify-center overflow-hidden"

@@ -4,15 +4,8 @@ import { useParams, useRouter } from 'next/navigation';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
 import useAuthStore from '@/store/authStore';
+import { ADMIN_PERMISSIONS } from '@/lib/adminNav';
 import '@/styles/admin.css';
-
-const ADMIN_PERMISSIONS = [
-  'can_manage_permissions',
-  'can_post',
-  'can_expense',
-  'can_approve_comments',
-  'can_view_dashboard',
-];
 
 export default function AdminRootLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();

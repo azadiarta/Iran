@@ -2,23 +2,10 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  LayoutDashboard,
-  Users,
-  ShieldCheck,
-  HandCoins,
-  Receipt,
-  Newspaper,
-  MessageSquare,
-  Wallet,
-  Settings,
-  Database,
-  ScrollText,
-  Terminal,
-  X,
-} from 'lucide-react';
+import { X } from 'lucide-react';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
 import useAuthStore from '@/store/authStore';
+import { ADMIN_NAV_ITEMS, isNavItemVisible } from '@/lib/adminNav';
 
 interface AdminSidebarProps {
   locale: 'en' | 'fa';
@@ -26,17 +13,7 @@ interface AdminSidebarProps {
   mobileOpen: boolean;
   onMobileClose: () => void;
   pendingCommentCount?: number;
-}
-
-interface NavItem {
-  key: string;
-  href: string;
-  label: string;
-  icon: React.ElementType;
-  permission?: string;
-  badge?: number;
-  superuserOnly?: boolean;
-  divider?: boolean;
+  pendingContributionCount?: number;
 }
 
 export default function AdminSidebar({
@@ -45,32 +22,21 @@ export default function AdminSidebar({
   mobileOpen,
   onMobileClose,
   pendingCommentCount = 0,
+  pendingContributionCount = 0,
 }: AdminSidebarProps) {
   const pathname = usePathname();
   const { member, hasPermission } = useAuthStore();
   const isRTL = locale === 'fa';
   const isSuperuser = !!member?.is_superuser;
 
-  const items: NavItem[] = [
-    { key: 'dashboard', href: '', label: isRTL ? 'داشبورد' : 'Dashboard', icon: LayoutDashboard, permission: 'can_view_dashboard' },
-    { key: 'members', href: 'members', label: isRTL ? 'اعضا' : 'Members', icon: Users, permission: 'can_manage_permissions' },
-    { key: 'groups', href: 'groups', label: isRTL ? 'گروه‌ها' : 'Groups', icon: ShieldCheck, permission: 'can_manage_permissions' },
-    { key: 'contributions', href: 'contributions', label: isRTL ? 'مشارکت‌ها' : 'Contributions', icon: HandCoins, permission: 'can_view_balance' },
-    { key: 'expenses', href: 'expenses', label: isRTL ? 'هزینه‌ها' : 'Expenses', icon: Receipt, permission: 'can_view_balance' },
-    { key: 'posts', href: 'posts', label: isRTL ? 'پست‌ها' : 'Posts', icon: Newspaper, permission: 'can_post' },
-    { key: 'comments', href: 'comments', label: isRTL ? 'نظرات' : 'Comments', icon: MessageSquare, permission: 'can_approve_comments', badge: pendingCommentCount },
-    { key: 'payments', href: 'payments', label: isRTL ? 'تنظیمات پرداخت' : 'Payments', icon: Wallet, permission: 'can_manage_permissions' },
-    { key: 'settings', href: 'settings', label: isRTL ? 'تنظیمات' : 'Settings', icon: Settings, permission: 'can_manage_permissions' },
-    { key: 'system-status', href: 'system', label: isRTL ? 'وضعیت سیستم' : 'System Status', icon: Database, superuserOnly: true },
-    { key: 'activity-log', href: 'logs/activity', label: isRTL ? 'گزارش فعالیت' : 'Activity Log', icon: ScrollText, divider: true, permission: 'can_manage_permissions' },
-    { key: 'system-log', href: 'logs/system', label: isRTL ? 'گزارش سیستم' : 'System Log', icon: Terminal, superuserOnly: true },
-  ];
+  const items = ADMIN_NAV_ITEMS;
+  const badgeCounts = {
+    pendingCommentCount,
+    pendingContributionCount,
+  };
 
-  function isVisible(item: NavItem) {
-    if (isSuperuser) return true;
-    if (item.superuserOnly) return false;
-    if (item.permission) return hasPermission(item.permission);
-    return true;
+  function isVisible(item: (typeof ADMIN_NAV_ITEMS)[number]) {
+    return isNavItemVisible(item, { isSuperuser, hasPermission });
   }
 
   function isActive(href: string) {
@@ -87,6 +53,8 @@ export default function AdminSidebar({
       {items.filter(isVisible).map((item) => {
         const Icon = item.icon;
         const active = isActive(item.href);
+        const label = isRTL ? item.label.fa : item.label.en;
+        const badge = item.badgeKey ? badgeCounts[item.badgeKey] : 0;
         return (
           <div key={item.key}>
             {item.divider && (
@@ -100,11 +68,11 @@ export default function AdminSidebar({
                 color: active ? '#00ffff' : 'rgba(255,255,255,0.6)',
                 justifyContent: collapsed ? 'center' : 'flex-start',
               }}
-              title={collapsed ? item.label : undefined}
+              title={collapsed ? label : undefined}
             >
               <Icon className="w-[18px] h-[18px] flex-shrink-0" />
-              {!collapsed && <span className="truncate">{item.label}</span>}
-              {!!item.badge && item.badge > 0 && (
+              {!collapsed && <span className="truncate">{label}</span>}
+              {!!badge && badge > 0 && (
                 <span
                   className="flex-shrink-0 flex items-center justify-center text-[10px] font-bold rounded-full"
                   style={{
@@ -119,7 +87,7 @@ export default function AdminSidebar({
                     insetInlineEnd: collapsed ? 4 : undefined,
                   }}
                 >
-                  {item.badge > 99 ? '99+' : item.badge}
+                  {badge > 99 ? '99+' : badge}
                 </span>
               )}
             </Link>

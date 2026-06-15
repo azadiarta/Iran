@@ -8,7 +8,8 @@
     "contact": "تماس",
     "login": "ورود",
     "logout": "خروج",
-    "profile": "پروفایل"
+    "profile": "پروفایل",
+    "admin_panel": "پنل مدیریت"
   },
   "landing": {
     "headline": "صندوق گروهی",
@@ -267,6 +268,9 @@
     "next": "بعدی",
     "page_info": "صفحه {page} از {total}",
     "lightbox_hint": "برای بستن، خارج از تصویر کلیک کنید یا کلید Esc را بزنید",
-    "submitting": "در حال ارسال…"
+    "submitting": "در حال ارسال…",
+    "deactivated_title": "حساب غیرفعال شده",
+    "deactivated_message": "حساب شما توسط مدیر غیرفعال شده است. برای اطلاعات بیشتر با مدیران تماس بگیرید.",
+    "deactivated_contact_link": "تماس با ما"
   }
 }

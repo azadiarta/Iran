@@ -26,6 +26,7 @@ import { LionAndSun } from '@/components/animations/IranianSymbols';
 import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
 import { dashboardAPI, DashboardData } from '@/lib/api';
+import { ADMIN_NAV_ITEMS, isNavItemVisible } from '@/lib/adminNav';
 
 export default function AdminDashboardPage() {
   const params = useParams();
@@ -69,8 +70,13 @@ export default function AdminDashboardPage() {
 
   if (!canViewDashboard) {
     return (
-      <div className="admin-glass-card p-8 text-center text-white/50 text-sm">
-        {isRTL ? 'شما دسترسی مشاهده داشبورد را ندارید.' : 'You do not have permission to view the dashboard.'}
+      <div className="flex flex-col gap-4" dir={isRTL ? 'rtl' : 'ltr'}>
+        <div className="admin-glass-card p-6 text-center text-white/50 text-sm">
+          {isRTL
+            ? 'شما دسترسی مشاهده داشبورد را ندارید. بخش‌های قابل دسترس شما در زیر آمده است.'
+            : 'You do not have permission to view the dashboard. Your accessible sections are listed below.'}
+        </div>
+        <AccessSummaryCard locale={locale} isRTL={isRTL} />
       </div>
     );
   }
@@ -107,6 +113,8 @@ export default function AdminDashboardPage() {
           {isRTL ? `خوش آمدید، ${member?.display_name || member?.full_name}` : `Welcome back, ${member?.display_name || member?.full_name}`}
         </p>
       </div>
+
+      {!member?.is_superuser && <AccessSummaryCard locale={locale} isRTL={isRTL} />}
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -230,6 +238,45 @@ export default function AdminDashboardPage() {
           </RecentCard>
         )}
       </div>
+    </div>
+  );
+}
+
+function AccessSummaryCard({ locale, isRTL }: { locale: 'en' | 'fa'; isRTL: boolean }) {
+  const { member, hasPermission } = useAuthStore();
+  const isSuperuser = !!member?.is_superuser;
+  const items = ADMIN_NAV_ITEMS.filter((item) => isNavItemVisible(item, { isSuperuser, hasPermission }));
+
+  return (
+    <div className="admin-glass-card p-5">
+      <h2 className="text-sm font-semibold text-white/80 mb-3">
+        {isRTL ? 'دسترسی‌های شما' : 'Your Access'}
+      </h2>
+      {items.length === 0 ? (
+        <p className="text-sm text-white/30 py-6 text-center">
+          {isRTL ? 'بخشی برای نمایش وجود ندارد.' : 'No sections available.'}
+        </p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {items.map((item) => {
+            const Icon = item.icon;
+            const label = isRTL ? item.label.fa : item.label.en;
+            return (
+              <Link
+                key={item.key}
+                href={`/${locale}/admin${item.href ? `/${item.href}` : ''}`}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors duration-150"
+                style={{ color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.08)' }}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.color = '#00ffff')}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.7)')}
+              >
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                <span>{label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

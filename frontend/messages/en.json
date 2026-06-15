@@ -8,7 +8,8 @@
     "contact": "Contact",
     "login": "Login",
     "logout": "Logout",
-    "profile": "Profile"
+    "profile": "Profile",
+    "admin_panel": "Admin Panel"
   },
   "landing": {
     "headline": "Group Fund",
@@ -267,6 +268,9 @@
     "next": "Next",
     "page_info": "Page {page} of {total}",
     "lightbox_hint": "Click outside or press Esc to close",
-    "submitting": "Submitting…"
+    "submitting": "Submitting…",
+    "deactivated_title": "Account Deactivated",
+    "deactivated_message": "Your account has been deactivated by an admin. Please contact the admins for more information.",
+    "deactivated_contact_link": "Contact Us"
   }
 }
