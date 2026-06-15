@@ -198,7 +198,7 @@ class AccessGroupSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'is_default', 'created_at']
 
     def get_member_count(self, obj):
-        return obj.members.count()
+        return obj.members.filter(is_superuser=False).count()
 
 
 class AccessGroupCreateSerializer(serializers.ModelSerializer):
