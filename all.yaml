@@ -13,7 +13,7 @@ rules:
   after_build: update exports + update imports with status
 
 progress:
-  current_phase: 16
+  current_phase: 17
   current_task: "complete (except phase 10 — deferred per project decision)"
   phases:
     1:
@@ -79,6 +79,10 @@ progress:
       name: "Lion-and-Sun / Faravahar / Iranian-heritage visual redesign"
       status: done
       done: ["Replaced the emoji-based CulturalEmblem/LionAndSun with image-based components rendering Public Domain SVG assets in NEW frontend/public/symbols/: lion-and-sun.svg (Wikimedia Commons 'Lion and Sun.svg' — Iran's official historical Lion-and-Sun emblem) and faravahar.svg (Wikimedia Commons 'Faravahar-Gold.svg'). LionAndSun/FaravaharSimple keep their exact {size?, className?, animated?} SymbolProps signature (zero changes needed across all 17 LionAndSun consumers); LionAndSun wraps its non-square <img> in a size×size flex-centered div to preserve the square bounding-box contract.", "Added a shared internal GlowPulse({children}) helper in IranianSymbols.tsx (2s drop-shadow pulse, factored out of the previous per-component duplication), reused by LionAndSun/FaravaharSimple/the 5 new heritage icons' `animated` variant.", "REMOVED CulturalEmblem (emoji-in-medallion component, dead code) AND the landing page's dedicated 'Iranian Heritage' grid section (heading + 5-card grid). REMOVED the `heritage` i18n namespace from messages/en.json AND messages/fa.json (12 leaf keys each, 264→252 total, parity verified via python3 json diff).", "Added 5 NEW hand-drawn currentColor inline-SVG icon exports to IranianSymbols.tsx (viewBox 0 0 100 100, SymbolProps): PersepolisIcon, PasargadaeIcon, NaqsheRostamIcon, HafezIcon, SaadiIcon. Woven into frontend/app/[locale]/page.tsx as small/large low-opacity (0.06-0.07) absolutely-positioned background decorations in the Hero, Stats Bar, Recent Posts, How It Works, and CTA sections (pointer-events-none, hidden on small/medium breakpoints, logical start/end classes for RTL) — per the project requirement that these decorate without becoming a page focal point.", "Verified via `npm run build` (lint+typecheck pass, no warnings/errors) and Playwright full-page screenshots of localhost:3000 /en and /fa (Lion-and-Sun emblem renders correctly at navbar/hero/footer sizes, all 5 heritage icons render as subtle corner decorations, RTL logical start/end positioning confirmed correct in /fa)."]
+    17:
+      name: "env-vars panel removal, hamburger language-switcher order, admin-access baseline-permission rule, first-load hydration fix, deactivated-member quick-logout fix + reason/admin display"
+      status: done
+      done: ["item a — completely removed the Phase 15 env-vars admin panel: deleted backend/core/runtime_config.py, backend/core/middleware.py (RuntimeConfigMiddleware, also removed from settings.py MIDDLEWARE), backend/core/env_vars_views.py, backend/core/env_vars_urls.py (and its `path('api/env-vars/', ...)` include in groupfund/urls.py), the EnvVarOverride model (+ its admin.py registration) and the AUTO_DETECTED_DEFAULTS settings.py snapshot; NEW migration backend/core/migrations/0004_remove_envvaroverride.py drops the EnvVarOverride table AND deletes the can_manage_env_vars Permission row (now 11 seeded permissions again). Frontend: deleted frontend/lib/envVarsMeta.ts, frontend/app/[locale]/admin/env-vars/page.tsx, the envVarsAPI/EnvVar* types from lib/api.ts, the can_manage_env_vars entry in lib/permissionsMeta.ts, the env-vars entry in adminNav.ts's ADMIN_NAV_ITEMS (and its Server icon import), and the help.sections env_vars entry + its 2 i18n keys in messages/en.json and fa.json.", "item b — hamburger drawer language-switcher reordered: in frontend/components/layout/Navbar.tsx's mobile drawer, the language-switcher button is now rendered LAST (after the admin-panel-entry/profile/login block), instead of at the top of the post-divider section, so it is always the final item in the menu on every page.", "items c/e/f — default-group baseline permissions now drive admin-panel access: NEW backend/accounts/models.py constant BASELINE_GROUP_PERMISSIONS = ['can_contribute','can_comment','can_view_balance','can_view_posts'] is the single source of truth, used by seed_initial_data.py (DEFAULT_GROUP_PERMISSIONS = BASELINE_GROUP_PERMISSIONS, was ['can_contribute','can_comment'] — the seeded default 'Members' group and any group created with no explicit permissions now get all 4 baseline permissions) and by accounts/serializers.py AccessGroupCreateSerializer (defaults permission_ids to BASELINE_GROUP_PERMISSIONS only when none are submitted — no forced additions on top of an explicit selection) and AccessGroupUpdateSerializer (now sets exactly the submitted permission set with no forced union, so an admin CAN manually disable any of the 4 baseline permissions for a given group — item f). Admin-panel access is now gated by a NEW frontend/lib/adminNav.ts export `hasAdminAccess({isSuperuser, groupPermissions})` (replaces the old ADMIN_PERMISSIONS export, also exporting BASELINE_PERMISSIONS = the same 4 codenames): superusers always pass; everyone else passes only if their group has at least one permission OUTSIDE the 4-item BASELINE_PERMISSIONS set — a member whose group grants ONLY some/all of those 4 'default plan' permissions is denied admin-panel access (admin/layout.tsx redirects to /forbidden) and the 'Admin Panel' entry is hidden from Navbar.tsx entirely (items c/e). admin/groups/page.tsx's create-group modal now seeds its permission checkboxes from BASELINE_PERMISSIONS instead of a hardcoded ['can_contribute','can_comment'].", "item d — fixed garbled/broken first-load text: frontend/app/layout.tsx (a redundant second root layout that ALSO rendered <html>/<body>, nesting inside frontend/app/[locale]/layout.tsx's own <html>/<body> and causing a hydration mismatch that briefly rendered broken/unstyled text on first paint) was DELETED entirely; frontend/app/[locale]/layout.tsx is now the SOLE root layout and gained the `metadata` export ({title:'Group Fund', description:'Transparent community fund management'}) and the `@/styles/globals.css` import that the deleted file used to provide.", "item g — fixed quick-logout for deactivated members + dedicated deactivated experience: backend/groupfund/settings.py SIMPLE_JWT gained CHECK_USER_IS_ACTIVE: False, so a deactivated member's existing JWT access token is no longer rejected by simplejwt's own authentication layer on every request (previously this caused an immediate logout loop right after login, even though accounts/backends.py already allowed a deactivated member's credentials to authenticate) — DRF permission classes (IsActiveMember/HasGroupPermission/IsSuperuser) are UNCHANGED and still require is_active=True, so the Phase 15 DeactivatedGuard + Navbar's home/contact-only nav for deactivated members continue to fully apply (deactivated members can reach only '/{locale}' and '/{locale}/contact'). NEW Member fields deactivation_reason (TextField, blank) and deactivated_by (FK to self, SET_NULL, related_name='+'), via migration 0004_member_deactivated_by_member_deactivation_reason; MemberToggleActiveView now records/clears both fields (and logs the reason in extra_data) on deactivate/reactivate; MemberProfileSerializer and MemberDetailSerializer expose deactivation_reason + a computed deactivated_by_name (display_name||full_name of the deactivating admin). The landing page's existing deactivation banner now also shows the admin-supplied reason (new common.deactivated_reason_label) and the deactivating admin's name (new common.deactivated_by_label) when present — 2 new i18n keys in messages/en.json and fa.json. admin/members/[id]/page.tsx's deactivate-confirmation AdminConfirmDialog gained a children slot containing an AdminTextarea for the reason (shown only when about to deactivate), and a new amber 'Danger Zone' info block on already-deactivated members' detail pages displays the stored reason and deactivating admin's name."]
 
 roadmap:
   # Task-oriented navigation index. When the user asks for a change, find the
@@ -155,7 +159,7 @@ roadmap:
       - "frontend/lib/adminNav.ts"
     typical_files:
       - "frontend/app/[locale]/admin/<new>/page.tsx"            # new page
-      - "frontend/lib/adminNav.ts"                               # ADMIN_NAV_ITEMS entry — single source of truth for AdminSidebar's nav link, admin/page.tsx's AccessSummaryCard, AND (via exported ADMIN_PERMISSIONS) admin/layout.tsx's route guard
+      - "frontend/lib/adminNav.ts"                               # ADMIN_NAV_ITEMS entry — single source of truth for AdminSidebar's nav link and admin/page.tsx's AccessSummaryCard; admin/layout.tsx's route guard uses hasAdminAccess()/BASELINE_PERMISSIONS (Phase 17), not ADMIN_NAV_ITEMS directly
       - "frontend/lib/api.ts"                                     # new API namespace + TS types, if a new backend endpoint is needed
       - "backend/<app>/views.py + backend/<app>/urls.py + backend/groupfund/urls.py"  # new backend endpoint, if needed
       - "frontend/app/[locale]/help/page.tsx"                     # add the new page to the permission->help-section mapping (help.sections), if relevant
@@ -169,7 +173,7 @@ roadmap:
       - "7. Admin panel pages do NOT use messages/*.json — all copy is inline isRTL ternaries (see i18n.admin_panel_i18n_policy)."
     gotchas:
       - "Every admin page renders inside AdminLayout.tsx (mounted by the admin/layout.tsx route guard) — AdminToastContainer is already mounted there, so useToastStore().show(...) just works; do not re-mount AdminToastContainer on the new page."
-      - "admin/layout.tsx's route guard imports ADMIN_PERMISSIONS from frontend/lib/adminNav.ts — a deduplicated union of every `permission` value (string or string[]) across ALL non-superuserOnly ADMIN_NAV_ITEMS entries (is_superuser bypasses this check entirely). A brand-new permission codename is AUTOMATICALLY added to this guard as soon as it's referenced by an ADMIN_NAV_ITEMS entry (step 5) — there is no separate admin/layout.tsx edit to remember."
+      - "admin/layout.tsx's route guard calls hasAdminAccess({isSuperuser, groupPermissions}) from frontend/lib/adminNav.ts (Phase 17, items c/e/f) — a member passes if isSuperuser OR their group has at least one permission codename NOT in BASELINE_PERMISSIONS (the 4 'default plan' codenames: can_comment/can_contribute/can_view_balance/can_view_posts). A brand-new permission codename referenced by a new ADMIN_NAV_ITEMS entry is AUTOMATICALLY 'outside BASELINE_PERMISSIONS' (unless you add it to BASELINE_PERMISSIONS too), so it grants admin access on its own — no separate admin/layout.tsx edit needed."
       - "AdminTable has no shared column-definition file — column.render functions are defined inline per-page (7 existing AdminTable-based pages each define their own columns); copying a similar page's columns is the fastest path."
     see_also: ["change_admin_component_library", "change_permissions_access_groups", "change_db_model_field", "shared_components.admin_component_library", "shared_components.adminNav"]
 
@@ -259,24 +263,24 @@ roadmap:
     typical_files:
       - "backend/accounts/permissions.py"   # HasGroupPermission, IsSuperuser, IsActiveMember permission classes
       - "backend/core/utils.py"             # get_default_group_id
-      - "backend/core/management/commands/seed_initial_data.py"  # Permission/AccessGroup/DefaultSetting seed rows — the ONLY place new permission codenames get created in the DB (12 codenames as of Phase 15 — see files['frontend/lib/permissionsMeta.ts'] for the bilingual list)
+      - "backend/core/management/commands/seed_initial_data.py"  # Permission/AccessGroup/DefaultSetting seed rows — the ONLY place new permission codenames get created in the DB (11 codenames as of Phase 17 — can_manage_env_vars removed; see files['frontend/lib/permissionsMeta.ts'] for the bilingual list)
       - "backend/accounts/models.py"        # AccessGroup model, Member.group FK
       - "backend/<app>/views.py"            # permission_classes=[HasGroupPermission('<codename>')] on each view
       - "frontend/store/authStore.ts"       # hasPermission(codename) — public_interface
       - "frontend/components/admin/fields/AdminPermissionCheckbox.tsx"  # permission grid UI; hardcoded always-on entries can_contribute/can_comment
       - "frontend/app/[locale]/admin/groups/page.tsx"  # group CRUD + permission grid
-      - "frontend/lib/adminNav.ts"          # ADMIN_NAV_ITEMS[].permission per nav item — single source for BOTH AdminSidebar's per-item gating AND admin/layout.tsx's ADMIN_PERMISSIONS route guard (Phase 15 refactor, items B/C/L)
+      - "frontend/lib/adminNav.ts"          # ADMIN_NAV_ITEMS[].permission drives AdminSidebar's per-item gating; admin/layout.tsx's route guard uses hasAdminAccess()/BASELINE_PERMISSIONS instead (Phase 17, items c/e — was ADMIN_PERMISSIONS in Phase 15, items B/C/L)
       - "frontend/app/[locale]/help/page.tsx"          # permission -> help-section mapping, kept in parity with adminNav.ts's gating
     order_of_operations:
       - "1. Add the new permission codename to backend/core/management/commands/seed_initial_data.py (Permission row) — this is the ONLY seeding path; a codename not seeded here does not exist in the DB on fresh installs."
       - "2. Apply the permission to relevant backend/<app>/views.py via HasGroupPermission('<codename>') in permission_classes."
-      - "3. If the codename should be assignable via the admin UI: AdminPermissionCheckbox.tsx's PermissionOption list is populated dynamically from permissionsAPI.getList() (backend/core/views.py PermissionListView) — no frontend hardcoding needed UNLESS it's one of the 'always-on locked' entries (can_contribute/can_comment), which ARE hardcoded in AdminPermissionCheckbox.tsx."
+      - "3. If the codename should be assignable via the admin UI: AdminPermissionCheckbox.tsx's PermissionOption list is populated dynamically from permissionsAPI.getList() (backend/core/views.py PermissionListView) — no frontend hardcoding needed UNLESS it's one of the 'always-on locked' entries (can_contribute/can_comment), which ARE hardcoded via AdminPermissionCheckbox.tsx's `alwaysOn` prop default."
       - "4. Add frontend gating via useAuthStore().hasPermission('<codename>') (see shared_components.useAuthStore for the ~23 files already doing this — follow the same `member.is_superuser` bypass pattern used everywhere)."
-      - "5. If the new permission should let a member into the admin panel at all AND/OR unlock a specific nav item, set/extend that item's `permission` field (string, or string[] meaning 'any of these is sufficient') on the relevant entry in ADMIN_NAV_ITEMS (frontend/lib/adminNav.ts). admin/layout.tsx's ADMIN_PERMISSIONS route guard is a deduplicated union DERIVED from ADMIN_NAV_ITEMS — no separate edit to admin/layout.tsx or AdminSidebar.tsx is needed."
+      - "5. If the new permission should let a member into the admin panel at all AND/OR unlock a specific nav item, set/extend that item's `permission` field (string, or string[] meaning 'any of these is sufficient') on the relevant entry in ADMIN_NAV_ITEMS (frontend/lib/adminNav.ts). Separately (Phase 17), admin/layout.tsx/Navbar.tsx's hasAdminAccess() check is driven by BASELINE_PERMISSIONS, NOT by ADMIN_NAV_ITEMS — a brand-new permission codename outside BASELINE_PERMISSIONS automatically grants admin-panel access to any group that has it, with no separate edit needed."
       - "6. Add the new permission to help/page.tsx's help.sections mapping (kept in parity with adminNav.ts's gating per existing convention)."
     gotchas:
       - "is_superuser ALWAYS bypasses hasPermission checks on both frontend AND backend (IsSuperuser permission class) — every gated page/view has a parallel `member.is_superuser` OR-condition; forgetting it means superusers could lose access to a feature they should always have."
-      - "AdminPermissionCheckbox.tsx hardcodes can_contribute/can_comment as 'always included regardless of what's checked' — these 2 codenames are baseline member permissions, not admin-assignable; do not add them to the dynamic grid."
+      - "AdminPermissionCheckbox.tsx hardcodes can_contribute/can_comment as 'always included regardless of what's checked' via its `alwaysOn` prop default — these 2 codenames are 2 of the 4 BASELINE_GROUP_PERMISSIONS; do not add them to the dynamic grid. NOTE (Phase 17): the backend no longer force-includes these 2 either, but this UI-side lock was left in place — see frontend/components/admin/fields/AdminPermissionCheckbox.tsx's note."
       - "seed_initial_data is idempotent (get_or_create) but only runs on fresh/explicit invocation — renaming a codename does NOT rename it in already-deployed DBs; requires a migration or manual data-fix."
     see_also: ["add_admin_page_or_feature", "shared_components.useAuthStore", "shared_components.admin_component_library", "shared_components.adminNav"]
 
@@ -435,11 +439,10 @@ shared_components:
           - {file: "frontend/app/[locale]/admin/payments/page.tsx", context: "page header icon"}
           - {file: "frontend/app/[locale]/admin/settings/page.tsx", context: "page header icon"}
           - {file: "frontend/app/[locale]/admin/groups/page.tsx", context: "page header icon"}
-          - {file: "frontend/app/[locale]/admin/env-vars/page.tsx", context: "loading-state centerpiece (size=48, animated) — Phase 15"}
           - {file: "frontend/app/[locale]/admin/system/page.tsx", context: "loading-state centerpiece (size=48, animated) — Phase 13"}
           - {file: "frontend/components/animations/SplashScreen.tsx", context: "splash centerpiece, size=140, glow-pulse"}
           - {file: "frontend/components/animations/PageTransition.tsx", context: "transition overlay spinner, size=40 — NOTE: PageTransition itself is UNUSED (zero importers, orphaned), see its files entry"}
-        note: "Renders <img src=\"/symbols/lion-and-sun.svg\"> (Public Domain — Wikimedia Commons 'Lion and Sun.svg', the official historical Iranian Lion-and-Sun emblem) inside a size×size flex-centered <div> (LION_AND_SUN_RATIO ~1.385 preserves the source's non-square aspect ratio within the square bounding box every consumer expects). `animated` wraps the result in the shared internal GlowPulse helper. 20 consumers total (all 20 listed above; count includes SplashScreen + PageTransition)."
+        note: "Renders <img src=\"/symbols/lion-and-sun.svg\"> (Public Domain — Wikimedia Commons 'Lion and Sun.svg', the official historical Iranian Lion-and-Sun emblem) inside a size×size flex-centered <div> (LION_AND_SUN_RATIO ~1.385 preserves the source's non-square aspect ratio within the square bounding box every consumer expects). `animated` wraps the result in the shared internal GlowPulse helper. 19 consumers total (all 19 listed above; count includes SplashScreen + PageTransition; Phase 17 removed the admin/env-vars/page.tsx consumer along with the whole page)."
       FaravaharSimple:
         signature: "{ size?: number; className?: string; animated?: boolean }"
         needed_by:
@@ -507,11 +510,10 @@ shared_components:
       - {file: "frontend/app/[locale]/admin/settings/page.tsx", uses: ["member.is_superuser"]}
       - {file: "frontend/app/[locale]/admin/logs/activity/page.tsx", uses: ["hasPermission('can_manage_permissions')", "member.is_superuser"]}
       - {file: "frontend/app/[locale]/admin/logs/system/page.tsx", uses: ["member.is_superuser"]}
-      - {file: "frontend/app/[locale]/admin/env-vars/page.tsx", uses: [hasPermission], context: "Phase 15 (item A) — gates the whole /admin/env-vars page on can_manage_env_vars (also enforced server-side)"}
       - {file: "frontend/components/layout/DeactivatedGuard.tsx", uses: [member], context: "Phase 15 (item V) — if member.is_active === false and the current route isn't '/' or '/contact', router.replace('/${locale}')"}
       - {file: "frontend/components/common/BalanceIndicator.tsx", uses: [hasPermission], context: "Phase 15 (item Y) — gates on can_view_balance"}
       - {file: "frontend/app/[locale]/contact/page.tsx", uses: [member], context: "Phase 15 (item V) — shows the deactivated-account banner when member?.is_active === false"}
-    note: "27 distinct external consumer files (the store's own definition file is not counted; Phase 14: 23, Phase 15 +4)."
+    note: "26 distinct external consumer files (the store's own definition file is not counted; Phase 14: 23, Phase 15 +4, Phase 17 -1 for the removed admin/env-vars/page.tsx)."
 
   useLangStore:
     file: "frontend/store/langStore.ts"
@@ -541,28 +543,30 @@ shared_components:
       - {file: "frontend/app/[locale]/admin/settings/page.tsx", uses: [show], context: "settingsAPI.getAll() failure + each per-field settingsAPI.update() success+error"}
       - {file: "frontend/app/[locale]/admin/logs/activity/page.tsx", uses: [show], context: "logsAPI.getActivity() failure only (read-only page)"}
       - {file: "frontend/app/[locale]/admin/logs/system/page.tsx", uses: [show], context: "logsAPI.getSystem() failure only (read-only page)"}
-      - {file: "frontend/app/[locale]/admin/env-vars/page.tsx", uses: [show], context: "Phase 15 (item A) — bilingual success/error toasts on save/add/remove/reset/reset-section/reset-all/regenerate"}
-    note: "AdminToastContainer must be mounted (it is, via AdminLayout.tsx) for show() calls anywhere to be visible — if a new admin page is added and calls show() but AdminLayout isn't its ancestor, toasts silently don't render. 14 total consumers (13 admin pages + the container)."
+    note: "AdminToastContainer must be mounted (it is, via AdminLayout.tsx) for show() calls anywhere to be visible — if a new admin page is added and calls show() but AdminLayout isn't its ancestor, toasts silently don't render. 13 total consumers (12 admin pages + the container; Phase 17 removed the admin/env-vars/page.tsx consumer)."
 
   adminNav:
     file: "frontend/lib/adminNav.ts"
     status: done
-    note: "NEW (Phase 15, items B/C/L) — single source of truth for the admin sidebar, extracted from AdminSidebar.tsx's previously-inline ADMIN_NAV array. Adding a new admin page/permission now requires editing ONLY this file (plus admin/layout.tsx's redirect uses ADMIN_PERMISSIONS automatically)."
+    note: "NEW (Phase 15, items B/C/L) — single source of truth for the admin sidebar, extracted from AdminSidebar.tsx's previously-inline ADMIN_NAV array. Adding a new admin page/permission now requires editing ONLY this file (plus admin/layout.tsx's redirect, via hasAdminAccess). Phase 17 (items c/e/f) replaced the old ADMIN_PERMISSIONS export with BASELINE_PERMISSIONS + hasAdminAccess() to implement the new 'default plan' admin-access rule — see below."
     exports:
       ADMIN_NAV_ITEMS:
         type: "Array<{ key: string; href: string; icon: LucideIcon; permission?: string | string[]; superuserOnly?: boolean; badgeKey?: string; label: {en, fa} }>"
-        note: "permission as an array means 'any of these is sufficient' (used for the 'expenses' item: ['can_view_balance','can_expense'] — fixes item C, where a member with ONLY can_expense saw an empty admin panel because the old single-permission check required can_view_balance). 'contributions' item has badgeKey:'pendingContributionCount' (item L). New 'env-vars' item (icon: Server, permission: 'can_manage_env_vars', item A)."
-      ADMIN_PERMISSIONS:
+        note: "permission as an array means 'any of these is sufficient' (used for the 'expenses' item: ['can_view_balance','can_expense'] — fixes item C, where a member with ONLY can_expense saw an empty admin panel because the old single-permission check required can_view_balance). 'contributions' item has badgeKey:'pendingContributionCount' (item L). Now 12 items (Phase 15 added a 13th, 'env-vars'; Phase 17 item a removed it again, along with its now-unused `Server` lucide-react icon import)."
+      BASELINE_PERMISSIONS:
         type: "string[]"
-        note: "deduplicated union of every permission referenced in ADMIN_NAV_ITEMS (flattening string|string[]) plus implicit superuser bypass. Used by admin/layout.tsx's route-guard (replacing its old hardcoded list) AND by Navbar.tsx to decide whether to show the 'Admin Panel' entry button (item B: member.is_superuser || ADMIN_PERMISSIONS.some(hasPermission))."
+        note: "NEW (Phase 17, items c/e/f) — REPLACES the old ADMIN_PERMISSIONS export. The 4 'default plan' permission codenames: ['can_comment','can_contribute','can_view_balance','can_view_posts'] — mirrors backend/accounts/models.py's BASELINE_GROUP_PERMISSIONS (duplicated deliberately across the FE/BE boundary; adminNav.ts has no backend import path). Every AccessGroup is seeded/created with exactly these 4 by default (see backend/accounts/models.py and accounts/serializers.py entries) — admin/groups/page.tsx's create-group modal also seeds its checkbox selection from this array."
+      hasAdminAccess:
+        signature: "(opts: { isSuperuser: boolean; groupPermissions?: string[] | null }) => boolean"
+        note: "NEW (Phase 17, items c/e/f) — REPLACES the old `member.is_superuser || ADMIN_PERMISSIONS.some(hasPermission)` check. Returns true if isSuperuser, OR groupPermissions contains at least one codename OUTSIDE BASELINE_PERMISSIONS (i.e. any permission beyond the 4 'default plan' ones grants admin-panel access). A member whose group grants ONLY some/all of the 4 baseline permissions is a 'default plan' member and returns false — admin/layout.tsx redirects such members to /forbidden, and Navbar.tsx hides the 'Admin Panel' entry for them entirely."
       isNavItemVisible:
         signature: "(item, { isSuperuser, hasPermission }) => boolean"
         note: "true if isSuperuser, OR item has no permission requirement, OR (permission is a string and hasPermission(permission)), OR (permission is string[] and hasPermission(any))."
     needed_by:
       - {file: "frontend/components/layout/AdminSidebar.tsx", context: "renders ADMIN_NAV_ITEMS, filtered via isNavItemVisible; badge rendering for badgeKey:'pendingCommentCount'/'pendingContributionCount'"}
-      - {file: "frontend/app/[locale]/admin/layout.tsx", context: "route-guard: redirects to /forbidden unless member.is_superuser || ADMIN_PERMISSIONS.some(hasPermission)"}
+      - {file: "frontend/app/[locale]/admin/layout.tsx", context: "route-guard: redirects to /forbidden unless hasAdminAccess({isSuperuser: member.is_superuser, groupPermissions: member.group_permissions}) (Phase 17, items c/e)"}
       - {file: "frontend/app/[locale]/admin/page.tsx", context: "Phase 15 (item C) — new AccessSummaryCard renders the subset of ADMIN_NAV_ITEMS visible to the current (non-superuser) member, as a quick-links list; shown both to members with can_view_dashboard (above the full dashboard) and to members without it (replacing the old empty-state message)"}
-      - {file: "frontend/components/layout/Navbar.tsx", context: "item B — 'Admin Panel' entry button (desktop + mobile drawer), shown when member.is_superuser || ADMIN_PERMISSIONS.some(hasPermission)"}
+      - {file: "frontend/components/layout/Navbar.tsx", context: "item B/c/e — 'Admin Panel' entry button (desktop + mobile drawer), shown when hasAdminAccess({isSuperuser: member.is_superuser, groupPermissions: member.group_permissions}) (Phase 17 replaced the old ADMIN_PERMISSIONS.some(hasPermission) check)"}
 
   ImageLightbox:
     file: "frontend/components/common/ImageLightbox.tsx"
@@ -721,7 +725,7 @@ i18n:
     nav:
       keys: [home, posts, expenses, contribute, help, contact, login, logout, profile, contributions, admin_panel]
       used_by:
-        - {file: "frontend/components/layout/Navbar.tsx", via: "useTranslations('nav') — Phase 15: contributions (link to new public donors page) + admin_panel (Admin Panel entry button, shown when member.is_superuser || ADMIN_PERMISSIONS.some(hasPermission), gated via frontend/lib/adminNav.ts)"}
+        - {file: "frontend/components/layout/Navbar.tsx", via: "useTranslations('nav') — Phase 15: contributions (link to new public donors page) + admin_panel (Admin Panel entry button, shown when hasAdminAccess({isSuperuser, groupPermissions}) && !isDeactivated — Phase 17, gated via frontend/lib/adminNav.ts)"}
         - {file: "frontend/components/layout/Footer.tsx", via: "useTranslations('nav') (aliased tNav — footer reuses nav labels for its quick-link column)"}
       note: "AdminSidebar.tsx does NOT use this namespace (verified — no useTranslations call in that file at all); admin nav labels are inline isRTL strings, see admin_panel_i18n_policy."
     landing:
@@ -766,10 +770,10 @@ i18n:
       used_by:
         - {file: "frontend/app/[locale]/contact/page.tsx", via: "useTranslations('contact')"}
     help:
-      keys: [title, subtitle, guest_heading, member_heading, admin_heading, guest_note, member_note, admin_note, "sections.<home|posts|expenses|contribute|contact|auth|comment|profile|logout|dashboard|members|groups|balance|manage_posts|manage_comments|payments|settings|activity_log|system_log|contributions_public|my_contributions|env_vars>"]
+      keys: [title, subtitle, guest_heading, member_heading, admin_heading, guest_note, member_note, admin_note, "sections.<home|posts|expenses|contribute|contact|auth|comment|profile|logout|dashboard|members|groups|balance|manage_posts|manage_comments|payments|settings|activity_log|system_log|contributions_public|my_contributions>"]
       used_by:
         - {file: "frontend/app/[locale]/help/page.tsx", via: "useTranslations('help')"}
-      note: "help.sections is a NESTED object with 22 keys (Phase 14: 19; Phase 15 +3: contributions_public — group:guest, no permission gate; my_contributions — group:member, IsAuthenticated; env_vars — group:admin, permission can_manage_env_vars), one per guest/member/admin section heading — the set of sections actually RENDERED is filtered at runtime by useAuthStore permission checks (can_view_dashboard/can_manage_permissions/can_view_balance/can_post/can_approve_comments/can_manage_env_vars/is_superuser), mirroring AdminSidebar's gating."
+      note: "help.sections is a NESTED object with 21 keys (Phase 14: 19; Phase 15 +3: contributions_public — group:guest, no permission gate; my_contributions — group:member, IsAuthenticated; env_vars — group:admin, permission can_manage_env_vars; Phase 17 item a removed env_vars again, back to 21), one per guest/member/admin section heading — the set of sections actually RENDERED is filtered at runtime by useAuthStore permission checks (can_view_dashboard/can_manage_permissions/can_view_balance/can_post/can_approve_comments/is_superuser), mirroring AdminSidebar's gating."
     errors:
       keys: [not_found_title, not_found_msg, forbidden_title, forbidden_msg, unavailable_title, unavailable_msg, back_home]
       used_by:
@@ -781,15 +785,15 @@ i18n:
       used_by:
         - {file: "frontend/components/layout/Footer.tsx", via: "useTranslations('footer')"}
     common:
-      keys: [loading, error, retry, close, prev, next, page_info, lightbox_hint, submitting, deactivated_title, deactivated_message, deactivated_contact_link]
+      keys: [loading, error, retry, close, prev, next, page_info, lightbox_hint, submitting, deactivated_title, deactivated_message, deactivated_reason_label, deactivated_by_label, deactivated_contact_link]
       used_by:
         - {file: "frontend/app/[locale]/posts/page.tsx", via: "useTranslations('common') (aliased tc) — prev/next/page_info for pagination controls"}
         - {file: "frontend/app/[locale]/posts/[id]/page.tsx", via: "useTranslations('common') (aliased tc) — lightbox_hint (ImageLightbox), submitting (comment-submit button)"}
         - {file: "frontend/app/[locale]/expenses/page.tsx", via: "useTranslations('common') (aliased tc) — lightbox_hint (ImageLightbox receipt modal)"}
         - {file: "frontend/app/[locale]/expenses/[id]/page.tsx", via: "useTranslations('common') (aliased tc) — lightbox_hint (ImageLightbox), submitting (comment-submit button)"}
-        - {file: "frontend/app/[locale]/page.tsx", via: "useTranslations() root translator — Phase 15 (item V): deactivated_title/_message/_contact_link render an amber warning banner when member?.is_active === false, with a link to /contact"}
+        - {file: "frontend/app/[locale]/page.tsx", via: "useTranslations() root translator — Phase 15 (item V): deactivated_title/_message/_contact_link render an amber warning banner when member?.is_active === false, with a link to /contact; Phase 17 (item g) added conditional <p> lines below the banner message rendering deactivated_reason_label + member.deactivation_reason (if present) and deactivated_by_label + member.deactivated_by_name (if present)"}
         - {file: "frontend/app/[locale]/contact/page.tsx", via: "useTranslations('common') — Phase 15 (item V): same deactivated_* banner as the home page"}
-      note: "12 keys total (Phase 13: 9; Phase 15 +3 for item V). loading/error/retry/close from the original set remain unused — grep confirms no call sites for those 4."
+      note: "14 keys total (Phase 13: 9; Phase 15 +3 for item V; Phase 17 +2 for item g — deactivated_reason_label/deactivated_by_label). loading/error/retry/close from the original set remain unused — grep confirms no call sites for those 4."
   admin_panel_i18n_policy: >
     The admin panel (frontend/app/[locale]/admin/**) does NOT use the
     messages/{en,fa}.json namespace system. Per the existing convention
@@ -817,25 +821,21 @@ files:
       railway_auto_detection: "_on_railway := bool(RAILWAY_ENVIRONMENT), always injected by Railway. When true: SECRET_KEY auto-derives from sha256(RAILWAY_PROJECT_ID+RAILWAY_SERVICE_ID) if not set explicitly, DEBUG defaults to False (vs True elsewhere), RAILWAY_PUBLIC_DOMAIN (if a public domain was generated) and RAILWAY_PRIVATE_DOMAIN (always present, *.railway.internal — used for service-to-service traffic) are both appended to ALLOWED_HOSTS + CSRF_TRUSTED_ORIGINS, and CORS_ALLOWED_ORIGIN_REGEXES trusts the whole *.up.railway.app suffix (kept for back-compat/custom setups — safe since the API is JWT-bearer-only and CORS_ALLOW_CREDENTIALS is never enabled). Combined with the SQLite DB fallback above, the recommended Railway layout is now a SINGLE service built from the repo-root railway.json/Dockerfile.railway (see those entries) — backend (gunicorn) and frontend (Next.js) run as two processes in one container, talking over 127.0.0.1, with the frontend's next.config.mjs rewrites() proxying /api,/admin,/i18n,/static,/media to the backend. ZERO service variables are required: PORT is Railway-injected and used by the Next.js server, BACKEND_INTERNAL_URL is hardcoded to http://127.0.0.1:8000 in Dockerfile.railway. Everything else (DEBUG, SECRET_KEY, ALLOWED_HOSTS, CSRF, DB, migrate/seed/collectstatic, HTTPS) remains automatic and overridable via the usual env vars for non-Railway hosts. The old 2-service layout (separate backend/frontend Railway services) is no longer recommended — see DEPLOYMENT.md."
       media: "conditional on AWS_STORAGE_BUCKET_NAME env var: if set → DEFAULT_FILE_STORAGE=storages.backends.s3.S3Storage (django-storages), MEDIA_URL derived from AWS_S3_CUSTOM_DOMAIN / AWS_S3_ENDPOINT_URL / default S3 URL (supports AWS S3, Cloudflare R2, Backblaze B2, ...); if unset → local MEDIA_ROOT=backend/media, MEDIA_URL=/media/ for dev. DEFAULT_FILE_STORAGE used (not STORAGES dict) — Django raises ImproperlyConfigured if both STORAGES and STATICFILES_STORAGE are set"
       static: "STATIC_ROOT=backend/staticfiles, STATIC_URL=/static/, STATICFILES_STORAGE=whitenoise.storage.CompressedManifestStaticFilesStorage"
-      middleware: "whitenoise.middleware.WhiteNoiseMiddleware added directly after SecurityMiddleware. Phase 15 (item A): 'core.middleware.RuntimeConfigMiddleware' is now the FIRST entry in MIDDLEWARE (before CorsMiddleware) — see env_vars_panel below."
+      middleware: "whitenoise.middleware.WhiteNoiseMiddleware added directly after SecurityMiddleware."
       storages_app: "'storages' (django-storages) added to INSTALLED_APPS"
       cors: CORS_ALLOWED_ORIGINS from env
       auth_env_vars: [SECRET_KEY, DEBUG, ALLOWED_HOSTS]
       csrf_trusted_origins: "derived from ALLOWED_HOSTS (https:// + each non-local host) unless CSRF_TRUSTED_ORIGINS env override is set — required for Django admin POST/PATCH/DELETE to pass CSRF checks behind a TLS-terminating reverse proxy (e.g. Caddy in the Docker setup, which sets it explicitly to PUBLIC_URL); fixes a real gap: was previously unset, which 403s all unsafe admin requests once DEBUG=False"
-      simple_jwt: ACCESS=1day, REFRESH=7days, ROTATE=true, BLACKLIST=true
+      simple_jwt: "ACCESS=1day, REFRESH=7days, ROTATE=true, BLACKLIST=true, CHECK_USER_IS_ACTIVE=False (Phase 17, item g) — simplejwt's default authentication check rejects tokens for Member.is_active=False users; disabling it means a deactivated member's existing token keeps authenticating (fixes the 'quick logout' bug), while DRF permission classes (IsActiveMember/HasGroupPermission/IsSuperuser, unaffected by this setting) continue to enforce is_active=True for authorization."
       drf_default_auth: JWTAuthentication
       drf_default_permission: IsAuthenticated
       production_security: "SECURE_PROXY_SSL_HEADER always set (works behind any TLS-terminating reverse proxy, e.g. Caddy in the Docker setup); when DEBUG=False also sets SECURE_SSL_REDIRECT/SECURE_HSTS_SECONDS/SECURE_HSTS_INCLUDE_SUBDOMAINS/SECURE_HSTS_PRELOAD/SESSION_COOKIE_SECURE/CSRF_COOKIE_SECURE/X_FRAME_OPTIONS — note docker-compose.yml hardcodes SECURE_SSL_REDIRECT=False since Caddy↔backend traffic is plain HTTP (TLS already terminated at the edge), avoiding an infinite redirect loop"
       logging: "console handler + NEW (Phase 14) 'system_log' handler (core.logging_handlers.SystemLogHandler, level=WARNING) writing WARNING+ records into logs.models.SystemLog — added to both the 'root' logger and the 'django' logger (propagate=False, so django.request/django.security records don't reach root without it); INFO in DEBUG, WARNING in production for level thresholds. FIXES a real gap: previously NOTHING in the backend ever wrote to SystemLog, so /admin/system's System Status log was always empty even for real 500s/security warnings."
-      env_vars_panel: "NEW (Phase 15, item A) — at the very end of this file, AFTER all the auto-detect logic above has run, AUTO_DETECTED_DEFAULTS = {DEBUG, ALLOWED_HOSTS: list(...), CSRF_TRUSTED_ORIGINS: list(...), CORS_ALLOWED_ORIGINS: list(...)} captures an immutable one-time snapshot of this process's computed values. This snapshot is the source of truth for the /admin/env-vars panel's 'reset to default' and the base list that admin-added *_EXTRA entries are appended to (never replace) — see backend/core/runtime_config.py + backend/core/middleware.py. The auto-detect logic itself is UNCHANGED; only its output is captured."
     imports:
       external: [{from: os, items: [environ]}, {from: pathlib, items: [Path]}, {from: datetime, items: [timedelta]}]
       internal: []
-    exports:
-      - {name: AUTO_DETECTED_DEFAULTS, kind: constant, type: "dict[str, bool | list[str]]", note: "NEW (Phase 15, item A) — see env_vars_panel above"}
-    needed_by:
-      - {file: "backend/core/runtime_config.py", items: [AUTO_DETECTED_DEFAULTS], status: available}
-      - {file: "backend/core/middleware.py",     items: [AUTO_DETECTED_DEFAULTS], status: available}
+    exports: []
+    needed_by: []
 
   "backend/groupfund/wsgi.py":
     status: done
@@ -861,7 +861,6 @@ files:
         - {file: "backend/posts/urls.py",           items: [urlpatterns], status: available}
         - {file: "backend/logs/urls.py",            items: [urlpatterns], status: available}
         - {file: "backend/core/settings_urls.py",   items: [urlpatterns], status: available}
-        - {file: "backend/core/env_vars_urls.py",   items: [urlpatterns], status: available, note: "NEW (Phase 15, item A) — mounted at /api/env-vars/"}
         - {file: "backend/core/dashboard_urls.py",  items: [urlpatterns], status: available}
         - {file: "backend/core/urls.py",            items: [urlpatterns], status: available}
         - {file: "backend/payments/urls.py",         items: [urlpatterns], status: available}
@@ -957,13 +956,12 @@ files:
         - {from: django.db.models, items: [Q]}
         - {from: django.utils.html, items: [mark_safe]}
       internal:
-        - {from: "backend/core/models.py",  items: [{name: DefaultSetting, status: available}, {name: EnvVarOverride, status: available}, {name: Permission, status: available}]}
+        - {from: "backend/core/models.py",  items: [{name: DefaultSetting, status: available}, {name: Permission, status: available}]}
         - {from: "backend/logs/models.py",  items: [{name: ActivityLog, status: available}]}
     exports:
       - {name: PermissionAdmin,      kind: class, type: Django ModelAdmin, note: "list_display codename/label/desc; read-only in admin"}
       - {name: DefaultSettingAdmin,  kind: class, type: Django ModelAdmin, note: "auto-sets updated_by; logs setting_updated_via_admin; SettingCategoryFilter; key readonly on edit"}
       - {name: SettingCategoryFilter,kind: class, type: SimpleListFilter,  note: "filters by key prefix: general/visibility/payment_manual/paypal/stripe/google"}
-      - {name: EnvVarOverrideAdmin, kind: class, type: Django ModelAdmin, note: "NEW (Phase 15, item A) — list_display key/value/section/requires_restart/is_enabled/updated_by/updated_at; key readonly after creation; auto-sets updated_by + logs env_var_updated_via_admin. Manual-recovery fallback for the /admin/env-vars API (e.g. if a bad override somehow breaks the API itself, a superuser can still fix/delete the row here)."}
     needed_by: []
 
   "backend/accounts/admin.py":
@@ -1045,6 +1043,7 @@ files:
 
   "backend/core/models.py":
     status: done
+    note: "Phase 17 (item a) — REMOVED the EnvVarOverride model entirely (was added Phase 15, item A). NEW migration backend/core/migrations/0004_remove_envvaroverride.py drops the EnvVarOverride table AND deletes the can_manage_env_vars Permission row via RunPython (back to 11 seeded permissions)."
     imports:
       external: [{from: uuid, items: [uuid4]}, {from: django.db, items: [models]}]
       internal: []
@@ -1072,28 +1071,10 @@ files:
           updated_at: datetime, auto
         seeds: [default_group=<UUID>, default_currency=GBP, require_comment_approval=true, max_receipt_image_size_mb=5]
         permission_seeds: [can_contribute(ON), can_comment(ON), can_post, can_expense, can_manage_permissions, can_approve_comments, can_view_balance]
-      - name: EnvVarOverride
-        kind: class
-        type: Django Model
-        fields:
-          id: UUID, pk, auto
-          key: str(100), unique
-          value: text
-          section: str(50)
-          requires_restart: bool, default False
-          is_enabled: bool, default True
-          updated_by: FK → accounts.Member, SET_NULL, null
-          created_at: datetime, auto
-          updated_at: datetime, auto
-        note: "NEW (Phase 15, item A) — a row only exists once an admin has changed `key` from its auto-detected default; 'reset to default' = delete the row. See backend/core/runtime_config.py (ENV_VAR_REGISTRY = full list of manageable keys) and backend/core/middleware.py (RuntimeConfigMiddleware = how 'live'-category overrides are applied on every request)."
-        migration: "backend/core/migrations/0003_envvaroverride.py"
     needed_by:
       - {file: "backend/accounts/models.py",  items: [Permission], status: available}
       - {file: "backend/core/serializers.py", items: [Permission, DefaultSetting], status: pending}
       - {file: "backend/core/views.py",       items: [Permission, DefaultSetting], status: pending}
-      - {file: "backend/core/env_vars_views.py", items: [EnvVarOverride], status: available, note: "NEW (Phase 15)"}
-      - {file: "backend/core/middleware.py",     items: [EnvVarOverride], status: available, note: "NEW (Phase 15) — lazy-imported inside _load_overrides()"}
-      - {file: "backend/core/admin.py",          items: [EnvVarOverride], status: available, note: "NEW (Phase 15) — EnvVarOverrideAdmin, manual-recovery fallback for the API"}
 
   "backend/core/apps.py":
     status: done
@@ -1120,21 +1101,26 @@ files:
       can_expense, can_view_balance, can_view_posts, can_view_dashboard,
       can_approve_comments, can_delete_member, can_change_any_password,
       can_manage_permissions), a default "Members" AccessGroup
-      (is_default=True, granted can_contribute+can_comment per the
-      accounts/models.py contract), and every DefaultSetting key the codebase
-      reads (general/visibility/payment_manual/payment_paypal +
-      payment_stripe/payment_google_pay placeholders reserved for Phase 10).
-      Wired into backend/docker-entrypoint.sh, after migrate and before
-      collectstatic — runs (harmlessly) on every container start.
-      Phase 15 (item A): added a 12th permission codename, can_manage_env_vars
-      ('Can Manage Environment Variables' — view/edit the runtime config panel
-      at /admin/env-vars and reset entries to their auto-detected defaults).
-      Existing AccessGroups are NOT auto-granted this permission (admin must
-      opt in via /admin/groups, same as any other non-required permission).
+      (is_default=True, granted DEFAULT_GROUP_PERMISSIONS), and every
+      DefaultSetting key the codebase reads (general/visibility/payment_manual/
+      payment_paypal + payment_stripe/payment_google_pay placeholders reserved
+      for Phase 10). Wired into backend/docker-entrypoint.sh, after migrate and
+      before collectstatic — runs (harmlessly) on every container start.
+      Phase 15 (item A) added, and Phase 17 (item a) REMOVED again, a 12th
+      permission codename can_manage_env_vars — back to 11 codenames (listed
+      above).
+      Phase 17 (items c/e/f): DEFAULT_GROUP_PERMISSIONS is now
+      `= BASELINE_GROUP_PERMISSIONS` imported from accounts/models.py (was a
+      locally-hardcoded ['can_contribute','can_comment']) — the seeded default
+      "Members" group, and any new AccessGroup created with no explicit
+      permission list, now gets all 4 baseline codenames
+      (can_contribute, can_comment, can_view_balance, can_view_posts), the
+      same set frontend/lib/adminNav.ts's BASELINE_PERMISSIONS/hasAdminAccess()
+      uses to decide admin-panel access.
     imports:
       external: [{from: django.core.management.base, items: [BaseCommand]}, {from: django.db, items: [transaction]}]
       internal:
-        - {from: "backend/accounts/models.py", items: [{name: AccessGroup, status: available}]}
+        - {from: "backend/accounts/models.py", items: [{name: AccessGroup, status: available}, {name: BASELINE_GROUP_PERMISSIONS, status: available}]}
         - {from: "backend/core/models.py",     items: [{name: DefaultSetting, status: available}, {name: Permission, status: available}]}
     exports:
       - {name: Command, kind: class, type: Django BaseCommand, invocation: "python manage.py seed_initial_data"}
@@ -1310,82 +1296,6 @@ files:
     needed_by:
       - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: available}
 
-  # ─── Env Vars admin panel (Phase 15, item A) ───────────────────────────────
-  # Single source of truth: backend/core/runtime_config.py.ENV_VAR_REGISTRY.
-  # 4 files together implement GET/PATCH/reset for the "Environment Variables"
-  # admin page, plus a 30s-TTL request middleware that applies the 'live'
-  # category overrides (DEBUG / *_EXTRA host+CORS+CSRF lists) on top of
-  # AUTO_DETECTED_DEFAULTS (backend/groupfund/settings.py) — see that file's
-  # key_settings.env_vars_panel note for the full append-only/no-lockout design.
-
-  "backend/core/runtime_config.py":
-    status: done
-    kind: module
-    note: "NEW (Phase 15, item A) — single source of truth for the /admin/env-vars panel. ENV_VAR_REGISTRY maps each manageable key to {section, category ('live'|'restart'|'readonly'), value_type ('bool'|'csv_extra'|'string'|'secret'|'secret_regenerate'), requires_restart, env_name, current (zero-arg callable for the *effective* current value, e.g. masked for secrets via _mask()), and for the 3 *_EXTRA csv_extra keys also `base` (callable returning the relevant AUTO_DETECTED_DEFAULTS list)}. 17 keys total across 3 categories (4 live + 8 restart + 5 readonly) — live: DEBUG, ALLOWED_HOSTS_EXTRA, CSRF_TRUSTED_ORIGINS_EXTRA, CORS_ALLOWED_ORIGINS_EXTRA; restart: SECURE_SSL_REDIRECT, AWS_STORAGE_BUCKET_NAME, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_REGION_NAME, AWS_S3_ENDPOINT_URL, AWS_S3_CUSTOM_DOMAIN, SECRET_KEY; readonly: RAILWAY_ENVIRONMENT, DATABASE_URL (via _database_info(), password masked), NEXT_PUBLIC_API_URL, NEXT_PUBLIC_SITE_NAME, NEXT_PUBLIC_MEDIA_URL. get_source(key) reports 'override'|'env'|'default'|'auto-detected' for the UI's source badge. Mirrored bilingual metadata (label/description/effect/suggested chips) lives in frontend/lib/envVarsMeta.ts — ENV_VAR_META keys must stay in sync with this registry's keys."
-    imports:
-      external: [{from: os, items: [environ]}, {from: django.conf, items: [settings]}]
-      internal:
-        - {from: "backend/core/models.py", items: [{name: EnvVarOverride, status: available}], note: "lazy-imported inside get_source()"}
-    exports:
-      - {name: ENV_VAR_REGISTRY, kind: constant, type: "dict[str, dict]", description: "14-key registry described above"}
-      - {name: get_source, kind: function, signature: "(key: str) -> 'env'|'override'|'auto-detected'|'default'"}
-    needed_by:
-      - {file: "backend/core/env_vars_views.py", items: [ENV_VAR_REGISTRY, get_source], status: available}
-      - {file: "backend/core/middleware.py",     items: [implicit — _LIVE_KEYS subset of ENV_VAR_REGISTRY keys is hardcoded separately for the hot path], status: available}
-
-  "backend/core/middleware.py":
-    status: done
-    kind: module
-    note: "NEW (Phase 15, item A) — RuntimeConfigMiddleware, first entry in MIDDLEWARE (before CorsMiddleware, see backend/groupfund/settings.py) so DEBUG/ALLOWED_HOSTS/CSRF/CORS are correct for the rest of the request pipeline. On every request, refreshes a process-local cache (_cache, TTL=30s) of EnvVarOverride rows for the 4 'live' keys (DEBUG, ALLOWED_HOSTS_EXTRA, CSRF_TRUSTED_ORIGINS_EXTRA, CORS_ALLOWED_ORIGINS_EXTRA) via a try/except-wrapped query (a transient DB hiccup just keeps the previous/default values — never breaks a request). settings.DEBUG = override or AUTO_DETECTED_DEFAULTS['DEBUG']; for the 3 *_EXTRA keys, settings.ALLOWED_HOSTS/CSRF_TRUSTED_ORIGINS/CORS_ALLOWED_ORIGINS = AUTO_DETECTED_DEFAULTS[...] + json.loads(override) — i.e. ALWAYS appended to the auto-detected base, never replacing it, so a bad/empty override can never lock the admin panel out of itself. core.env_vars_views._bust_cache() sets _cache['expires_at']=0 after a live-key update/reset so the change is visible on the very next request instead of waiting up to 30s."
-    imports:
-      external: [{from: json, items: [json]}, {from: time, items: [time]}, {from: django.conf, items: [settings]}]
-      internal:
-        - {from: "backend/core/models.py", items: [{name: EnvVarOverride, status: available}], note: "lazy-imported inside _load_overrides()"}
-    exports:
-      - {name: RuntimeConfigMiddleware, kind: class, type: "Django middleware"}
-      - {name: _cache, kind: "module-level dict", note: "{data: dict, expires_at: float} — mutated directly by core/env_vars_views.py._bust_cache() to force an immediate refresh after an admin edit"}
-    needed_by:
-      - {file: "backend/groupfund/settings.py",   items: [RuntimeConfigMiddleware], status: available, note: "first entry in MIDDLEWARE"}
-      - {file: "backend/core/env_vars_views.py", items: [_cache (as runtime_middleware._cache)], status: available, note: "_bust_cache() helper"}
-
-  "backend/core/env_vars_views.py":
-    status: done
-    kind: module
-    note: "NEW (Phase 15, item A) — 3 APIViews behind IsAuthenticated + HasGroupPermission('can_manage_env_vars'). EnvVarListView (GET) serializes every ENV_VAR_REGISTRY key via _serialize() (key, section, category, value_type, requires_restart, source, value, and `base` for csv_extra keys). EnvVarUpdateView (PATCH /<key>/) validates per value_type: bool requires a JSON bool; csv_extra requires a list[str], rejects '*' and any item already covered by `base` (no-lockout guarantee), de-dupes, stores json.dumps(list); string/secret store the raw string; secret_regenerate (SECRET_KEY only) requires {confirm: true} and calls get_random_secret_key() — readonly-category keys 400. On success, upserts core.models.EnvVarOverride via update_or_create, calls _bust_cache() for 'live' keys, and ActivityLog 'env_var_updated' with extra_data={key, old, new}. EnvVarResetView (POST /<key>/reset/) deletes that key's override row (logs 'env_var_reset' only if a row existed). EnvVarResetAllView (POST /reset-all/) deletes ALL override rows in one go and logs 'env_var_reset_all' with extra_data={keys: [...]}."
-    imports:
-      external:
-        - {from: json, items: [json]}
-        - {from: django.core.management.utils, items: [get_random_secret_key]}
-        - {from: rest_framework.permissions, items: [IsAuthenticated]}
-        - {from: rest_framework.views, items: [APIView]}
-      internal:
-        - {from: "backend/accounts/permissions.py", items: [{name: HasGroupPermission, status: available}]}
-        - {from: "backend/core/middleware.py",      items: [{name: _cache, status: available}], note: "imported as `runtime_middleware`, for _bust_cache()"}
-        - {from: "backend/core/models.py",          items: [{name: EnvVarOverride, status: available}]}
-        - {from: "backend/core/runtime_config.py",  items: [{name: ENV_VAR_REGISTRY, status: available}, {name: get_source, status: available}]}
-        - {from: "backend/core/utils.py",           items: [{name: api_success, status: available}, {name: api_error, status: available}]}
-        - {from: "backend/logs/models.py",          items: [{name: ActivityLog, status: available}]}
-    exports:
-      - {name: EnvVarListView,    kind: class, type: DRF APIView, endpoint: "GET /api/env-vars/",            auth: can_manage_env_vars}
-      - {name: EnvVarUpdateView,  kind: class, type: DRF APIView, endpoint: "PATCH /api/env-vars/<key>/",     auth: can_manage_env_vars}
-      - {name: EnvVarResetView,   kind: class, type: DRF APIView, endpoint: "POST /api/env-vars/<key>/reset/", auth: can_manage_env_vars}
-      - {name: EnvVarResetAllView,kind: class, type: DRF APIView, endpoint: "POST /api/env-vars/reset-all/",  auth: can_manage_env_vars}
-    needed_by:
-      - {file: "backend/core/env_vars_urls.py", items: [EnvVarListView, EnvVarUpdateView, EnvVarResetView, EnvVarResetAllView], status: available}
-
-  "backend/core/env_vars_urls.py":
-    status: done
-    kind: module
-    note: "NEW (Phase 15, item A)"
-    imports:
-      external: [{from: django.urls, items: [path]}]
-      internal:
-        - {from: "backend/core/env_vars_views.py", items: [{name: EnvVarListView, status: available}, {name: EnvVarUpdateView, status: available}, {name: EnvVarResetView, status: available}, {name: EnvVarResetAllView, status: available}]}
-    exports:
-      - {name: urlpatterns, kind: constant, type: list, routes: ["GET ''  → EnvVarListView", "POST 'reset-all/' → EnvVarResetAllView (registered before <str:key>/ so the literal path wins)", "PATCH '<str:key>/' → EnvVarUpdateView", "POST '<str:key>/reset/' → EnvVarResetView"]}
-    needed_by:
-      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: available, note: "mounted at /api/env-vars/"}
-
   # ─── ACCOUNTS APP ──────────────────────────────────────────────────────────
 
   "backend/accounts/models.py":
@@ -1404,6 +1314,11 @@ files:
         kind: function
         signature: "() -> UUID | None"
         description: "returns id of AccessGroup with is_default=True; returns None if none exists or DB unavailable"
+      - name: BASELINE_GROUP_PERMISSIONS
+        kind: constant
+        type: "list[str]"
+        value: "['can_contribute', 'can_comment', 'can_view_balance', 'can_view_posts']"
+        note: "NEW (Phase 17, items c/e/f) — single source of truth for the 4 'default plan' permission codenames. Used by core/management/commands/seed_initial_data.py (DEFAULT_GROUP_PERMISSIONS = BASELINE_GROUP_PERMISSIONS, granted to the seeded default 'Members' group and any new group created with no explicit permission list) and accounts/serializers.py (AccessGroupCreateSerializer defaults permission_ids to this list only when none are submitted; AccessGroupUpdateSerializer no longer force-unions these in, so an admin can disable any of them per group). Mirrored on the frontend as frontend/lib/adminNav.ts's BASELINE_PERMISSIONS (identical 4 codenames), which hasAdminAccess() uses to decide whether a member's group grants admin-panel access (any permission OUTSIDE this set ⇒ access granted)."
       - name: MemberManager
         kind: class
         type: Django BaseUserManager
@@ -1439,6 +1354,9 @@ files:
           is_superuser: bool, default False
           created_at: datetime, auto
           updated_at: datetime, auto
+          deactivation_reason: text, blank
+          deactivated_by: FK → self (Member), SET_NULL, null=True, blank=True, related_name='+'
+        migration: "backend/accounts/migrations/0004_member_deactivated_by_member_deactivation_reason.py — NEW (Phase 17, item g) — adds deactivation_reason and deactivated_by."
         username_field: email
         required_fields: [full_name]
         validation: "clean() → phone OR email required"
@@ -1466,7 +1384,7 @@ files:
         kind: class
         type: Django auth backend
         methods:
-          - {signature: "authenticate(request, credential=None, password=None, username=None, **kwargs) -> Member | None", note: "'@' in credential → email lookup, else phone lookup. credential = credential or username (FIXED CRITICAL pre-existing bug — Django's built-in AuthenticationForm, used by the Django admin login page, calls authenticate(username=..., password=...); this backend only accepted credential=, so admin login ALWAYS failed with 'Please enter the correct email and password for a staff account', even with correct credentials. The app's own /api/auth/login/ already passed credential= and is unaffected. Discovered + fixed during end-to-end testing of the Railway combined image but applies to ALL deploy modes. Phase 15 (item V): the lookup is now Member.objects.get(**lookup) — WITHOUT is_active=True. A deactivated member can still authenticate and receive a JWT (LoginView has no separate is_active check either). Authorization for everything else is unchanged: IsActiveMember/HasGroupPermission/IsSuperuser (accounts/permissions.py) still gate on is_active=True, so a deactivated member's token only ever succeeds against ProfileView (IsAuthenticated-only) — i.e. they can log in and see their own profile/the home+contact pages, but every other endpoint 403s. See frontend/components/layout/DeactivatedGuard.tsx for the client-side route guard built on this."}
+          - {signature: "authenticate(request, credential=None, password=None, username=None, **kwargs) -> Member | None", note: "'@' in credential → email lookup, else phone lookup. credential = credential or username (FIXED CRITICAL pre-existing bug — Django's built-in AuthenticationForm, used by the Django admin login page, calls authenticate(username=..., password=...); this backend only accepted credential=, so admin login ALWAYS failed with 'Please enter the correct email and password for a staff account', even with correct credentials. The app's own /api/auth/login/ already passed credential= and is unaffected. Discovered + fixed during end-to-end testing of the Railway combined image but applies to ALL deploy modes. Phase 15 (item V): the lookup is now Member.objects.get(**lookup) — WITHOUT is_active=True. A deactivated member can still authenticate and receive a JWT (LoginView has no separate is_active check either). Authorization for everything else is unchanged: IsActiveMember/HasGroupPermission/IsSuperuser (accounts/permissions.py) still gate on is_active=True, so a deactivated member's token only ever succeeds against ProfileView (IsAuthenticated-only) — i.e. they can log in and see their own profile/the home+contact pages, but every other endpoint 403s. See frontend/components/layout/DeactivatedGuard.tsx for the client-side route guard built on this. Phase 17 (item g): this lookup fix was necessary but NOT sufficient to stop a 'quick logout' loop for deactivated members — simplejwt's own JWTAuthentication ALSO re-checks user.is_active on every authenticated request by default and raises AuthenticationFailed for is_active=False users, immediately invalidating the very token this backend just issued. The actual fix is backend/groupfund/settings.py SIMPLE_JWT['CHECK_USER_IS_ACTIVE'] = False, which disables that re-check; this backend's is_active-free lookup remains required so the initial login succeeds at all."}
           - {signature: "get_user(user_id: UUID) -> Member | None"}
     needed_by:
       - {file: "backend/groupfund/settings.py", items: [MemberAuthBackend], status: available}
@@ -1478,19 +1396,19 @@ files:
         - {from: rest_framework, items: [serializers]}
         - {from: rest_framework_simplejwt.tokens, items: [RefreshToken]}
       internal:
-        - {from: "backend/accounts/models.py", items: [{name: AccessGroup, status: available}, {name: Member, status: available}]}
+        - {from: "backend/accounts/models.py", items: [{name: AccessGroup, status: available}, {name: Member, status: available}, {name: BASELINE_GROUP_PERMISSIONS, status: available}]}
         - {from: "backend/core/models.py",     items: [{name: Permission, status: available}]}
     exports:
       - {name: RegisterSerializer,         kind: class, type: DRF ModelSerializer, fields: [full_name, display_name, phone, email, password(write_only), password_confirm(write_only)]}
       - {name: LoginSerializer,            kind: class, type: DRF Serializer,      fields: [credential, password(write_only)]}
-      - {name: MemberProfileSerializer,    kind: class, type: DRF ModelSerializer, fields: [id, full_name, display_name, email, phone, group_name, group_permissions, is_active, created_at], note: "group_permissions=['*'] for superuser"}
+      - {name: MemberProfileSerializer,    kind: class, type: DRF ModelSerializer, fields: [id, full_name, display_name, email, phone, group_name, group_permissions, is_active, is_superuser, created_at, deactivation_reason, deactivated_by_name], note: "group_permissions=['*'] for superuser. Phase 17 (item g): added deactivation_reason (plain field) and deactivated_by_name (SerializerMethodField → obj.deactivated_by.display_name or .full_name, else None) — read_only_fields=fields, so both are always included in GET /api/auth/profile/ for use by the landing-page deactivation banner."}
       - {name: MemberListSerializer,       kind: class, type: DRF ModelSerializer, fields: [id, full_name, display_name, group_name, is_active, created_at]}
-      - {name: MemberDetailSerializer,     kind: class, type: DRF ModelSerializer, fields: [id, full_name, display_name, email, phone, group_name, group_permissions, is_active, created_at]}
+      - {name: MemberDetailSerializer,     kind: class, type: DRF ModelSerializer, fields: [id, full_name, display_name, email, phone, group_name, group_permissions, is_active, created_at, deactivation_reason, deactivated_by_name], note: "Phase 17 (item g): same deactivation_reason/deactivated_by_name addition as MemberProfileSerializer, surfaced on admin/members/[id]/page.tsx's Danger Zone."}
       - {name: MemberUpdateSerializer,     kind: class, type: DRF ModelSerializer, fields: [full_name, display_name, email, phone], note: "all optional; validates at least one of phone/email remains"}
       - {name: ChangePasswordSerializer,   kind: class, type: DRF Serializer,      fields: [old_password(optional), new_password, confirm_new_password]}
       - {name: AccessGroupSerializer,      kind: class, type: DRF ModelSerializer, fields: [id, name, description, is_default, permissions(codename+label), member_count, created_at], note: "Phase 15 (item P): get_member_count() = obj.members.filter(is_superuser=False).count() (was .count()) — superusers have group=NULL but were still being counted toward the default group's member total in /admin/groups; same fix mirrored in backend/accounts/admin.py AccessGroupAdmin.member_count."}
-      - {name: AccessGroupCreateSerializer,kind: class, type: DRF ModelSerializer, fields: [name, description, permission_ids], note: "auto-adds can_contribute + can_comment"}
-      - {name: AccessGroupUpdateSerializer,kind: class, type: DRF ModelSerializer, fields: [name, description, permission_ids], note: "cannot remove can_contribute or can_comment"}
+      - {name: AccessGroupCreateSerializer,kind: class, type: DRF ModelSerializer, fields: [name, description, permission_ids], note: "Phase 17 (items c/e/f): create() now defaults permission_ids to BASELINE_GROUP_PERMISSIONS (the 4 'default plan' codenames) ONLY when the request submits none — previously it unconditionally force-added can_contribute+can_comment on top of whatever was submitted. A new group created with an explicit permission_ids list gets EXACTLY that list, even if it omits some/all of the 4 baseline permissions."}
+      - {name: AccessGroupUpdateSerializer,kind: class, type: DRF ModelSerializer, fields: [name, description, permission_ids], note: "Phase 17 (items c/e/f): update() now sets permissions to EXACTLY the submitted permission_ids (no forced union) — previously it force-unioned in can_contribute+can_comment, making them un-removable. An admin can now disable any of the 4 BASELINE_GROUP_PERMISSIONS for a given group."}
       - {name: MemberCreateSerializer, kind: class, type: "DRF ModelSerializer (extends RegisterSerializer)", fields: "RegisterSerializer.Meta.fields + [group_id]", note: "NEW (Phase 14) — admin manual member creation. group_id = PrimaryKeyRelatedField(source='group', queryset=AccessGroup.objects.all(), required=False, allow_null=True). create() pops password_confirm + password, sets member.group = group or default group (via get_default_group_id), set_password(password), save(). Reuses ALL of RegisterSerializer's validation (phone/email uniqueness, password match)."}
     needed_by:
       - {file: "backend/accounts/views.py",        items: [RegisterSerializer, LoginSerializer, MemberProfileSerializer], status: available}
@@ -1566,7 +1484,7 @@ files:
       - {name: MemberDetailView,       kind: class, type: DRF APIView, endpoint: "GET    /api/members/{id}/",                  auth: dynamic(member_profile_visibility), note: "full detail to owner or admin only"}
       - {name: MemberUpdateView,       kind: class, type: DRF APIView, endpoint: "PATCH  /api/members/{id}/update/",           auth: owner or can_manage_permissions}
       - {name: MemberChangeGroupView,  kind: class, type: DRF APIView, endpoint: "PATCH  /api/members/{id}/group/",            auth: can_manage_permissions, note: "cannot change superuser group (returns 403 — frontend admin/members/[id]/page.tsx now shows a dedicated bilingual message for this 403, Phase 14)"}
-      - {name: MemberToggleActiveView, kind: class, type: DRF APIView, endpoint: "PATCH  /api/members/{id}/toggle-active/",    auth: can_manage_permissions, note: "cannot deactivate superuser. Phase 15 (item U): _log(...) extra_data now includes {member_id, member_name, previous_state} so /admin/logs/activity shows exactly which member and what state it flipped from — pairs with item V (deactivated members can still log in, see accounts/backends.py)."}
+      - {name: MemberToggleActiveView, kind: class, type: DRF APIView, endpoint: "PATCH  /api/members/{id}/toggle-active/",    auth: can_manage_permissions, note: "cannot deactivate superuser. Phase 15 (item U): _log(...) extra_data now includes {member_id, member_name, previous_state} so /admin/logs/activity shows exactly which member and what state it flipped from — pairs with item V (deactivated members can still log in, see accounts/backends.py). Phase 17 (item g): accepts an optional body field `reason` (str). When deactivating (is_active True→False): sets member.deactivation_reason = reason.strip() and member.deactivated_by = request.user. When reactivating (False→True): clears both back to '' / None. _log(...) extra_data also gains {reason: member.deactivation_reason}. Response is still MemberListSerializer(member).data."}
       - {name: MemberDeleteView,       kind: class, type: DRF APIView, endpoint: "DELETE /api/members/{id}/delete/",           auth: can_delete_member, note: "cannot delete superuser. Phase 15 (item U): ActivityLog extra_data now includes {member_id, member_name, email, phone, group, previous_state} — a full snapshot of the member being deleted, since the row itself is gone afterwards."}
       - {name: ChangePasswordView,     kind: class, type: DRF APIView, endpoint: "POST   /api/members/{id}/change-password/",  auth: owner(needs old_pw) or can_change_any_password, note: "cannot change superuser password"}
     needed_by:
@@ -1600,8 +1518,8 @@ files:
         - {from: "backend/logs/models.py",          items: [{name: ActivityLog, status: available}]}
     exports:
       - {name: AccessGroupListView,       kind: class, type: DRF APIView, endpoint: "GET    /api/groups/",                    auth: can_manage_permissions}
-      - {name: AccessGroupCreateView,     kind: class, type: DRF APIView, endpoint: "POST   /api/groups/create/",             auth: can_manage_permissions, note: "auto-adds can_contribute+can_comment"}
-      - {name: AccessGroupUpdateView,     kind: class, type: DRF APIView, endpoint: "PATCH  /api/groups/{id}/update/",        auth: can_manage_permissions, note: "cannot remove can_contribute or can_comment"}
+      - {name: AccessGroupCreateView,     kind: class, type: DRF APIView, endpoint: "POST   /api/groups/create/",             auth: can_manage_permissions, note: "Phase 17 (items c/e/f): defaults permission_ids to BASELINE_GROUP_PERMISSIONS (can_contribute/can_comment/can_view_balance/can_view_posts) only when none submitted — see AccessGroupCreateSerializer."}
+      - {name: AccessGroupUpdateView,     kind: class, type: DRF APIView, endpoint: "PATCH  /api/groups/{id}/update/",        auth: can_manage_permissions, note: "Phase 17 (items c/e/f): permission_ids is now set verbatim, no forced minimum — an admin can remove any of the 4 BASELINE_GROUP_PERMISSIONS from a group — see AccessGroupUpdateSerializer."}
       - {name: AccessGroupSetDefaultView, kind: class, type: DRF APIView, endpoint: "PATCH  /api/groups/{id}/set-default/",   auth: superuser, note: "syncs DefaultSetting key=default_group"}
       - {name: AccessGroupDeleteView,     kind: class, type: DRF APIView, endpoint: "DELETE /api/groups/{id}/delete/",        auth: superuser, note: "cannot delete default group; signal moves members. Phase 15 (item U): _log(...) extra_data for group_deleted enriched from {name} to {name, description, permissions (codename list), member_count} — full snapshot of the group being deleted."}
     needed_by:
@@ -2093,27 +2011,25 @@ files:
   "frontend/lib/api.ts":
     status: done
     kind: module
-    note: "axios instance + interceptors: attaches JWT, unwraps {success,message,data} → data (leaves raw paginated/auth payloads untouched), 401 refresh-queue, 403→/forbidden, 404→/not-found, 503→/unavailable. EXTENDED in Phase 7B with admin-only methods/types (additions only — no Phase 7A method signatures changed, except Comment.id corrected number→string/UUID). Phase 13 — added fundAPI.getExpenseDetail/getExpenseComments/createExpenseComment (mirrors postsAPI.getDetail/getComments/createComment, for the new expense detail page) and a new systemAPI. Phase 14 — added fundAPI.createManualContribution and membersAPI.create (both additive, admin-only). Phase 15 (items E/F/Z/A) — added 4 new fundAPI methods (getContributionsPublic, getContributionDetail, updateContribution, getMyContributions), a brand-new envVarsAPI object, extended paymentsAPI.initiate + the Contribution type with the 4 new fields (show_in_public_list, display_name_choice, public_display_name, message), added ContributionPublic/MyContribution/MemberMinimal/ContributionDisplayNameChoice + EnvVarItem/EnvVarCategory/EnvVarValueType/EnvVarSource types, and DashboardData gained pending_contributions_count (item L)."
+    note: "axios instance + interceptors: attaches JWT, unwraps {success,message,data} → data (leaves raw paginated/auth payloads untouched), 401 refresh-queue, 403→/forbidden, 404→/not-found, 503→/unavailable. EXTENDED in Phase 7B with admin-only methods/types (additions only — no Phase 7A method signatures changed, except Comment.id corrected number→string/UUID). Phase 13 — added fundAPI.getExpenseDetail/getExpenseComments/createExpenseComment (mirrors postsAPI.getDetail/getComments/createComment, for the new expense detail page) and a new systemAPI. Phase 14 — added fundAPI.createManualContribution and membersAPI.create (both additive, admin-only). Phase 15 (items E/F/Z/A) — added 4 new fundAPI methods (getContributionsPublic, getContributionDetail, updateContribution, getMyContributions), a brand-new envVarsAPI object, extended paymentsAPI.initiate + the Contribution type with the 4 new fields (show_in_public_list, display_name_choice, public_display_name, message), added ContributionPublic/MyContribution/MemberMinimal/ContributionDisplayNameChoice + EnvVarItem/EnvVarCategory/EnvVarValueType/EnvVarSource types, and DashboardData gained pending_contributions_count (item L). Phase 17 (item a) REMOVED the entire envVarsAPI object and its 4 Env* types again. Phase 17 (item g) — membersAPI.toggleActive(id, reason?) now accepts an optional second `reason` argument, sent as body {reason} when provided (used only when deactivating); MemberDetail gained deactivation_reason?/deactivated_by_name? (mirrors MemberDetailSerializer)."
     exports:
       - {name: authAPI, kind: object, methods: [register, login, logout, getProfile, refreshToken]}
       - {name: postsAPI, kind: object, methods: [getList, getDetail, getComments, createComment, "(7B) create(multipart)", "(7B) update", "(7B) delete", "(7B) uploadImages(multipart)", "(7B) deleteImage"]}
       - {name: commentsAPI, kind: object, "phase": 7B, methods: [approve, delete], note: "target-agnostic moderation actions only — no global list endpoint exists in backend"}
       - {name: fundAPI, kind: object, methods: [getBalance, getContributions, getExpenses, "(7B) updateContributionStatus(completed|failed)", "(7B) deleteContribution(superuser)", "(7B) createExpense(multipart)", "(7B) deleteExpense", "(Phase 13) getExpenseDetail(id) → GET /api/fund/expenses/{id}/", "(Phase 13) getExpenseComments(id) → GET /api/fund/expenses/{id}/comments/", "(Phase 13) createExpenseComment(id, {text, rating?, guest_name?}) → POST /api/fund/expenses/{id}/comments/create/", "(Phase 14) createManualContribution({guest_name, amount, currency?, payment_method?, status?, notes?}) → POST /api/fund/contributions/create-manual/", "(Phase 15, item X) getExpenses(page, filters) gained filters.search → ?search=", "(Phase 15, item E) getContributionsPublic(page) → GET /api/fund/contributions/public/ (AllowAny, paginated ContributionPublic[])", "(Phase 15, item F) getContributionDetail(id) → GET /api/fund/contributions/{id}/ (can_manage_permissions, returns full Contribution incl. receipt_image)", "(Phase 15, item F/O/Z) updateContribution(id, data: Partial<{amount, currency, guest_name, payment_method, status, notes, rejection_reason, show_in_public_list, display_name_choice, public_display_name, message}>) → PATCH /api/fund/contributions/{id}/edit/", "(Phase 15, item Z) getMyContributions(page) → GET /api/fund/contributions/mine/ (IsAuthenticated, paginated MyContribution[] + total_approved)"]}
       - {name: paymentsAPI, kind: object, methods: [getMethods, "initiate(data: {amount, payment_method, guest_name?, notes?, show_in_public_list?, display_name_choice?, public_display_name?, message?}) — Phase 15 (item E): the 4 trailing fields are new, passed straight through to POST /api/payments/initiate/", uploadReceipt(field=receipt_image), getStatus]}
-      - {name: membersAPI, kind: object, methods: [getProfile, updateProfile, changePassword, "(7B) getList(paginated+filters)", "(7B) changeGroup", "(7B) toggleActive", "(7B) delete", "(Phase 14) create({full_name, display_name?, phone?, email?, password, password_confirm, group_id?}) → POST /api/members/create/"]}
+      - {name: membersAPI, kind: object, methods: [getProfile, updateProfile, changePassword, "(7B) getList(paginated+filters)", "(7B) changeGroup", "(7B) toggleActive(id, reason?) — Phase 17 (item g): optional `reason`, sent as {reason} only when provided", "(7B) delete", "(Phase 14) create({full_name, display_name?, phone?, email?, password, password_confirm, group_id?}) → POST /api/members/create/"]}
       - {name: groupsAPI, kind: object, "phase": 7B, methods: [getList, create, update, setDefault(superuser), delete(superuser)]}
       - {name: dashboardAPI, kind: object, "phase": 7B, methods: [getStats]}
       - {name: logsAPI, kind: object, "phase": 7B, methods: [getActivity, getActivityDetail, getSystem(superuser), getSystemDetail(superuser)]}
       - {name: settingsAPI, kind: object, methods: [getPublicSettings, "(7B) getAll(superuser)", "(7B) update(key,value)(superuser)"], note: "raw axios.get bypassing shared interceptor — avoids 403→/forbidden redirect for guests on public /contact page"}
       - {name: systemAPI, kind: object, "phase": 13, methods: ["getStatus(superuser) → GET /api/settings/system-status/"]}
-      - {name: envVarsAPI, kind: object, "phase": 15, note: "NEW (item A) — all 5 methods hit /api/env-vars/, behind can_manage_env_vars on the backend", methods: ["getAll() → GET /api/env-vars/ → EnvVarItem[] (grouped by section in the UI)", "update(key, value: boolean | string | string[]) → PATCH /api/env-vars/{key}/ {value}", "regenerateSecret(key) → PATCH /api/env-vars/{key}/ {confirm: true} — SECRET_KEY only (value_type=secret_regenerate)", "reset(key) → POST /api/env-vars/{key}/reset/", "resetAll() → POST /api/env-vars/reset-all/"]}
-      - {name: types, kind: type, items: [ApiResponse, PostAuthor, PostImage, PostSummary, PostDetail, Comment, Paginated<T>, FundBalance, "(7B) MemberMinimal, Contribution, Expense, MemberListItem, MemberDetail, GroupPermission, AccessGroup, DashboardData, ActivityLogEntry, SystemLogEntry, DefaultSettingItem", "(Phase 13) SystemStatus {database: {engine, connected}, debug, environment: 'railway'|'local', media_storage: 's3'|'local', django_version, counts: {members_total, members_active, posts, contributions, expenses, pending_comments}}", "(Phase 15) ContributionDisplayNameChoice = 'hidden'|'display_name'|'full_name'|'custom'", "(Phase 15) Contribution gained: receipt_image?, show_in_public_list?, display_name_choice?, public_display_name?, message?, rejection_reason?, updated_at? (all optional — only populated on admin detail/edit responses)", "(Phase 15, item E) ContributionPublic {id, display_name: string|null, amount, currency, message, created_at}", "(Phase 15, item Z) MyContribution {id, amount, currency, payment_method, status, rejection_reason, message, created_at}", "(Phase 15, item A) EnvVarCategory = 'live'|'restart'|'readonly'; EnvVarValueType = 'bool'|'csv_extra'|'string'|'secret'|'secret_regenerate'; EnvVarSource = 'env'|'override'|'auto-detected'|'default'; EnvVarItem {key, section, category, value_type, requires_restart, source, value: string|boolean|string[], base?: string[]}", "(Phase 15, item L) DashboardData gained pending_contributions_count?: number"]}
+      - {name: types, kind: type, items: [ApiResponse, PostAuthor, PostImage, PostSummary, PostDetail, Comment, Paginated<T>, FundBalance, "(7B) MemberMinimal, Contribution, Expense, MemberListItem, MemberDetail, GroupPermission, AccessGroup, DashboardData, ActivityLogEntry, SystemLogEntry, DefaultSettingItem", "(Phase 13) SystemStatus {database: {engine, connected}, debug, environment: 'railway'|'local', media_storage: 's3'|'local', django_version, counts: {members_total, members_active, posts, contributions, expenses, pending_comments}}", "(Phase 15) ContributionDisplayNameChoice = 'hidden'|'display_name'|'full_name'|'custom'", "(Phase 15) Contribution gained: receipt_image?, show_in_public_list?, display_name_choice?, public_display_name?, message?, rejection_reason?, updated_at? (all optional — only populated on admin detail/edit responses)", "(Phase 15, item E) ContributionPublic {id, display_name: string|null, amount, currency, message, created_at}", "(Phase 15, item Z) MyContribution {id, amount, currency, payment_method, status, rejection_reason, message, created_at}", "(Phase 15, item L) DashboardData gained pending_contributions_count?: number", "(Phase 17, item g) MemberDetail gained deactivation_reason?: string, deactivated_by_name?: string | null"]}
     needed_by:
       - {file: "frontend/app/[locale]/**/page.tsx", items: [authAPI, postsAPI, fundAPI, paymentsAPI, membersAPI, settingsAPI], status: available}
       - {file: "frontend/app/[locale]/admin/**/page.tsx", items: [commentsAPI, groupsAPI, dashboardAPI, logsAPI, systemAPI, "extended fundAPI/membersAPI/postsAPI/settingsAPI"], status: available}
       - {file: "frontend/app/[locale]/admin/contributions/page.tsx", items: [fundAPI.createManualContribution, "(Phase 15) fundAPI.getContributionDetail, fundAPI.updateContribution"], status: available, note: "Phase 14 — 'Add Contribution' modal. Phase 15 (items F/O/Z) — 'Details' and 'Edit' modals."}
       - {file: "frontend/app/[locale]/admin/members/page.tsx", items: [membersAPI.create], status: available, note: "NEW (Phase 14) — 'Add Member' modal"}
-      - {file: "frontend/app/[locale]/admin/env-vars/page.tsx", items: [envVarsAPI, "types: EnvVarItem, EnvVarCategory, EnvVarValueType, EnvVarSource"], status: available, note: "NEW (Phase 15, item A)"}
       - {file: "frontend/app/[locale]/contributions/page.tsx", items: [fundAPI.getContributionsPublic, "types: ContributionPublic, Paginated"], status: available, note: "NEW (Phase 15, item E)"}
       - {file: "frontend/app/[locale]/contribute/page.tsx", items: [paymentsAPI.initiate, "types: ContributionDisplayNameChoice"], status: available, note: "Phase 15 (item E) — new form fields"}
       - {file: "frontend/app/[locale]/profile/page.tsx", items: [fundAPI.getMyContributions, "types: MyContribution, Paginated"], status: available, note: "NEW (Phase 15, item Z) — 'My Contributions' tab"}
@@ -2135,7 +2051,7 @@ files:
   "frontend/lib/permissionsMeta.ts":
     status: done
     kind: module
-    note: "NEW (Phase 14) — PERMISSION_META: Record<string, PermissionMeta> bilingual {label,description} metadata for Permission codenames seeded by backend/core/management/commands/seed_initial_data.py (can_contribute, can_comment, can_post, can_expense, can_view_balance, can_view_posts, can_view_dashboard, can_approve_comments, can_delete_member, can_change_any_password, can_manage_permissions). Same pattern as SETTINGS_META (frontend/lib/settingsMeta.ts) — translates DB-sourced English Permission.label/description for display in the admin UI. Any codename NOT present falls back to the raw perm.label from the backend (safe for future permissions added without an i18n update). Phase 15 (item A) — added a 12th entry, can_manage_env_vars, mirroring the seed's label/description (used on /admin/groups when assigning the new permission, and indirectly via ADMIN_PERMISSIONS/adminNav.ts for the env-vars nav item)."
+    note: "NEW (Phase 14) — PERMISSION_META: Record<string, PermissionMeta> bilingual {label,description} metadata for Permission codenames seeded by backend/core/management/commands/seed_initial_data.py (can_contribute, can_comment, can_post, can_expense, can_view_balance, can_view_posts, can_view_dashboard, can_approve_comments, can_delete_member, can_change_any_password, can_manage_permissions). Same pattern as SETTINGS_META (frontend/lib/settingsMeta.ts) — translates DB-sourced English Permission.label/description for display in the admin UI. Any codename NOT present falls back to the raw perm.label from the backend (safe for future permissions added without an i18n update). Phase 15 (item A) added a 12th entry, can_manage_env_vars; Phase 17 (item a) REMOVED it again — back to 11 entries matching the 11 seeded permissions."
     exports:
       - {name: PERMISSION_META, kind: const, type: "Record<string, PermissionMeta>"}
       - {name: PermissionMeta, kind: "interface ({label: {en,fa}, description: {en,fa}})"}
@@ -2146,32 +2062,22 @@ files:
   "frontend/lib/adminNav.ts":
     status: done
     kind: module
-    note: "NEW (Phase 15, items B/C/L) — single source of truth for the admin sidebar (see shared_components.adminNav for full design rationale); extracted from AdminSidebar.tsx's previously-hardcoded nav array."
+    note: "NEW (Phase 15, items B/C/L) — single source of truth for the admin sidebar (see shared_components.adminNav for full design rationale); extracted from AdminSidebar.tsx's previously-hardcoded nav array. Phase 17 (item a) removed the env-vars nav item + Server icon import (back to 12 items); Phase 17 (items c/e/f) replaced the ADMIN_PERMISSIONS export with BASELINE_PERMISSIONS + hasAdminAccess()."
     imports:
       external:
-        - {from: lucide-react, items: [LayoutDashboard, Users, ShieldCheck, HandCoins, Receipt, Newspaper, MessageSquare, Wallet, Settings, Database, ScrollText, Terminal, Server]}
+        - {from: lucide-react, items: [LayoutDashboard, Users, ShieldCheck, HandCoins, Receipt, Newspaper, MessageSquare, Wallet, Settings, Database, ScrollText, Terminal]}
     exports:
       - {name: AdminNavItem, kind: "interface ({key, href, icon: React.ElementType, label: {en,fa}, permission?: string|string[], superuserOnly?, divider?, badgeKey?: 'pendingCommentCount'|'pendingContributionCount'})"}
-      - {name: ADMIN_NAV_ITEMS, kind: const, type: "AdminNavItem[]", note: "13 items: dashboard, members, groups, contributions (badgeKey: pendingContributionCount), expenses (permission: ['can_view_balance','can_expense'] — fixes item C), posts, comments (badgeKey: pendingCommentCount), payments, env-vars (permission: 'can_manage_env_vars', icon: Server — item A), settings, system-status (superuserOnly), activity-log (divider: true), system-log (superuserOnly)"}
+      - {name: ADMIN_NAV_ITEMS, kind: const, type: "AdminNavItem[]", note: "12 items (Phase 15 added a 13th, 'env-vars'; Phase 17 item a removed it again): dashboard, members, groups, contributions (badgeKey: pendingContributionCount), expenses (permission: ['can_view_balance','can_expense'] — fixes item C), posts, comments (badgeKey: pendingCommentCount), payments, settings, system-status (superuserOnly), activity-log (divider: true), system-log (superuserOnly)"}
       - {name: isNavItemVisible, kind: function, signature: "(item: AdminNavItem, {isSuperuser, hasPermission}: {isSuperuser: boolean, hasPermission: (codename: string) => boolean}) => boolean"}
-      - {name: ADMIN_PERMISSIONS, kind: const, type: "string[]", note: "deduplicated union of ADMIN_NAV_ITEMS[].permission (flattening string|string[]) via Array.from(new Set(ADMIN_NAV_ITEMS.flatMap(...)))"}
+      - {name: BASELINE_PERMISSIONS, kind: const, type: "string[]", note: "NEW (Phase 17, items c/e/f) — REPLACES the old ADMIN_PERMISSIONS export (which was the deduplicated union of ADMIN_NAV_ITEMS[].permission). Hardcoded list of the 4 'default plan' codenames: ['can_comment','can_contribute','can_view_balance','can_view_posts'] — mirrors backend/accounts/models.py's BASELINE_GROUP_PERMISSIONS (same 4 codenames, different order). admin/groups/page.tsx's create-group modal seeds its checkbox selection from this array (was hardcoded ['can_contribute','can_comment'])."}
+      - {name: hasAdminAccess, kind: function, signature: "(opts: {isSuperuser: boolean; groupPermissions?: string[] | null}) => boolean", note: "NEW (Phase 17, items c/e/f) — REPLACES the old `member.is_superuser || ADMIN_PERMISSIONS.some(hasPermission)` check used by admin/layout.tsx's route guard and Navbar.tsx's 'Admin Panel' entry button. Returns true if isSuperuser, OR if groupPermissions contains at least one codename NOT in BASELINE_PERMISSIONS. A member whose group grants ONLY some/all of the 4 baseline ('default plan') permissions has NO admin-panel access — implements the 'default plan users can never reach /admin' rule."}
     needed_by:
       - {file: "frontend/components/layout/AdminSidebar.tsx", items: [ADMIN_NAV_ITEMS, isNavItemVisible], status: available}
-      - {file: "frontend/app/[locale]/admin/layout.tsx", items: [ADMIN_PERMISSIONS], status: available}
+      - {file: "frontend/app/[locale]/admin/layout.tsx", items: [hasAdminAccess], status: available, note: "Phase 17 — route guard: redirects to /forbidden unless hasAdminAccess({isSuperuser: member.is_superuser, groupPermissions: member.group_permissions})"}
       - {file: "frontend/app/[locale]/admin/page.tsx", items: [ADMIN_NAV_ITEMS, isNavItemVisible], status: available, note: "AccessSummaryCard"}
-      - {file: "frontend/components/layout/Navbar.tsx", items: [ADMIN_PERMISSIONS], status: available}
-
-  "frontend/lib/envVarsMeta.ts":
-    status: done
-    kind: module
-    note: "NEW (Phase 15, item A) — bilingual metadata for every key in backend/core/runtime_config.py's ENV_VAR_REGISTRY (17 keys), driving the /admin/env-vars UI. Same pattern as frontend/lib/permissionsMeta.ts/settingsMeta.ts (translate backend-sourced English keys for the admin UI)."
-    exports:
-      - {name: EnvVarSuggestion, kind: "interface ({value: string, label: {en,fa}})"}
-      - {name: EnvVarMeta, kind: "interface ({label: {en,fa}, description: {en,fa}, effect: {en,fa}, suggested?: EnvVarSuggestion[]})"}
-      - {name: ENV_VAR_SECTIONS, kind: const, type: "Record<string, {en,fa}>", note: "8 sections: debug, hosts, https, s3, secret_key, database, frontend, platform"}
-      - {name: ENV_VAR_META, kind: const, type: "Record<string, EnvVarMeta>", note: "all 17 keys matching ENV_VAR_REGISTRY (DEBUG, ALLOWED_HOSTS_EXTRA, CSRF_TRUSTED_ORIGINS_EXTRA, CORS_ALLOWED_ORIGINS_EXTRA, SECURE_SSL_REDIRECT, AWS_STORAGE_BUCKET_NAME, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_REGION_NAME, AWS_S3_ENDPOINT_URL, AWS_S3_CUSTOM_DOMAIN, SECRET_KEY, RAILWAY_ENVIRONMENT, DATABASE_URL, NEXT_PUBLIC_API_URL, NEXT_PUBLIC_SITE_NAME, NEXT_PUBLIC_MEDIA_URL); DEBUG and SECURE_SSL_REDIRECT have `suggested` chip arrays (true/false toggles)"}
-    needed_by:
-      - {file: "frontend/app/[locale]/admin/env-vars/page.tsx", items: [ENV_VAR_SECTIONS, ENV_VAR_META], status: available}
+      - {file: "frontend/components/layout/Navbar.tsx", items: [hasAdminAccess], status: available, note: "Phase 17 — 'Admin Panel' entry button shown when hasAdminAccess({isSuperuser: member.is_superuser, groupPermissions: member.group_permissions}) && !isDeactivated"}
+      - {file: "frontend/app/[locale]/admin/groups/page.tsx", items: [BASELINE_PERMISSIONS], status: available, note: "Phase 17 — create-group modal's default-selected permission checkboxes"}
 
   "frontend/lib/paymentMethodsMeta.ts":
     status: done
@@ -2194,14 +2100,10 @@ files:
     kind: config
     note: "next-intl middleware — locales: [en, fa], defaultLocale: en, localePrefix: always. matcher excludes api|admin|i18n|static|media|_next|_vercel + any path with a dot, so the Django-proxied prefixes (next.config.mjs rewrites()) are never locale-redirected (FIXED CRITICAL pre-existing bug — /admin and /i18n were unreachable via the proxy: next-intl redirected /admin/login/ → /en/admin/login/, a 404, and /i18n/setlang/ → /en/i18n/setlang, breaking the admin language switcher). Discovered + fixed during end-to-end testing of the Railway combined image but applies to ALL deploy modes."
 
-  "frontend/app/layout.tsx":
-    status: done
-    kind: component
-
   "frontend/app/[locale]/layout.tsx":
     status: done
     kind: component
-    note: "server layout — wraps children with NextIntlClientProvider + ClientLayout"
+    note: "server layout — wraps children with NextIntlClientProvider + ClientLayout. Phase 17 (item d): this is now the SOLE root layout — it renders <html lang={locale} dir={dir}><body>...</body></html> directly. The old frontend/app/layout.tsx (DELETED) used to ALSO render its own <html lang='en'><body>, nesting one <html>/<body> pair inside another; React hydration then had to reconcile two competing root elements, which on first load briefly rendered unstyled/garbled text before settling (a hydration mismatch). This file now also carries the `metadata` export ({title:'Group Fund', description:'Transparent community fund management'}) and the `@/styles/globals.css` import that the deleted root layout used to provide — both unchanged in content, just moved here."
 
   # ─── FRONTEND (Phase 7B) — React Admin Panel (app/[locale]/admin/) ─────────
   # Reuses Phase 7A primitives (LionAndSun, PageTransition, authStore, langStore,
@@ -2515,7 +2417,7 @@ files:
   "frontend/app/[locale]/admin/layout.tsx":
     status: done
     kind: component
-    note: "ROUTE PROTECTION — redirects to /login if unauthenticated, /forbidden if member lacks is_superuser AND lacks every permission in ADMIN_PERMISSIONS (Phase 15 item B — replaced the old hardcoded 5-permission list with the deduplicated union of every ADMIN_NAV_ITEMS[].permission, imported from frontend/lib/adminNav.ts; now automatically includes can_view_balance/can_approve_comments/can_manage_env_vars/etc. without needing this file to change when a new admin section is added); shows LionAndSun spinner while checking; imports styles/admin.css; wraps children in AdminLayout"
+    note: "ROUTE PROTECTION — redirects to /login if unauthenticated, /forbidden if !hasAdminAccess({isSuperuser: member.is_superuser, groupPermissions: member.group_permissions}) (Phase 17, items c/e — replaced the Phase 15 ADMIN_PERMISSIONS-union check: a member now needs is_superuser OR at least one group permission OUTSIDE the 4-item BASELINE_PERMISSIONS set; a member whose group grants ONLY some/all of can_comment/can_contribute/can_view_balance/can_view_posts is a 'default plan' member and is denied); shows LionAndSun spinner while checking; imports styles/admin.css; wraps children in AdminLayout"
     imports:
       external:
         - {from: next/navigation, items: [useParams, useRouter]}
@@ -2525,10 +2427,10 @@ files:
         - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun], status: available}
         - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
         - {file: "frontend/styles/admin.css", items: ["(side-effect import — admin theme CSS)"], status: available}
-        - {file: "frontend/lib/adminNav.ts", items: [ADMIN_PERMISSIONS], status: available, note: "NEW (Phase 15, item B) — single source of truth for the route-protection permission list, replacing the old hardcoded array"}
+        - {file: "frontend/lib/adminNav.ts", items: [hasAdminAccess], status: available, note: "Phase 17 (items c/e/f) — REPLACES the Phase 15 ADMIN_PERMISSIONS import; see frontend/lib/adminNav.ts's hasAdminAccess/BASELINE_PERMISSIONS exports"}
     exports:
       - {name: AdminRootLayout, kind: function, type: "React Server/Client Component (layout) — default export, props {children: React.ReactNode}"}
-    notes_extra: "useAuthStore usage: hasHydrated (waits for persisted state before redirecting), isAuthenticated, member, member.is_superuser, member.group_permissions (checked via `member.is_superuser || ADMIN_PERMISSIONS.some((p) => member.group_permissions?.includes(p))`, ADMIN_PERMISSIONS from frontend/lib/adminNav.ts). Does NOT use useToastStore (only the page.tsx files do)."
+    notes_extra: "useAuthStore usage: hasHydrated (waits for persisted state before redirecting), isAuthenticated, member, member.is_superuser, member.group_permissions (checked via `hasAdminAccess({isSuperuser: member.is_superuser, groupPermissions: member.group_permissions})`, from frontend/lib/adminNav.ts — Phase 17). Does NOT use useToastStore (only the page.tsx files do)."
     i18n_namespace: "none — admin panel uses inline bilingual strings (isRTL ternary), not messages/*.json (here just the loading spinner has no text at all)"
     needed_by: []
 
@@ -2587,7 +2489,7 @@ files:
     status: done
     kind: page
     route: "/{locale}/admin/members/{id}"
-    note: "membersAPI.getProfile/updateProfile/changeGroup/changePassword/toggleActive/delete — profile edit form, group-change form, password-change form (gated can_change_any_password), danger zone (deactivate via AdminConfirmDialog, delete gated can_delete_member). Phase 14 — saveGroup's catch block now narrows the axios error (unknown, manual 'response'/'status' checks) and shows a dedicated bilingual toast when the backend returns 403 (MemberChangeGroupView intentionally rejects changing a superuser's group: 'گروه کاربران سوپریوزر را نمی‌توان تغییر داد.'/'The group of a superuser account cannot be changed.'), falling back to the generic 'Failed to change group' toast for other errors; also fixed the back-button's hardcoded aria-label='Back' → bilingual ({isRTL ? 'بازگشت' : 'Back'})."
+    note: "membersAPI.getProfile/updateProfile/changeGroup/changePassword/toggleActive/delete — profile edit form, group-change form, password-change form (gated can_change_any_password), danger zone (deactivate via AdminConfirmDialog, delete gated can_delete_member). Phase 14 — saveGroup's catch block now narrows the axios error (unknown, manual 'response'/'status' checks) and shows a dedicated bilingual toast when the backend returns 403 (MemberChangeGroupView intentionally rejects changing a superuser's group: 'گروه کاربران سوپریوزر را نمی‌توان تغییر داد.'/'The group of a superuser account cannot be changed.'), falling back to the generic 'Failed to change group' toast for other errors; also fixed the back-button's hardcoded aria-label='Back' → bilingual ({isRTL ? 'بازگشت' : 'Back'}). Phase 17 (item g) — new state `deactivateReason` (string); toggleActive() now computes `wasActive = !!target?.is_active` and calls `membersAPI.toggleActive(id, wasActive ? deactivateReason.trim() : undefined)` (reason sent only when deactivating), then locally updates `target.deactivation_reason`/`deactivated_by_name` (the latter from `currentMember?.display_name || currentMember?.full_name`) and resets `deactivateReason` on success. The deactivate AdminConfirmDialog now passes `target.is_active && <AdminTextarea label='Deactivation reason (shown to the member)' value={deactivateReason} onChange=... rows={3} />` as `children` (only shown when about to deactivate, not reactivate); its `onClose` also resets `deactivateReason`. A new amber 'Danger Zone' info block renders `target.deactivation_reason`/`target.deactivated_by_name` (Reason/By) whenever `!target.is_active && (deactivation_reason || deactivated_by_name)`."
     imports:
       external:
         - {from: react, items: [useEffect, useState]}
@@ -2597,6 +2499,7 @@ files:
         - {file: "frontend/components/admin/AdminBadge.tsx", items: [default], status: available}
         - {file: "frontend/components/admin/fields/AdminInput.tsx", items: [default], status: available}
         - {file: "frontend/components/admin/fields/AdminSelect.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminTextarea.tsx", items: [default], status: available, note: "NEW (Phase 17, item g) — deactivation-reason textarea inside AdminConfirmDialog's children"}
         - {file: "frontend/components/admin/AdminConfirmDialog.tsx", items: [default], status: available}
         - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun], status: available}
         - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
@@ -2604,7 +2507,7 @@ files:
         - {file: "frontend/lib/api.ts", items: [membersAPI, groupsAPI, "types: MemberDetail, AccessGroup"], status: available}
     exports:
       - {name: default, kind: function, type: "React Server/Client Component (page)"}
-    notes_extra: "useAuthStore usage: hasPermission('can_manage_permissions'/'can_delete_member'/'can_change_any_password'), member.is_superuser bypass for canManage/canDelete/canChangeAnyPassword. useToastStore usage: show(...) on every profile/group/password/toggle-active/delete success+error path."
+    notes_extra: "useAuthStore usage: hasPermission('can_manage_permissions'/'can_delete_member'/'can_change_any_password'), member.is_superuser bypass for canManage/canDelete/canChangeAnyPassword; currentMember.display_name/full_name used as the deactivated_by_name fallback (Phase 17). useToastStore usage: show(...) on every profile/group/password/toggle-active/delete success+error path."
     i18n_namespace: "none — admin panel uses inline bilingual strings (isRTL ternary), not messages/*.json"
     needed_by: []
 
@@ -2816,30 +2719,6 @@ files:
     i18n_namespace: "none — admin panel uses inline bilingual strings (isRTL ternary), not messages/*.json"
     needed_by: []
 
-  "frontend/app/[locale]/admin/env-vars/page.tsx":
-    status: done
-    kind: page
-    route: "/{locale}/admin/env-vars"
-    note: "NEW (Phase 15, item A) — Environment Variables admin panel, gated on the new `can_manage_env_vars` permission (12th seeded permission; entry point is the adminNav.ts 'env-vars' nav item with a Server icon). envVarsAPI.getAll() → EnvVarItem[] (one row per backend/core/runtime_config.py ENV_VAR_REGISTRY key, 17 total), grouped client-side by `section` per SECTION_ORDER=[debug, hosts, https, s3, secret_key, database, frontend, platform] (skipping empty sections) and rendered as admin-glass-card sections using ENV_VAR_SECTIONS[section].label for the heading. Each item is rendered by the local EnvVarRow component, dispatched on `value_type`: 'bool' → AdminToggle + Save button (envVarsAPI.update(key, bool)); 'csv_extra' → two chip rows — base/auto-detected values (gray, locked, from `item.base`) and admin-added extras (cyan, each with an X 'remove' button calling envVarsAPI.update(key, filteredArray)) plus an AdminInput+Plus 'add' control (envVarsAPI.update(key, [...current, val]), server-side append-only/duplicate/'*' validation errors surfaced via toast); 'string'/'secret' (category!=='readonly') → AdminInput (secret shows `current: <masked value>` as placeholder, never the real value) + Save button (envVarsAPI.update(key, value)); 'secret_regenerate' (SECRET_KEY only) → read-only <code> + 'Regenerate' button opening an AdminConfirmDialog (double-confirm, warns ALL sessions are invalidated) → envVarsAPI.regenerateSecret('SECRET_KEY'); 'readonly' category → plain <code> of the current value. Each row also shows a cyan SOURCE_LABEL badge (env/override/auto-detected/default), an amber 'Needs restart' badge when `item.requires_restart`, a 'Default' reset button when `item.source==='override'` (envVarsAPI.reset(key)), the bilingual ENV_VAR_META description + 'Effect of changing this' text, and (if `meta.suggested`) clickable suggested-value chips that populate the input/toggle without saving. Section headers with at least one override show a 'Reset Section' button (loops envVarsAPI.reset(key) over that section's overridden, non-readonly keys); the page header has a global 'Reset All to Default' button → envVarsAPI.resetAll() — both behind the same AdminConfirmDialog. All mutations call `load()` (envVarsAPI.getAll()) on success to re-sync from RuntimeConfigMiddleware's effective values."
-    imports:
-      external:
-        - {from: react, items: [useEffect, useState]}
-        - {from: next/navigation, items: [useParams]}
-        - {from: lucide-react, items: [Server, RotateCcw, Save, X, Plus, RefreshCw]}
-      internal:
-        - {file: "frontend/components/admin/fields/AdminInput.tsx", items: [default], status: available}
-        - {file: "frontend/components/admin/fields/AdminToggle.tsx", items: [default], status: available}
-        - {file: "frontend/components/admin/AdminConfirmDialog.tsx", items: [default], status: available}
-        - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun], status: available}
-        - {file: "frontend/store/toastStore.ts", items: [useToastStore], status: available}
-        - {file: "frontend/lib/api.ts", items: [envVarsAPI, "types: EnvVarItem"], status: available, note: "NEW (Phase 15, item A) — envVarsAPI.getAll/update/reset/resetAll/regenerateSecret"}
-        - {file: "frontend/lib/envVarsMeta.ts", items: [ENV_VAR_META, ENV_VAR_SECTIONS], status: available, note: "NEW (Phase 15, item A)"}
-    exports:
-      - {name: default, kind: function, type: "React Server/Client Component (page)"}
-    notes_extra: "Local constant SOURCE_LABEL maps EnvVarItem.source ('env'/'override'/'auto-detected'/'default') to a bilingual badge label. No useAuthStore usage beyond what admin/layout.tsx + adminNav.ts already enforce for route access (can_manage_env_vars). useToastStore usage: bilingual success/error toasts on every save/add/remove/reset/reset-section/reset-all/regenerate action."
-    i18n_namespace: "none — admin panel uses inline bilingual strings (isRTL ternary), not messages/*.json"
-    needed_by: []
-
   "frontend/app/[locale]/admin/logs/activity/page.tsx":
     status: done
     kind: page
@@ -2942,7 +2821,7 @@ files:
   "frontend/components/layout/Navbar.tsx":
     status: done
     kind: component
-    note: "glassmorphism nav — mobile drawer, language switcher, auth dropdown (login/register/profile/logout via authStore). Fixed/sticky header (height 64px, ClientLayout adds pt-16 to <main> for public routes). Active-link underline via path-prefix matching; mobile drawer is a SEPARATE block with its own copy of nav links/auth/language-switcher markup — any nav-link or auth-UI change must be applied to BOTH the desktop <ul> and the mobile drawer <nav>. Phase 15: (item D) added a 'contributions' link (nav.contributions, → /{locale}/contributions, the new public donors page) to allNavLinks between contribute and help; (item V) `isDeactivated = mounted && member?.is_active === false` — if true, `navLinks` is filtered down to only 'home' and 'contact' (both desktop <ul> and mobile drawer read from this filtered list); (item B) `canAccessAdmin = mounted && !!member && !isDeactivated && (member.is_superuser || ADMIN_PERMISSIONS.some(hasPermission))` gates a new 'Admin Panel' link (nav.admin_panel, ShieldCheck icon, → /{locale}/admin) rendered in BOTH the desktop auth-dropdown and the mobile drawer; (item Y) renders <BalanceIndicator /> in the desktop nav (hidden md:block, before the auth section) and in the mobile drawer (self-start, before the admin-panel link)."
+    note: "glassmorphism nav — mobile drawer, language switcher, auth dropdown (login/register/profile/logout via authStore). Fixed/sticky header (height 64px, ClientLayout adds pt-16 to <main> for public routes). Active-link underline via path-prefix matching; mobile drawer is a SEPARATE block with its own copy of nav links/auth/language-switcher markup — any nav-link or auth-UI change must be applied to BOTH the desktop <ul> and the mobile drawer <nav>. Phase 15: (item D) added a 'contributions' link (nav.contributions, → /{locale}/contributions, the new public donors page) to allNavLinks between contribute and help; (item V) `isDeactivated = mounted && member?.is_active === false` — if true, `navLinks` is filtered down to only 'home' and 'contact' (both desktop <ul> and mobile drawer read from this filtered list); (item Y) renders <BalanceIndicator /> in the desktop nav (hidden md:block, before the auth section) and in the mobile drawer (self-start, before the admin-panel link). Phase 17: (items c/e) `canAccessAdmin = mounted && !!member && !isDeactivated && hasAdminAccess({isSuperuser: member.is_superuser, groupPermissions: member.group_permissions})` gates the 'Admin Panel' link (nav.admin_panel, ShieldCheck icon, → /{locale}/admin) rendered in BOTH the desktop auth-dropdown and the mobile drawer — REPLACES the Phase 15 `member.is_superuser || ADMIN_PERMISSIONS.some(hasPermission)` check (and the now-unused `hasPermission` destructure from useAuthStore was removed); (item g) both the desktop dropdown's Profile link and the mobile drawer's Profile link, plus BalanceIndicator in both the desktop nav and mobile drawer, are now wrapped in `!isDeactivated &&` (previously only navLinks/admin-panel were hidden for deactivated members — Profile/balance were still shown); (item b) the mobile drawer's language-switcher button moved from the FIRST item in the post-divider block to the LAST item (after admin-panel-entry/profile/login), so it is always the final entry in the hamburger menu site-wide."
     imports:
       external: [{from: next/link, items: [Link]}, {from: next/navigation, items: [usePathname, useRouter]}, {from: next-intl, items: [useTranslations]}, {from: lucide-react, items: [Menu, X, User, LogOut, ChevronDown, ShieldCheck]}, {from: framer-motion, items: [motion, AnimatePresence]}]
       internal:
@@ -2951,7 +2830,7 @@ files:
         - {file: "frontend/store/langStore.ts", items: [useLangStore], status: available}
         - {file: "frontend/lib/api.ts", items: [authAPI], status: available}
         - {file: "frontend/components/common/BalanceIndicator.tsx", items: [default], status: available, note: "NEW (Phase 15, item Y)"}
-        - {file: "frontend/lib/adminNav.ts", items: [ADMIN_PERMISSIONS], status: available, note: "NEW (Phase 15, item B)"}
+        - {file: "frontend/lib/adminNav.ts", items: [hasAdminAccess], status: available, note: "Phase 17 (items c/e) — REPLACES the Phase 15 ADMIN_PERMISSIONS import"}
     exports: [{name: default, kind: function, type: "React component", props: "NavbarProps {locale: 'en'|'fa'}"}]
     i18n_namespace: nav
     needed_by:
@@ -3001,7 +2880,7 @@ files:
   "frontend/components/layout/AdminSidebar.tsx":
     status: done
     kind: component
-    note: "260px/64px collapsible (framer-motion width transition) + mobile drawer w/ overlay; visibility via authStore.hasPermission() + is_superuser bypass; active state via .admin-nav-item.active (defined in frontend/styles/admin.css). Phase 15 (item B refactor) — the nav item array is NO LONGER hardcoded here: `const items = ADMIN_NAV_ITEMS` (imported from frontend/lib/adminNav.ts), and `isVisible(item)` delegates to `isNavItemVisible(item, {isSuperuser, hasPermission})` (also from adminNav.ts, supports both a single permission string and an array meaning 'any of'). Adding a new admin section now only requires editing frontend/lib/adminNav.ts (plus creating the page) — see roadmap.add_admin_page_or_feature. Badge rendering is now generic: `badgeCounts = {pendingCommentCount, pendingContributionCount}`, and each item with a `badgeKey` ('pendingCommentCount' on Comments, 'pendingContributionCount' on Contributions — item L) reads `badgeCounts[item.badgeKey]` (99+ cap, same as before). The 13 ADMIN_NAV_ITEMS (dashboard/members/groups/contributions/expenses/posts/comments/payments/env-vars[item A]/settings/system-status/activity-log-divider/system-log) are documented in shared_components.adminNav and frontend/lib/adminNav.ts's own entry."
+    note: "260px/64px collapsible (framer-motion width transition) + mobile drawer w/ overlay; visibility via authStore.hasPermission() + is_superuser bypass; active state via .admin-nav-item.active (defined in frontend/styles/admin.css). Phase 15 (item B refactor) — the nav item array is NO LONGER hardcoded here: `const items = ADMIN_NAV_ITEMS` (imported from frontend/lib/adminNav.ts), and `isVisible(item)` delegates to `isNavItemVisible(item, {isSuperuser, hasPermission})` (also from adminNav.ts, supports both a single permission string and an array meaning 'any of'). Adding a new admin section now only requires editing frontend/lib/adminNav.ts (plus creating the page) — see roadmap.add_admin_page_or_feature. Badge rendering is now generic: `badgeCounts = {pendingCommentCount, pendingContributionCount}`, and each item with a `badgeKey` ('pendingCommentCount' on Comments, 'pendingContributionCount' on Contributions — item L) reads `badgeCounts[item.badgeKey]` (99+ cap, same as before). The 12 ADMIN_NAV_ITEMS (dashboard/members/groups/contributions/expenses/posts/comments/payments/settings/system-status/activity-log-divider/system-log — Phase 15 added a 13th, env-vars[item A]; Phase 17 item a removed it again) are documented in shared_components.adminNav and frontend/lib/adminNav.ts's own entry."
     imports:
       external: [{from: next/link, items: [Link]}, {from: next/navigation, items: [usePathname]}, {from: framer-motion, items: [motion, AnimatePresence]}, {from: lucide-react, items: [X]}]
       internal:
@@ -3093,12 +2972,12 @@ files:
   "frontend/components/admin/AdminConfirmDialog.tsx":
     status: done
     kind: component
-    note: "destructive-action confirmation — AlertTriangle icon, red confirm + neutral cancel, loading state; role=alertdialog + aria-label for accessibility. Phase 15 (item T) — calls useBodyScrollLock(isOpen) so background content can't scroll while open."
+    note: "destructive-action confirmation — AlertTriangle icon, red confirm + neutral cancel, loading state; role=alertdialog + aria-label for accessibility. Phase 15 (item T) — calls useBodyScrollLock(isOpen) so background content can't scroll while open. Phase 17 (item g) — added an optional `children` prop (rendered in a `<div className=\"mb-6 text-start\">` between the message and the action buttons; message `<p>` className changed mb-6→mb-4 to make room) so callers can embed extra form fields (e.g. admin/members/[id]/page.tsx's deactivation-reason AdminTextarea, shown only when deactivating)."
     imports:
       external: [{from: framer-motion, items: [AnimatePresence, motion]}, {from: lucide-react, items: [AlertTriangle]}]
       internal:
         - {file: "frontend/hooks/useBodyScrollLock.ts", items: [useBodyScrollLock], status: available, note: "NEW (Phase 15, item T)"}
-    exports: [{name: default, kind: function, type: "React component", props: "AdminConfirmDialogProps {isOpen, onClose, onConfirm, title, message, confirmLabel?, cancelLabel?, loading?}"}]
+    exports: [{name: default, kind: function, type: "React component", props: "AdminConfirmDialogProps {isOpen, onClose, onConfirm, title, message, confirmLabel?, cancelLabel?, loading?, children?: React.ReactNode}", note: "Phase 17 (item g): added children?"}]
     needed_by: "see shared_components.admin_component_library.components.AdminConfirmDialog for the full per-admin-page consumer list"
 
   "frontend/components/admin/AdminStatCard.tsx":
@@ -3183,7 +3062,7 @@ files:
   "frontend/components/admin/fields/AdminPermissionCheckbox.tsx":
     status: done
     kind: component
-    note: "permission grid with locked always-on entries (can_contribute/can_comment, force-included by backend regardless). Phase 14 — added optional `isRTL?: boolean` prop (default false); each permission's label now renders via PERMISSION_META[perm.codename] (isRTL ? .label.fa : .label.en), falling back to the raw perm.label for any codename not present in the map — fixes the permission grid showing English-only labels when adding/editing a group in Persian."
+    note: "permission grid with locked always-on entries (can_contribute/can_comment — `alwaysOn` prop default). Phase 14 — added optional `isRTL?: boolean` prop (default false); each permission's label now renders via PERMISSION_META[perm.codename] (isRTL ? .label.fa : .label.en), falling back to the raw perm.label for any codename not present in the map — fixes the permission grid showing English-only labels when adding/editing a group in Persian. Phase 17 (items c/e/f) note: the backend (AccessGroupCreateSerializer/AccessGroupUpdateSerializer) no longer force-includes/unions can_contribute+can_comment into a group's permissions — but this component's `alwaysOn=['can_contribute','can_comment']` default was NOT changed, so those 2 of the 4 BASELINE_GROUP_PERMISSIONS remain visually locked-on/non-toggleable in admin/groups/page.tsx's checkbox grid (can_view_balance/can_view_posts, the other 2, ARE freely toggleable). Disabling can_contribute/can_comment for a specific group is currently only possible via the Django admin or a direct API call, not this UI."
     imports:
       external: [{from: lucide-react, items: [Check]}]
       internal:
@@ -3197,7 +3076,7 @@ files:
     note: "zustand + persist; holds member, accessToken, refreshToken, isAuthenticated, hasPermission(codename); login/logout/setTokens"
     exports:
       - {name: "default (useAuthStore hook)", kind: function, type: "zustand store hook (persist middleware, localStorage key 'groupfund-auth')"}
-      - {name: Member, kind: type, type: "interface { id, full_name, display_name, email, phone, group_name, group_permissions[], is_active, is_superuser, created_at }"}
+      - {name: Member, kind: type, type: "interface { id, full_name, display_name, email, phone, group_name, group_permissions[], is_active, is_superuser, created_at, deactivation_reason?, deactivated_by_name? }", note: "Phase 17 (item g): deactivation_reason?: string and deactivated_by_name?: string | null added after created_at, mirroring MemberProfileSerializer — shown on the home page banner for deactivated members."}
     needed_by: "see shared_components.useAuthStore"
 
   "frontend/store/langStore.ts":
