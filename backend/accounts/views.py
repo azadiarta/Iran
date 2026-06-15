@@ -3,8 +3,10 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenRefreshView
 
 from accounts.models import Member
 from accounts.serializers import LoginSerializer, MemberProfileSerializer, RegisterSerializer
@@ -125,6 +127,27 @@ class LogoutView(APIView):
             ip=_get_client_ip(request),
         )
         return Response({'detail': 'Logged out successfully.'})
+
+
+class SafeTokenRefreshSerializer(TokenRefreshSerializer):
+    """
+    TokenRefreshSerializer.validate() looks up the member referenced by the
+    refresh token's user_id claim with a plain .get() and no error handling.
+    If that member has since been deleted (e.g. by an admin), Django raises
+    Member.DoesNotExist, which simplejwt does not catch -> 500 Internal
+    Server Error instead of a normal 401. Convert it into an InvalidToken so
+    the frontend's refresh-failure handling (logout) kicks in as expected.
+    """
+
+    def validate(self, attrs):
+        try:
+            return super().validate(attrs)
+        except Member.DoesNotExist:
+            raise InvalidToken('No account found for this token.')
+
+
+class SafeTokenRefreshView(TokenRefreshView):
+    serializer_class = SafeTokenRefreshSerializer
 
 
 class ProfileView(APIView):
