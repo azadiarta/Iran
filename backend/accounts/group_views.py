@@ -129,7 +129,11 @@ class AccessGroupDeleteView(APIView):
         if group.is_default:
             return api_error('Cannot delete the default group.', status_code=400)
 
-        _log(request.user, 'group_deleted',
-             extra_data={'name': group.name}, ip=_get_ip(request))
+        _log(request.user, 'group_deleted', extra_data={
+            'name': group.name,
+            'description': group.description,
+            'permissions': list(group.permissions.values_list('codename', flat=True)),
+            'member_count': group.members.count(),
+        }, ip=_get_ip(request))
         group.delete()  # core/signals.py on_access_group_delete moves members to default
         return api_success(message='Group deleted.')

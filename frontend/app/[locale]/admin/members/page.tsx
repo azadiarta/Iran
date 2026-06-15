@@ -201,14 +201,16 @@ export default function AdminMembersPage() {
         <AdminSelect
           value={groupFilter}
           onChange={(e) => { setGroupFilter(e.target.value); setPage(1); }}
-          placeholder={isRTL ? 'همه گروه‌ها' : 'All groups'}
-          options={groups.map((g) => ({ value: g.id, label: g.name }))}
+          options={[
+            { value: '', label: isRTL ? 'همه گروه‌ها' : 'All groups' },
+            ...groups.map((g) => ({ value: g.id, label: g.name })),
+          ]}
         />
         <AdminSelect
           value={activeFilter}
           onChange={(e) => { setActiveFilter(e.target.value); setPage(1); }}
-          placeholder={isRTL ? 'همه وضعیت‌ها' : 'All statuses'}
           options={[
+            { value: '', label: isRTL ? 'همه وضعیت‌ها' : 'All statuses' },
             { value: 'active', label: isRTL ? 'فعال' : 'Active' },
             { value: 'inactive', label: isRTL ? 'غیرفعال' : 'Inactive' },
           ]}

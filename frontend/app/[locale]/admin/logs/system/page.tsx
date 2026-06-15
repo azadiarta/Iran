@@ -119,8 +119,8 @@ export default function AdminSystemLogPage() {
           label={isRTL ? 'سطح' : 'Level'}
           value={levelFilter}
           onChange={(e) => setLevelFilter(e.target.value)}
-          placeholder={isRTL ? 'همه سطوح' : 'All levels'}
           options={[
+            { value: '', label: isRTL ? 'همه سطوح' : 'All levels' },
             { value: 'info', label: isRTL ? 'اطلاعات' : 'Info' },
             { value: 'warning', label: isRTL ? 'هشدار' : 'Warning' },
             { value: 'error', label: isRTL ? 'خطا' : 'Error' },

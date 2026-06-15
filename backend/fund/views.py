@@ -305,7 +305,13 @@ class ExpenseDeleteView(APIView):
         except Expense.DoesNotExist:
             return api_error('Expense not found.', status_code=404)
 
-        _log(request.user, 'expense_deleted', target=expense, ip=_get_ip(request))
+        _log(request.user, 'expense_deleted', target=expense, ip=_get_ip(request), extra_data={
+            'amount': str(expense.amount),
+            'short_reason': expense.short_reason,
+            'description': expense.description,
+            'expense_date': str(expense.expense_date),
+            'withdrawn_by': str(expense.withdrawn_by_id) if expense.withdrawn_by_id else None,
+        })
         expense.delete()
         return api_success(message='Expense deleted.')
 

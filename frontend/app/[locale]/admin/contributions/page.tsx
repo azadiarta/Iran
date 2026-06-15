@@ -411,8 +411,8 @@ export default function AdminContributionsPage() {
         <AdminSelect
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          placeholder={isRTL ? 'همه وضعیت‌ها' : 'All statuses'}
           options={[
+            { value: '', label: isRTL ? 'همه وضعیت‌ها' : 'All statuses' },
             { value: 'pending', label: isRTL ? 'در انتظار' : 'Pending' },
             { value: 'pending_review', label: isRTL ? 'در انتظار بررسی' : 'Pending Review' },
             { value: 'completed', label: isRTL ? 'تکمیل شده' : 'Completed' },
@@ -422,8 +422,8 @@ export default function AdminContributionsPage() {
         <AdminSelect
           value={methodFilter}
           onChange={(e) => { setMethodFilter(e.target.value); setPage(1); }}
-          placeholder={isRTL ? 'همه روش‌ها' : 'All methods'}
           options={[
+            { value: '', label: isRTL ? 'همه روش‌ها' : 'All methods' },
             { value: 'manual', label: isRTL ? 'دستی' : 'Manual' },
             { value: 'paypal', label: 'PayPal' },
           ]}

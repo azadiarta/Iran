@@ -177,7 +177,11 @@ class PostDeleteView(APIView):
         if not _can_modify_post(request, post):
             return api_error('Permission denied.', status_code=403)
 
-        _log(request.user, 'post_deleted', target=post, ip=_get_ip(request))
+        _log(request.user, 'post_deleted', target=post, ip=_get_ip(request), extra_data={
+            'title': post.title,
+            'body': post.body,
+            'author': str(post.author) if post.author else None,
+        })
         post.delete()  # signals handle comment cascade + system log
         return api_success(message='Post deleted.')
 
@@ -342,6 +346,12 @@ class CommentDeleteView(APIView):
         except Comment.DoesNotExist:
             return api_error('Comment not found.', status_code=404)
 
-        _log(request.user, 'comment_deleted', target=comment, ip=_get_ip(request))
+        _log(request.user, 'comment_deleted', target=comment, ip=_get_ip(request), extra_data={
+            'text': comment.text,
+            'rating': comment.rating,
+            'author': str(comment.author) if comment.author else (comment.guest_name or None),
+            'target_type': comment.content_type.model,
+            'target_id': str(comment.object_id),
+        })
         comment.delete()
         return api_success(message='Comment deleted.')

@@ -203,11 +203,16 @@ class MemberToggleActiveView(APIView):
         if member.is_superuser:
             return api_error('Cannot deactivate superuser.', status_code=403)
 
+        previous_state = member.is_active
         member.is_active = not member.is_active
         member.save(update_fields=['is_active'])
 
         action = 'member_activated' if member.is_active else 'member_deactivated'
-        _log(request.user, action, target=member, ip=_get_ip(request))
+        _log(request.user, action, target=member, ip=_get_ip(request), extra_data={
+            'member_id': str(member.pk),
+            'member_name': str(member),
+            'previous_state': previous_state,
+        })
         status_label = 'activated' if member.is_active else 'deactivated'
         return api_success(MemberListSerializer(member).data, message=f'Member {status_label}.')
 
@@ -233,6 +238,14 @@ class MemberDeleteView(APIView):
             action='member_deleted',
             target_display=target_display,
             ip_address=_get_ip(request),
+            extra_data={
+                'member_id': str(member.pk),
+                'member_name': target_display,
+                'email': member.email,
+                'phone': member.phone,
+                'group': str(member.group) if member.group else None,
+                'previous_state': member.is_active,
+            },
         )
         member.delete()  # core/signals.py on_member_delete fires here
         return api_success(message='Member deleted.')
