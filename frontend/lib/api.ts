@@ -568,6 +568,8 @@ export interface MemberDetail extends MemberListItem {
   email: string | null;
   phone: string | null;
   group_permissions: string[];
+  deactivation_reason?: string;
+  deactivated_by_name?: string | null;
 }
 
 export const membersAPI = {
@@ -618,8 +620,8 @@ export const membersAPI = {
   changeGroup: (id: string, groupId: string) =>
     api.patch<ApiResponse>(`/api/members/${id}/group/`, { group_id: groupId }),
 
-  toggleActive: (id: string) =>
-    api.patch<ApiResponse>(`/api/members/${id}/toggle-active/`),
+  toggleActive: (id: string, reason?: string) =>
+    api.patch<ApiResponse>(`/api/members/${id}/toggle-active/`, reason !== undefined ? { reason } : undefined),
 
   delete: (id: string) => api.delete<ApiResponse>(`/api/members/${id}/delete/`),
 };
@@ -813,38 +815,6 @@ export interface SystemStatus {
 
 export const systemAPI = {
   getStatus: () => api.get<ApiResponse>('/api/settings/system-status/'),
-};
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Environment Variables API (admin)
-// ═══════════════════════════════════════════════════════════════════════════════
-export type EnvVarCategory = 'live' | 'restart' | 'readonly';
-export type EnvVarValueType = 'bool' | 'csv_extra' | 'string' | 'secret' | 'secret_regenerate';
-export type EnvVarSource = 'env' | 'override' | 'auto-detected' | 'default';
-
-export interface EnvVarItem {
-  key: string;
-  section: string;
-  category: EnvVarCategory;
-  value_type: EnvVarValueType;
-  requires_restart: boolean;
-  source: EnvVarSource;
-  value: string | boolean | string[];
-  base?: string[];
-}
-
-export const envVarsAPI = {
-  getAll: () => api.get<ApiResponse>('/api/env-vars/'),
-
-  update: (key: string, value: boolean | string | string[]) =>
-    api.patch<ApiResponse>(`/api/env-vars/${key}/`, { value }),
-
-  regenerateSecret: (key: string) =>
-    api.patch<ApiResponse>(`/api/env-vars/${key}/`, { confirm: true }),
-
-  reset: (key: string) => api.post<ApiResponse>(`/api/env-vars/${key}/reset/`),
-
-  resetAll: () => api.post<ApiResponse>('/api/env-vars/reset-all/'),
 };
 
 export default api;

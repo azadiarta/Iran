@@ -10,7 +10,7 @@ import BalanceIndicator from '@/components/common/BalanceIndicator';
 import useAuthStore from '@/store/authStore';
 import useLangStore from '@/store/langStore';
 import { authAPI } from '@/lib/api';
-import { ADMIN_PERMISSIONS } from '@/lib/adminNav';
+import { hasAdminAccess } from '@/lib/adminNav';
 
 interface NavbarProps {
   locale: 'en' | 'fa';
@@ -26,7 +26,7 @@ export default function Navbar({ locale }: NavbarProps) {
   const t = useTranslations('nav');
   const pathname = usePathname();
   const router = useRouter();
-  const { member, isAuthenticated, logout, hasPermission } = useAuthStore();
+  const { member, isAuthenticated, logout } = useAuthStore();
   const { setLocale } = useLangStore();
 
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -75,7 +75,7 @@ export default function Navbar({ locale }: NavbarProps) {
     mounted &&
     !!member &&
     !isDeactivated &&
-    (member.is_superuser || ADMIN_PERMISSIONS.some((p) => hasPermission(p)));
+    hasAdminAccess({ isSuperuser: member.is_superuser, groupPermissions: member.group_permissions });
 
   // Active detection: strip locale prefix
   const pathSegments = pathname.split('/').filter(Boolean);
@@ -199,9 +199,11 @@ export default function Navbar({ locale }: NavbarProps) {
           {/* Right section */}
           <div className="flex items-center gap-2">
             {/* Fund balance indicator */}
-            <div className="hidden md:block">
-              <BalanceIndicator />
-            </div>
+            {!isDeactivated && (
+              <div className="hidden md:block">
+                <BalanceIndicator />
+              </div>
+            )}
 
             {/* Language switcher */}
             <button
@@ -309,20 +311,22 @@ export default function Navbar({ locale }: NavbarProps) {
                           </span>
                         </Link>
                       )}
-                      <Link
-                        href={`/${locale}/profile`}
-                        className="flex items-center gap-2 px-4 py-2.5 text-sm transition-colors duration-150"
-                        style={{ color: 'rgba(255,255,255,0.7)' }}
-                        onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.color = '#00ffff')}
-                        onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.7)')}
-                        onClick={() => setUserDropOpen(false)}
-                        dir={isRTL ? 'rtl' : 'ltr'}
-                      >
-                        <User size={14} />
-                        <span style={{ fontFamily: isRTL ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }}>
-                          {t('profile')}
-                        </span>
-                      </Link>
+                      {!isDeactivated && (
+                        <Link
+                          href={`/${locale}/profile`}
+                          className="flex items-center gap-2 px-4 py-2.5 text-sm transition-colors duration-150"
+                          style={{ color: 'rgba(255,255,255,0.7)' }}
+                          onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.color = '#00ffff')}
+                          onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.7)')}
+                          onClick={() => setUserDropOpen(false)}
+                          dir={isRTL ? 'rtl' : 'ltr'}
+                        >
+                          <User size={14} />
+                          <span style={{ fontFamily: isRTL ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }}>
+                            {t('profile')}
+                          </span>
+                        </Link>
+                      )}
                       <button
                         onClick={handleLogout}
                         className="flex w-full items-center gap-2 px-4 py-2.5 text-sm transition-colors duration-150"
@@ -478,25 +482,8 @@ export default function Navbar({ locale }: NavbarProps) {
                 className="mt-4 pt-4 flex flex-col gap-3"
                 style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
               >
-                {/* Language switcher */}
-                <button
-                  onClick={() => {
-                    handleLanguageSwitch();
-                    setMobileOpen(false);
-                  }}
-                  className="flex items-center justify-center rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200"
-                  style={{
-                    border: '1px solid rgba(0,255,255,0.3)',
-                    color: 'rgba(255,255,255,0.7)',
-                    backgroundColor: 'transparent',
-                    fontFamily: 'Inter, sans-serif',
-                  }}
-                >
-                  {locale === 'en' ? 'فارسی' : 'English'}
-                </button>
-
                 {/* Fund balance indicator */}
-                <BalanceIndicator className="self-start" />
+                {!isDeactivated && <BalanceIndicator className="self-start" />}
 
                 {mounted && isAuthenticated && member ? (
                   <>
@@ -534,18 +521,20 @@ export default function Navbar({ locale }: NavbarProps) {
                         {t('admin_panel')}
                       </Link>
                     )}
-                    <Link
-                      href={`/${locale}/profile`}
-                      className="flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors duration-150"
-                      style={{
-                        color: 'rgba(255,255,255,0.7)',
-                        fontFamily: isRTL ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif',
-                      }}
-                      onClick={() => setMobileOpen(false)}
-                    >
-                      <User size={14} />
-                      {t('profile')}
-                    </Link>
+                    {!isDeactivated && (
+                      <Link
+                        href={`/${locale}/profile`}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors duration-150"
+                        style={{
+                          color: 'rgba(255,255,255,0.7)',
+                          fontFamily: isRTL ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif',
+                        }}
+                        onClick={() => setMobileOpen(false)}
+                      >
+                        <User size={14} />
+                        {t('profile')}
+                      </Link>
+                    )}
                     <button
                       onClick={handleLogout}
                       className="flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors duration-150"
@@ -573,6 +562,23 @@ export default function Navbar({ locale }: NavbarProps) {
                     {t('login')}
                   </Link>
                 )}
+
+                {/* Language switcher */}
+                <button
+                  onClick={() => {
+                    handleLanguageSwitch();
+                    setMobileOpen(false);
+                  }}
+                  className="flex items-center justify-center rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200"
+                  style={{
+                    border: '1px solid rgba(0,255,255,0.3)',
+                    color: 'rgba(255,255,255,0.7)',
+                    backgroundColor: 'transparent',
+                    fontFamily: 'Inter, sans-serif',
+                  }}
+                >
+                  {locale === 'en' ? 'فارسی' : 'English'}
+                </button>
               </div>
             </motion.div>
           </>

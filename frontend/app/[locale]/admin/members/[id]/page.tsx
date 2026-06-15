@@ -5,6 +5,7 @@ import { ArrowLeft, Save, KeyRound, ShieldCheck, Trash2, Power } from 'lucide-re
 import AdminBadge from '@/components/admin/AdminBadge';
 import AdminInput from '@/components/admin/fields/AdminInput';
 import AdminSelect from '@/components/admin/fields/AdminSelect';
+import AdminTextarea from '@/components/admin/fields/AdminTextarea';
 import AdminConfirmDialog from '@/components/admin/AdminConfirmDialog';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
 import useAuthStore from '@/store/authStore';
@@ -48,6 +49,7 @@ export default function AdminMemberDetailPage() {
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [deactivateReason, setDeactivateReason] = useState('');
 
   useEffect(() => {
     if (!canManage) {
@@ -139,11 +141,18 @@ export default function AdminMemberDetailPage() {
   async function toggleActive() {
     setActionLoading(true);
     try {
-      const res = await membersAPI.toggleActive(id);
+      const wasActive = !!target?.is_active;
+      const res = await membersAPI.toggleActive(id, wasActive ? deactivateReason.trim() : undefined);
       const updated = res.data as unknown as { is_active: boolean };
-      setTarget((prev) => (prev ? { ...prev, is_active: updated.is_active } : prev));
+      setTarget((prev) => (prev ? {
+        ...prev,
+        is_active: updated.is_active,
+        deactivation_reason: wasActive ? deactivateReason.trim() : '',
+        deactivated_by_name: wasActive ? (currentMember?.display_name || currentMember?.full_name || null) : null,
+      } : prev));
       showToast('success', isRTL ? 'وضعیت عضو تغییر کرد' : 'Member status changed');
       setConfirmDeactivate(false);
+      setDeactivateReason('');
     } catch {
       showToast('error', isRTL ? 'تغییر وضعیت ناموفق بود' : 'Failed to change status');
     } finally {
@@ -284,6 +293,22 @@ export default function AdminMemberDetailPage() {
             <h2 className="text-sm font-semibold" style={{ color: '#ef4444' }}>
               {isRTL ? 'منطقه خطر' : 'Danger Zone'}
             </h2>
+            {!target.is_active && (target.deactivation_reason || target.deactivated_by_name) && (
+              <div className="text-xs text-white/50 rounded-lg p-3" style={{ backgroundColor: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                {target.deactivation_reason && (
+                  <p>
+                    <span className="font-semibold text-white/70">{isRTL ? 'دلیل: ' : 'Reason: '}</span>
+                    {target.deactivation_reason}
+                  </p>
+                )}
+                {target.deactivated_by_name && (
+                  <p>
+                    <span className="font-semibold text-white/70">{isRTL ? 'توسط: ' : 'By: '}</span>
+                    {target.deactivated_by_name}
+                  </p>
+                )}
+              </div>
+            )}
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => setConfirmDeactivate(true)}
@@ -310,7 +335,7 @@ export default function AdminMemberDetailPage() {
 
       <AdminConfirmDialog
         isOpen={confirmDeactivate}
-        onClose={() => setConfirmDeactivate(false)}
+        onClose={() => { setConfirmDeactivate(false); setDeactivateReason(''); }}
         onConfirm={toggleActive}
         loading={actionLoading}
         title={target.is_active ? (isRTL ? 'غیرفعال‌سازی عضو' : 'Deactivate Member') : (isRTL ? 'فعال‌سازی عضو' : 'Activate Member')}
@@ -321,7 +346,16 @@ export default function AdminMemberDetailPage() {
         }
         confirmLabel={target.is_active ? (isRTL ? 'غیرفعال کن' : 'Deactivate') : (isRTL ? 'فعال کن' : 'Activate')}
         cancelLabel={isRTL ? 'انصراف' : 'Cancel'}
-      />
+      >
+        {target.is_active && (
+          <AdminTextarea
+            label={isRTL ? 'دلیل غیرفعال‌سازی (به عضو نمایش داده می‌شود)' : 'Deactivation reason (shown to the member)'}
+            value={deactivateReason}
+            onChange={(e) => setDeactivateReason(e.target.value)}
+            rows={3}
+          />
+        )}
+      </AdminConfirmDialog>
 
       <AdminConfirmDialog
         isOpen={confirmDelete}

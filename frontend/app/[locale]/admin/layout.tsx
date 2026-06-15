@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
 import useAuthStore from '@/store/authStore';
-import { ADMIN_PERMISSIONS } from '@/lib/adminNav';
+import { hasAdminAccess } from '@/lib/adminNav';
 import '@/styles/admin.css';
 
 export default function AdminRootLayout({ children }: { children: React.ReactNode }) {
@@ -23,7 +23,7 @@ export default function AdminRootLayout({ children }: { children: React.ReactNod
       router.replace(`/${locale}/login`);
       return;
     }
-    const allowed = member.is_superuser || ADMIN_PERMISSIONS.some((p) => member.group_permissions?.includes(p));
+    const allowed = hasAdminAccess({ isSuperuser: member.is_superuser, groupPermissions: member.group_permissions });
     if (!allowed) {
       router.replace(`/${locale}/forbidden`);
       return;

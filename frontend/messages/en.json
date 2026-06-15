@@ -336,10 +336,6 @@
       "my_contributions": {
         "title": "My Contributions",
         "desc": "See the status of every contribution you've made, including the total approved so far and the reason for any that were rejected."
-      },
-      "env_vars": {
-        "title": "Environment Variables",
-        "desc": "Superusers and members with the right permission can review and adjust the deployment's runtime configuration (debug mode, allowed hosts, CORS/CSRF origins, S3 storage, secret key, and more) and reset any of them back to their auto-detected defaults."
       }
     }
   },
@@ -369,6 +365,8 @@
     "submitting": "Submitting…",
     "deactivated_title": "Account Deactivated",
     "deactivated_message": "Your account has been deactivated by an admin. Please contact the admins for more information.",
+    "deactivated_reason_label": "Reason",
+    "deactivated_by_label": "Deactivated by",
     "deactivated_contact_link": "Contact Us"
   }
 }
