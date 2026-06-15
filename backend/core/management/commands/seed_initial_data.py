@@ -17,6 +17,7 @@ PERMISSIONS = {
     'can_delete_member':      ('Can Delete Members', 'Deactivate or remove member accounts.'),
     'can_change_any_password':('Can Change Any Password', "Change another member's password."),
     'can_manage_permissions': ('Can Manage Permissions', 'Full admin access: members, groups, permissions, settings, payments and content moderation.'),
+    'can_manage_env_vars':    ('Can Manage Environment Variables', 'View and edit deployment/runtime configuration (environment variables) and reset them to auto-detected defaults.'),
 }
 
 # Every new AccessGroup must include these by default (see accounts/models.py).

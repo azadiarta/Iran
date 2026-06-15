@@ -65,3 +65,27 @@ class DefaultSetting(models.Model):
 
     def __str__(self):
         return f'{self.key} = {self.value}'
+
+
+# Runtime overrides for OS-level env vars (admin "Environment Variables" panel).
+# A row only exists when an admin has changed that key from its auto-detected
+# default; "reset to default" simply deletes the row. See core.runtime_config
+# for the registry of manageable keys and core.middleware for how these are
+# applied to live settings.
+
+class EnvVarOverride(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    key = models.CharField(max_length=100, unique=True)
+    value = models.TextField()
+    section = models.CharField(max_length=50)
+    requires_restart = models.BooleanField(default=False)
+    is_enabled = models.BooleanField(default=True)
+    updated_by = models.ForeignKey(
+        'accounts.Member', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='env_var_changes',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'{self.key} = {self.value}'

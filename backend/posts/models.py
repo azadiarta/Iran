@@ -49,7 +49,7 @@ class Comment(models.Model):
     text = models.TextField()
     rating = models.IntegerField(
         null=True, blank=True,
-        validators=[MinValueValidator(1), MaxValueValidator(10)],
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
     )
     is_approved = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

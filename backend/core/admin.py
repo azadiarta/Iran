@@ -6,7 +6,7 @@ from django.db.models import Q
 from django.utils.html import mark_safe
 from django.utils.translation import gettext_lazy as _
 
-from core.models import DefaultSetting, Permission
+from core.models import DefaultSetting, EnvVarOverride, Permission
 from logs.models import ActivityLog
 
 
@@ -86,6 +86,38 @@ class DefaultSettingAdmin(admin.ModelAdmin):
             actor=request.user,
             actor_display=str(request.user),
             action='setting_updated_via_admin',
+            target_type=ContentType.objects.get_for_model(obj),
+            target_id=obj.pk,
+            target_display=str(obj),
+            ip_address=_get_ip(request),
+            extra_data={'key': obj.key, 'value': obj.value},
+        )
+
+
+@admin.register(EnvVarOverride)
+class EnvVarOverrideAdmin(admin.ModelAdmin):
+    list_display = ['key', 'value', 'section', 'requires_restart', 'is_enabled', 'updated_by', 'updated_at']
+    search_fields = ['key', 'value', 'section']
+    list_filter = ['section', 'requires_restart', 'is_enabled']
+    readonly_fields = ['id', 'created_at', 'updated_at', 'updated_by']
+
+    fieldsets = [
+        (_('Override'), {'fields': ['key', 'value', 'section', 'requires_restart', 'is_enabled']}),
+        (_('Meta'), {'fields': ['id', 'updated_by', 'created_at', 'updated_at'], 'classes': ['collapse']}),
+    ]
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            return ['id', 'key', 'created_at', 'updated_at', 'updated_by']
+        return ['id', 'created_at', 'updated_at', 'updated_by']
+
+    def save_model(self, request, obj, form, change):
+        obj.updated_by = request.user
+        super().save_model(request, obj, form, change)
+        ActivityLog.objects.create(
+            actor=request.user,
+            actor_display=str(request.user),
+            action='env_var_updated_via_admin',
             target_type=ContentType.objects.get_for_model(obj),
             target_id=obj.pk,
             target_display=str(obj),

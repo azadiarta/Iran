@@ -83,8 +83,8 @@ class CommentCreateSerializer(serializers.ModelSerializer):
         return data
 
     def validate_rating(self, value):
-        if value is not None and not (1 <= value <= 10):
-            raise serializers.ValidationError('Rating must be between 1 and 10.')
+        if value is not None and not (1 <= value <= 5):
+            raise serializers.ValidationError('Rating must be between 1 and 5.')
         return value
 
     def create(self, validated_data):

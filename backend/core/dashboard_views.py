@@ -82,4 +82,13 @@ class DashboardView(APIView):
             ).order_by('-created_at')[:5]
             data['pending_comments'] = CommentSerializer(pending, many=True).data
 
+        can_view_balance = request.user.is_superuser or (
+            request.user.group and
+            request.user.group.permissions.filter(codename='can_view_balance').exists()
+        )
+        if can_view_balance:
+            data['pending_contributions_count'] = Contribution.objects.filter(
+                status__in=[Contribution.Status.PENDING, Contribution.Status.PENDING_REVIEW]
+            ).count()
+
         return api_success(data)

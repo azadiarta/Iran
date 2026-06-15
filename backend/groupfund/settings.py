@@ -92,6 +92,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'core.middleware.RuntimeConfigMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -400,4 +401,17 @@ LOGGING = {
             'propagate': False,
         },
     },
+}
+
+# ─── Env vars admin panel (runtime config) ────────────────────────────────────
+# Immutable snapshot of the values the auto-detect logic above computed for this
+# process — the source of truth for "reset to default" and the base list that
+# admin-added extras are appended to (see core.runtime_config and
+# core.middleware.RuntimeConfigMiddleware). The auto-detect logic above is never
+# changed by the admin panel; only its *output* is captured here, once.
+AUTO_DETECTED_DEFAULTS = {
+    'DEBUG': DEBUG,
+    'ALLOWED_HOSTS': list(ALLOWED_HOSTS),
+    'CSRF_TRUSTED_ORIGINS': list(CSRF_TRUSTED_ORIGINS),
+    'CORS_ALLOWED_ORIGINS': list(CORS_ALLOWED_ORIGINS),
 }

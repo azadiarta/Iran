@@ -21,7 +21,7 @@ class MemberAuthBackend(BaseBackend):
         lookup = {'email': credential} if '@' in credential else {'phone': credential}
 
         try:
-            member = Member.objects.get(**lookup, is_active=True)
+            member = Member.objects.get(**lookup)
         except Member.DoesNotExist:
             return None
 
