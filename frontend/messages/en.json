@@ -40,11 +40,26 @@
     "title": "Iranian Cultural Heritage",
     "subtitle": "A glimpse into Iran's ancient civilization, art, and poetry",
     "items": {
-      "persepolis": { "name": "Persepolis", "desc": "Ceremonial capital of the Achaemenid Empire" },
-      "pasargadae": { "name": "Pasargadae", "desc": "Tomb of Cyrus the Great" },
-      "naqshe_rostam": { "name": "Naqsh-e Rostam", "desc": "Ancient Achaemenid and Sassanid rock reliefs" },
-      "hafez": { "name": "Hafez", "desc": "Beloved Persian poet of the Divan" },
-      "saadi": { "name": "Saadi", "desc": "Author of the Gulistan and Bustan" }
+      "persepolis": {
+        "name": "Persepolis",
+        "desc": "Ceremonial capital of the Achaemenid Empire"
+      },
+      "pasargadae": {
+        "name": "Pasargadae",
+        "desc": "Tomb of Cyrus the Great"
+      },
+      "naqshe_rostam": {
+        "name": "Naqsh-e Rostam",
+        "desc": "Ancient Achaemenid and Sassanid rock reliefs"
+      },
+      "hafez": {
+        "name": "Hafez",
+        "desc": "Beloved Persian poet of the Divan"
+      },
+      "saadi": {
+        "name": "Saadi",
+        "desc": "Author of the Gulistan and Bustan"
+      }
     }
   },
   "auth": {
@@ -129,7 +144,13 @@
     "name_required": "Your name is required.",
     "comment_submit_error": "Failed to submit comment. Please try again.",
     "no_comments": "No comments yet. Be the first!",
-    "anonymous": "Anonymous"
+    "anonymous": "Anonymous",
+    "search_placeholder": "Search by reason or description...",
+    "filter_date_from": "From",
+    "filter_date_to": "To",
+    "filter_amount_min": "Min amount",
+    "filter_amount_max": "Max amount",
+    "filters_clear": "Clear filters"
   },
   "contribute": {
     "title": "Make a Contribution",
@@ -258,27 +279,90 @@
     "member_note": "Sign in to unlock these features.",
     "admin_note": "These sections are only visible to staff members with the matching permissions.",
     "sections": {
-      "home": { "title": "Home Page", "desc": "The landing page introduces Group Fund, shows live statistics (members, total contributions, current balance) and highlights recent posts." },
-      "posts": { "title": "Posts", "desc": "Browse news and announcements published by the group. Open a post to read the full text, view its images, and read approved comments from other members." },
-      "expenses": { "title": "Expenses", "desc": "A transparent, public log of how the group's funds are spent — each entry shows the amount, date, description and who withdrew it." },
-      "contribute": { "title": "Contribute", "desc": "Support the group financially. Choose an amount and payment method (manual bank transfer or PayPal), and optionally upload a receipt for review." },
-      "contact": { "title": "Contact Us", "desc": "Send a message to the group's administrators directly through the site, or use the published email/phone if available." },
-      "auth": { "title": "Register & Login", "desc": "Create an account to unlock member features such as commenting and contributing. Existing members can sign in from the Login page." },
-      "comment": { "title": "Commenting", "desc": "Signed-in members (and guests, where allowed) can leave a comment and rating on posts. Comments are reviewed by moderators before they appear publicly." },
-      "profile": { "title": "Your Profile", "desc": "View and update your personal information, change your password, and see your group membership and permissions." },
-      "logout": { "title": "Logging Out", "desc": "Use the profile menu in the navigation bar to securely sign out of your account on this device." },
-      "dashboard": { "title": "Dashboard", "desc": "An overview of the group's financial health, member statistics, and recent activity — contributions, expenses, posts and pending comments at a glance." },
-      "members": { "title": "Member Management", "desc": "View, search, and manage every registered member: edit their details, assign them to access groups, activate/deactivate accounts, or remove members." },
-      "groups": { "title": "Access Groups", "desc": "Create and manage permission groups. Each group bundles a set of permissions (e.g. who can post, approve comments, or view the balance) and can be assigned to members." },
-      "balance": { "title": "Contributions & Expenses (Admin)", "desc": "Review and manage every contribution and expense record, verify payment receipts, and update statuses." },
-      "manage_posts": { "title": "Post Management", "desc": "Create, edit, publish and delete posts, and manage their images." },
-      "manage_comments": { "title": "Comment Moderation", "desc": "Review pending comments, approve the appropriate ones, filter by status or content type, and remove inappropriate comments." },
-      "payments": { "title": "Payment Review", "desc": "Inspect incoming contributions, verify uploaded receipts, and confirm or reject manual payments." },
-      "settings": { "title": "System Settings", "desc": "Configure site-wide defaults such as the default currency, visibility rules, and other global options." },
-      "activity_log": { "title": "Activity Log", "desc": "A searchable, filterable history of actions performed by members across the platform — logins, posts, approvals, and more." },
-      "system_log": { "title": "System Log", "desc": "Low-level system events and diagnostics, visible to superusers only." },
-      "contributions_public": { "title": "Contributors", "desc": "A public page listing everyone who has chosen to be shown after their contribution is approved, along with their optional message." },
-      "my_contributions": { "title": "My Contributions", "desc": "See the status of every contribution you've made, including the total approved so far and the reason for any that were rejected." }
+      "home": {
+        "title": "Home Page",
+        "desc": "The landing page introduces Group Fund, shows live statistics (members, total contributions, current balance) and highlights recent posts."
+      },
+      "posts": {
+        "title": "Posts",
+        "desc": "Browse news and announcements published by the group. Open a post to read the full text, view its images, and read approved comments from other members."
+      },
+      "expenses": {
+        "title": "Expenses",
+        "desc": "A transparent, public log of how the group's funds are spent — each entry shows the amount, date, description and who withdrew it."
+      },
+      "contribute": {
+        "title": "Contribute",
+        "desc": "Support the group financially. Choose an amount and payment method (manual bank transfer or PayPal), and optionally upload a receipt for review."
+      },
+      "contact": {
+        "title": "Contact Us",
+        "desc": "Send a message to the group's administrators directly through the site, or use the published email/phone if available."
+      },
+      "auth": {
+        "title": "Register & Login",
+        "desc": "Create an account to unlock member features such as commenting and contributing. Existing members can sign in from the Login page."
+      },
+      "comment": {
+        "title": "Commenting",
+        "desc": "Signed-in members (and guests, where allowed) can leave a comment and rating on posts. Comments are reviewed by moderators before they appear publicly."
+      },
+      "profile": {
+        "title": "Your Profile",
+        "desc": "View and update your personal information, change your password, and see your group membership and permissions."
+      },
+      "logout": {
+        "title": "Logging Out",
+        "desc": "Use the profile menu in the navigation bar to securely sign out of your account on this device."
+      },
+      "dashboard": {
+        "title": "Dashboard",
+        "desc": "An overview of the group's financial health, member statistics, and recent activity — contributions, expenses, posts and pending comments at a glance."
+      },
+      "members": {
+        "title": "Member Management",
+        "desc": "View, search, and manage every registered member: edit their details, assign them to access groups, activate/deactivate accounts, or remove members."
+      },
+      "groups": {
+        "title": "Access Groups",
+        "desc": "Create and manage permission groups. Each group bundles a set of permissions (e.g. who can post, approve comments, or view the balance) and can be assigned to members."
+      },
+      "balance": {
+        "title": "Contributions & Expenses (Admin)",
+        "desc": "Review and manage every contribution and expense record, verify payment receipts, and update statuses."
+      },
+      "manage_posts": {
+        "title": "Post Management",
+        "desc": "Create, edit, publish and delete posts, and manage their images."
+      },
+      "manage_comments": {
+        "title": "Comment Moderation",
+        "desc": "Review pending comments, approve the appropriate ones, filter by status or content type, and remove inappropriate comments."
+      },
+      "payments": {
+        "title": "Payment Review",
+        "desc": "Inspect incoming contributions, verify uploaded receipts, and confirm or reject manual payments."
+      },
+      "settings": {
+        "title": "System Settings",
+        "desc": "Configure site-wide defaults such as the default currency, visibility rules, and other global options."
+      },
+      "activity_log": {
+        "title": "Activity Log",
+        "desc": "A searchable, filterable history of actions performed by members across the platform — logins, posts, approvals, and more."
+      },
+      "system_log": {
+        "title": "System Log",
+        "desc": "Low-level system events and diagnostics, visible to superusers only."
+      },
+      "contributions_public": {
+        "title": "Contributors",
+        "desc": "A public page listing everyone who has chosen to be shown after their contribution is approved, along with their optional message."
+      },
+      "my_contributions": {
+        "title": "My Contributions",
+        "desc": "See the status of every contribution you've made, including the total approved so far and the reason for any that were rejected."
+      }
     }
   },
   "errors": {

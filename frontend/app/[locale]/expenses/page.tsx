@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { User, Calendar, ChevronLeft, ChevronRight, Wallet, Receipt } from 'lucide-react';
+import { User, Calendar, ChevronLeft, ChevronRight, Wallet, Receipt, Search, X } from 'lucide-react';
 import { fundAPI } from '@/lib/api';
 import type { FundBalance, Expense } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
@@ -36,6 +36,39 @@ export default function ExpensesPage() {
   const [hasPrev, setHasPrev] = useState(false);
   const [receiptModal, setReceiptModal] = useState<string | null>(null);
 
+  // Search & filter state
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [amountMin, setAmountMin] = useState('');
+  const [amountMax, setAmountMax] = useState('');
+  const [appliedFilters, setAppliedFilters] = useState({
+    search: '',
+    dateFrom: '',
+    dateTo: '',
+    amountMin: '',
+    amountMax: '',
+  });
+
+  // Debounce filter inputs before refetching
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedFilters({ search, dateFrom, dateTo, amountMin, amountMax });
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search, dateFrom, dateTo, amountMin, amountMax]);
+
+  const hasActiveFilters = !!(search || dateFrom || dateTo || amountMin || amountMax);
+
+  const clearFilters = () => {
+    setSearch('');
+    setDateFrom('');
+    setDateTo('');
+    setAmountMin('');
+    setAmountMax('');
+  };
+
   // Permissions live in localStorage; gate on mount so SSR and the first
   // client render agree (avoids React hydration mismatch).
   const [mounted, setMounted] = useState(false);
@@ -50,7 +83,13 @@ export default function ExpensesPage() {
       setLoadingExpenses(true);
       setLoginRequired(false);
       try {
-        const res = await fundAPI.getExpenses(pageNum);
+        const res = await fundAPI.getExpenses(pageNum, {
+          search: appliedFilters.search || undefined,
+          date_from: appliedFilters.dateFrom || undefined,
+          date_to: appliedFilters.dateTo || undefined,
+          amount_min: appliedFilters.amountMin || undefined,
+          amount_max: appliedFilters.amountMax || undefined,
+        });
         const raw = res.data as unknown as ExpensesResponse;
         setExpenses(raw.results || []);
         setTotalCount(raw.count || 0);
@@ -70,7 +109,7 @@ export default function ExpensesPage() {
         setLoadingExpenses(false);
       }
     },
-    [locale, router]
+    [locale, router, appliedFilters]
   );
 
   const fetchBalance = useCallback(async () => {
@@ -163,6 +202,81 @@ export default function ExpensesPage() {
           </div>
         )}
 
+        {/* Search & filters */}
+        <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-5 mb-6">
+          <div className="relative">
+            <Search
+              size={18}
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none"
+            />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('search_placeholder')}
+              className="w-full rounded-xl pl-11 pr-4 py-2.5 text-white placeholder-white/30 outline-none transition-colors"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+            <div>
+              <label className="block text-xs text-white/40 mb-1">{t('filter_date_from')}</label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="w-full rounded-xl px-3 py-2 text-white outline-none transition-colors"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-white/40 mb-1">{t('filter_date_to')}</label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="w-full rounded-xl px-3 py-2 text-white outline-none transition-colors"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-white/40 mb-1">{t('filter_amount_min')}</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={amountMin}
+                onChange={(e) => setAmountMin(e.target.value)}
+                className="w-full rounded-xl px-3 py-2 text-white placeholder-white/30 outline-none transition-colors"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-white/40 mb-1">{t('filter_amount_max')}</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={amountMax}
+                onChange={(e) => setAmountMax(e.target.value)}
+                className="w-full rounded-xl px-3 py-2 text-white placeholder-white/30 outline-none transition-colors"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+              />
+            </div>
+          </div>
+
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="mt-3 flex items-center gap-1.5 text-sm text-white/50 hover:text-white transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+              {t('filters_clear')}
+            </button>
+          )}
+        </div>
+
         {/* Expenses list */}
         {loadingExpenses ? (
           <div className="space-y-3">
@@ -246,9 +360,9 @@ export default function ExpensesPage() {
                       </div>
                       <p
                         className="font-bold text-lg flex-shrink-0"
-                        style={{ color: '#10b981', textShadow: '0 0 10px rgba(16,185,129,0.4)' }}
+                        style={{ color: '#ef4444', textShadow: '0 0 10px rgba(239,68,68,0.4)' }}
                       >
-                        {formatAmount(expense.amount, balance?.currency ?? '')}
+                        -{formatAmount(expense.amount, balance?.currency ?? '')}
                       </p>
                     </div>
 

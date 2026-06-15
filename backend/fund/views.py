@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
@@ -241,6 +241,10 @@ class ExpenseListView(APIView):
 
     def get(self, request):
         qs = Expense.objects.select_related('withdrawn_by').order_by('-expense_date')
+
+        search = request.query_params.get('search')
+        if search:
+            qs = qs.filter(Q(short_reason__icontains=search) | Q(description__icontains=search))
 
         date_from = request.query_params.get('date_from')
         date_to = request.query_params.get('date_to')

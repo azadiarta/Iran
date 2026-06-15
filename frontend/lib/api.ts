@@ -475,12 +475,15 @@ export const fundAPI = {
 
   getExpenses: (
     page = 1,
-    filters: { date_from?: string; date_to?: string; withdrawn_by?: string } = {}
+    filters: { search?: string; date_from?: string; date_to?: string; amount_min?: string; amount_max?: string; withdrawn_by?: string } = {}
   ) => {
     const params = new URLSearchParams();
     params.set('page', String(page));
+    if (filters.search) params.set('search', filters.search);
     if (filters.date_from) params.set('date_from', filters.date_from);
     if (filters.date_to) params.set('date_to', filters.date_to);
+    if (filters.amount_min) params.set('amount_min', filters.amount_min);
+    if (filters.amount_max) params.set('amount_max', filters.amount_max);
     if (filters.withdrawn_by) params.set('withdrawn_by', filters.withdrawn_by);
     return api.get<ApiResponse>(`/api/fund/expenses/?${params.toString()}`);
   },
