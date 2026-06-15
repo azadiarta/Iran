@@ -24,8 +24,8 @@ function StarRating({
   const [hover, setHover] = useState(0);
 
   return (
-    <div className="flex items-center gap-0.5">
-      {Array.from({ length: 10 }, (_, i) => i + 1).map((star) => (
+    <div className="flex items-center gap-2">
+      {Array.from({ length: 5 }, (_, i) => i + 1).map((star) => (
         <button
           key={star}
           type="button"
@@ -34,17 +34,17 @@ function StarRating({
           onMouseEnter={() => setHover(star)}
           onMouseLeave={() => setHover(0)}
           className="transition-transform duration-100 hover:scale-110 disabled:cursor-not-allowed"
-          aria-label={`Rate ${star} out of 10`}
+          aria-label={`Rate ${star} out of 5`}
         >
           <Star
-            size={16}
+            size={22}
             fill={(hover || value) >= star ? '#fbbf24' : 'none'}
             color={(hover || value) >= star ? '#fbbf24' : 'rgba(255,255,255,0.2)'}
           />
         </button>
       ))}
       {value > 0 && (
-        <span className="ml-2 text-xs text-white/40">{value}/10</span>
+        <span className="ml-2 text-xs text-white/40">{value}/5</span>
       )}
     </div>
   );
@@ -54,17 +54,18 @@ function StarRating({
 
 function StarDisplay({ rating }: { rating: number | null }) {
   if (!rating) return null;
+  const filled = Math.min(rating, 5);
   return (
-    <div className="flex items-center gap-0.5">
-      {Array.from({ length: 10 }, (_, i) => i + 1).map((star) => (
+    <div className="flex items-center gap-2">
+      {Array.from({ length: 5 }, (_, i) => i + 1).map((star) => (
         <Star
           key={star}
-          size={12}
-          fill={rating >= star ? '#fbbf24' : 'none'}
-          color={rating >= star ? '#fbbf24' : 'rgba(255,255,255,0.15)'}
+          size={18}
+          fill={filled >= star ? '#fbbf24' : 'none'}
+          color={filled >= star ? '#fbbf24' : 'rgba(255,255,255,0.15)'}
         />
       ))}
-      <span className="ml-1 text-xs text-white/40">{rating}/10</span>
+      <span className="ml-1 text-xs text-white/40">{filled}/5</span>
     </div>
   );
 }

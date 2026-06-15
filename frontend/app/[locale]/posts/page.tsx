@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { Search, MessageSquare, Calendar, User, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, MessageSquare, Calendar, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { postsAPI } from '@/lib/api';
 import type { PostSummary, Paginated } from '@/lib/api';
@@ -86,13 +86,6 @@ function PostCard({ post, locale, index }: { post: PostSummary; locale: string; 
             <Calendar size={12} />
             <span>{formatDate(post.created_at)}</span>
           </div>
-        </div>
-
-        {/* Read more */}
-        <div className="mt-auto pt-1">
-          <span className="inline-flex items-center gap-1 text-sm font-medium" style={{ color: '#00ffff' }}>
-            <ArrowRight size={14} />
-          </span>
         </div>
       </Link>
     </motion.div>

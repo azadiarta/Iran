@@ -1,5 +1,6 @@
 'use client';
 import { useEffect } from 'react';
+import { X } from 'lucide-react';
 
 export default function ImageLightbox({
   src,
@@ -42,11 +43,23 @@ export default function ImageLightbox({
         />
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
-          style={{ background: 'rgba(0,0,0,0.6)' }}
+          className="absolute top-3 right-3 w-11 h-11 rounded-full flex items-center justify-center text-white/70 transition-all duration-150 hover:text-white hover:scale-110"
+          style={{
+            background: 'rgba(0,0,0,0.6)',
+            border: '1px solid rgba(0,255,255,0.3)',
+            boxShadow: '0 0 12px rgba(0,255,255,0.15)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#00ffff';
+            e.currentTarget.style.boxShadow = '0 0 18px rgba(0,255,255,0.4)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'rgba(0,255,255,0.3)';
+            e.currentTarget.style.boxShadow = '0 0 12px rgba(0,255,255,0.15)';
+          }}
           aria-label="Close preview"
         >
-          ✕
+          <X className="w-5 h-5" />
         </button>
         {hintText && (
           <p className="text-center text-white/30 text-xs mt-2">{hintText}</p>
