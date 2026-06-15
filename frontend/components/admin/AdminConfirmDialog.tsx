@@ -12,6 +12,7 @@ interface AdminConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   loading?: boolean;
+  children?: React.ReactNode;
 }
 
 export default function AdminConfirmDialog({
@@ -23,6 +24,7 @@ export default function AdminConfirmDialog({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   loading = false,
+  children,
 }: AdminConfirmDialogProps) {
   useBodyScrollLock(isOpen);
 
@@ -62,7 +64,9 @@ export default function AdminConfirmDialog({
             </div>
 
             <h3 id="admin-confirm-dialog-title" className="text-base font-bold text-white mb-2">{title}</h3>
-            <p id="admin-confirm-dialog-message" className="text-sm text-white/60 mb-6">{message}</p>
+            <p id="admin-confirm-dialog-message" className="text-sm text-white/60 mb-4">{message}</p>
+
+            {children && <div className="mb-6 text-start">{children}</div>}
 
             <div className="flex items-center gap-3">
               <button

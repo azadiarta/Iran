@@ -205,13 +205,24 @@ class MemberToggleActiveView(APIView):
 
         previous_state = member.is_active
         member.is_active = not member.is_active
-        member.save(update_fields=['is_active'])
+
+        if member.is_active:
+            member.deactivation_reason = ''
+            member.deactivated_by = None
+            update_fields = ['is_active', 'deactivation_reason', 'deactivated_by']
+        else:
+            member.deactivation_reason = (request.data.get('reason') or '').strip()
+            member.deactivated_by = request.user
+            update_fields = ['is_active', 'deactivation_reason', 'deactivated_by']
+
+        member.save(update_fields=update_fields)
 
         action = 'member_activated' if member.is_active else 'member_deactivated'
         _log(request.user, action, target=member, ip=_get_ip(request), extra_data={
             'member_id': str(member.pk),
             'member_name': str(member),
             'previous_state': previous_state,
+            'reason': member.deactivation_reason,
         })
         status_label = 'activated' if member.is_active else 'deactivated'
         return api_success(MemberListSerializer(member).data, message=f'Member {status_label}.')

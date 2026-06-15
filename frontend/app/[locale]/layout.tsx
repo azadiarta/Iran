@@ -1,9 +1,16 @@
+import type { Metadata } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
+import '@/styles/globals.css';
 import ClientLayout from './ClientLayout';
 
 const locales = ['en', 'fa'];
+
+export const metadata: Metadata = {
+  title: 'Group Fund',
+  description: 'Transparent community fund management',
+};
 
 export default async function LocaleLayout({
   children,

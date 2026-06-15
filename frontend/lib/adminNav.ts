@@ -11,7 +11,6 @@ import {
   Database,
   ScrollText,
   Terminal,
-  Server,
 } from 'lucide-react';
 
 export interface AdminNavItem {
@@ -35,7 +34,6 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { key: 'posts', href: 'posts', label: { en: 'Posts', fa: 'پست‌ها' }, icon: Newspaper, permission: 'can_post' },
   { key: 'comments', href: 'comments', label: { en: 'Comments', fa: 'نظرات' }, icon: MessageSquare, permission: 'can_approve_comments', badgeKey: 'pendingCommentCount' },
   { key: 'payments', href: 'payments', label: { en: 'Payments', fa: 'تنظیمات پرداخت' }, icon: Wallet, permission: 'can_manage_permissions' },
-  { key: 'env-vars', href: 'env-vars', label: { en: 'Environment Variables', fa: 'متغیرهای محیطی' }, icon: Server, permission: 'can_manage_env_vars' },
   { key: 'settings', href: 'settings', label: { en: 'Settings', fa: 'تنظیمات' }, icon: Settings, permission: 'can_manage_permissions' },
   { key: 'system-status', href: 'system', label: { en: 'System Status', fa: 'وضعیت سیستم' }, icon: Database, superuserOnly: true },
   { key: 'activity-log', href: 'logs/activity', label: { en: 'Activity Log', fa: 'گزارش فعالیت' }, icon: ScrollText, divider: true, permission: 'can_manage_permissions' },
@@ -53,13 +51,23 @@ export function isNavItemVisible(
   return opts.hasPermission(item.permission);
 }
 
-// Any member holding at least one of these permissions can enter /admin
-// (superuserOnly items are excluded -- superusers bypass this check entirely).
-export const ADMIN_PERMISSIONS: string[] = Array.from(
-  new Set(
-    ADMIN_NAV_ITEMS.flatMap((item) => {
-      if (!item.permission) return [];
-      return Array.isArray(item.permission) ? item.permission : [item.permission];
-    })
-  )
-);
+// Permissions granted to the default group (see seed_initial_data.py
+// DEFAULT_GROUP_PERMISSIONS): commenting, contributing, viewing the fund
+// balance and viewing posts. Every plan/group is expected to include these
+// by default. A member whose group has no permission *outside* this set is
+// a regular member and must not see the "enter admin panel" button or be
+// able to reach /admin.
+export const BASELINE_PERMISSIONS: string[] = [
+  'can_comment',
+  'can_contribute',
+  'can_view_balance',
+  'can_view_posts',
+];
+
+export function hasAdminAccess(opts: {
+  isSuperuser: boolean;
+  groupPermissions?: string[] | null;
+}): boolean {
+  if (opts.isSuperuser) return true;
+  return (opts.groupPermissions || []).some((p) => !BASELINE_PERMISSIONS.includes(p));
+}

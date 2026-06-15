@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from accounts.models import AccessGroup
+from accounts.models import BASELINE_GROUP_PERMISSIONS, AccessGroup
 from core.models import DefaultSetting, Permission
 
 # codename -> (label, description)
@@ -17,12 +17,13 @@ PERMISSIONS = {
     'can_delete_member':      ('Can Delete Members', 'Deactivate or remove member accounts.'),
     'can_change_any_password':('Can Change Any Password', "Change another member's password."),
     'can_manage_permissions': ('Can Manage Permissions', 'Full admin access: members, groups, permissions, settings, payments and content moderation.'),
-    'can_manage_env_vars':    ('Can Manage Environment Variables', 'View and edit deployment/runtime configuration (environment variables) and reset them to auto-detected defaults.'),
 }
 
-# Every new AccessGroup must include these by default (see accounts/models.py).
+# The default group (assigned to newly registered members) gets the same
+# baseline permissions every group/plan is expected to have by default — see
+# accounts.models.BASELINE_GROUP_PERMISSIONS.
 DEFAULT_GROUP_NAME = 'Members'
-DEFAULT_GROUP_PERMISSIONS = ['can_contribute', 'can_comment']
+DEFAULT_GROUP_PERMISSIONS = BASELINE_GROUP_PERMISSIONS
 
 # key -> (default value, description)
 DEFAULT_SETTINGS = {

@@ -8,6 +8,7 @@ import AdminInput from '@/components/admin/fields/AdminInput';
 import AdminTextarea from '@/components/admin/fields/AdminTextarea';
 import AdminPermissionCheckbox, { PermissionOption } from '@/components/admin/fields/AdminPermissionCheckbox';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
+import { BASELINE_PERMISSIONS } from '@/lib/adminNav';
 import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
 import { groupsAPI, permissionsAPI, AccessGroup, Permission } from '@/lib/api';
@@ -31,7 +32,7 @@ export default function AdminGroupsPage() {
   const [editing, setEditing] = useState<AccessGroup | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedPermissions, setSelectedPermissions] = useState<string[]>(['can_contribute', 'can_comment']);
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([...BASELINE_PERMISSIONS]);
   const [saving, setSaving] = useState(false);
 
   const [confirmDelete, setConfirmDelete] = useState<AccessGroup | null>(null);
@@ -68,7 +69,7 @@ export default function AdminGroupsPage() {
     setEditing(null);
     setName('');
     setDescription('');
-    setSelectedPermissions(['can_contribute', 'can_comment']);
+    setSelectedPermissions([...BASELINE_PERMISSIONS]);
     setModalOpen(true);
   }
 

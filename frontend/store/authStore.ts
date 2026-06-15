@@ -12,6 +12,8 @@ export interface Member {
   is_active: boolean;
   is_superuser: boolean;
   created_at: string;
+  deactivation_reason?: string;
+  deactivated_by_name?: string | null;
 }
 
 interface AuthState {

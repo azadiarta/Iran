@@ -190,6 +190,18 @@ export default function LandingPage() {
           >
             <p className="font-semibold">{t('common.deactivated_title')}</p>
             <p>{t('common.deactivated_message')}</p>
+            {member?.deactivation_reason && (
+              <p>
+                <span className="font-semibold">{t('common.deactivated_reason_label')}: </span>
+                {member.deactivation_reason}
+              </p>
+            )}
+            {member?.deactivated_by_name && (
+              <p>
+                <span className="font-semibold">{t('common.deactivated_by_label')}: </span>
+                {member.deactivated_by_name}
+              </p>
+            )}
             <Link href={`/${locale}/contact`} className="underline inline-block">
               {t('common.deactivated_contact_link')}
             </Link>
