@@ -9,6 +9,23 @@ LEVEL_MAP = {
 }
 
 
+class Quiet4xxFilter(logging.Filter):
+    """Django's 'django.request' logger reports every 4xx response (401/403/404/...)
+    at WARNING via log_response(), e.g. anonymous visitors hitting member-only
+    endpoints (the homepage's balance/posts widgets) or bots probing the API.
+    That floods both the console and the admin System Log with routine,
+    expected traffic. Demote anything below 500 to INFO; real server errors
+    (5xx) keep their original level.
+    """
+
+    def filter(self, record):
+        status_code = getattr(record, 'status_code', None)
+        if status_code is not None and status_code < 500 and record.levelno > logging.INFO:
+            record.levelno = logging.INFO
+            record.levelname = 'INFO'
+        return True
+
+
 class SystemLogHandler(logging.Handler):
     """Persists warning-and-above log records to logs.SystemLog for the admin System Status page."""
 

@@ -384,6 +384,11 @@ if not DEBUG:
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'filters': {
+        'quiet_4xx': {
+            '()': 'core.logging_handlers.Quiet4xxFilter',
+        },
+    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
@@ -401,6 +406,12 @@ LOGGING = {
         'django': {
             'handlers': ['console', 'system_log'],
             'level': 'INFO' if DEBUG else 'WARNING',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['console', 'system_log'],
+            'level': 'INFO' if DEBUG else 'WARNING',
+            'filters': ['quiet_4xx'],
             'propagate': False,
         },
     },
