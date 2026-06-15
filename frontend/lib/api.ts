@@ -357,6 +357,8 @@ export interface MemberMinimal {
   full_name: string;
 }
 
+export type ContributionDisplayNameChoice = 'hidden' | 'display_name' | 'full_name' | 'custom';
+
 export interface Contribution {
   id: string;
   contributor: MemberMinimal | null;
@@ -366,6 +368,34 @@ export interface Contribution {
   payment_method: string;
   status: 'pending' | 'pending_review' | 'completed' | 'failed';
   notes: string;
+  created_at: string;
+  // Present on admin detail/edit responses
+  receipt_image?: string | null;
+  show_in_public_list?: boolean;
+  display_name_choice?: ContributionDisplayNameChoice;
+  public_display_name?: string;
+  message?: string;
+  rejection_reason?: string;
+  updated_at?: string;
+}
+
+export interface ContributionPublic {
+  id: string;
+  display_name: string | null;
+  amount: number;
+  currency: string;
+  message: string;
+  created_at: string;
+}
+
+export interface MyContribution {
+  id: string;
+  amount: number;
+  currency: string;
+  payment_method: string;
+  status: 'pending' | 'pending_review' | 'completed' | 'failed';
+  rejection_reason: string;
+  message: string;
   created_at: string;
 }
 
@@ -413,6 +443,35 @@ export const fundAPI = {
 
   deleteContribution: (id: string) =>
     api.delete<ApiResponse>(`/api/fund/contributions/${id}/delete/`),
+
+  getContributionsPublic: (page = 1) => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    return api.get<ApiResponse>(`/api/fund/contributions/public/?${params.toString()}`);
+  },
+
+  getContributionDetail: (id: string) =>
+    api.get<ApiResponse>(`/api/fund/contributions/${id}/`),
+
+  updateContribution: (id: string, data: Partial<{
+    amount: number;
+    currency: string;
+    guest_name: string;
+    payment_method: string;
+    status: string;
+    notes: string;
+    rejection_reason: string;
+    show_in_public_list: boolean;
+    display_name_choice: ContributionDisplayNameChoice;
+    public_display_name: string;
+    message: string;
+  }>) => api.patch<ApiResponse>(`/api/fund/contributions/${id}/edit/`, data),
+
+  getMyContributions: (page = 1) => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    return api.get<ApiResponse>(`/api/fund/contributions/mine/?${params.toString()}`);
+  },
 
   getExpenses: (
     page = 1,
@@ -470,6 +529,10 @@ export const paymentsAPI = {
     payment_method: string;
     guest_name?: string;
     notes?: string;
+    show_in_public_list?: boolean;
+    display_name_choice?: ContributionDisplayNameChoice;
+    public_display_name?: string;
+    message?: string;
   }) => api.post<ApiResponse>('/api/payments/initiate/', data),
 
   uploadReceipt: (contributionId: string, file: File) => {
@@ -624,6 +687,7 @@ export interface DashboardData {
   recent_expenses: Expense[];
   recent_posts: PostSummary[];
   pending_comments?: Comment[];
+  pending_contributions_count?: number;
 }
 
 export const dashboardAPI = {
@@ -746,6 +810,38 @@ export interface SystemStatus {
 
 export const systemAPI = {
   getStatus: () => api.get<ApiResponse>('/api/settings/system-status/'),
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Environment Variables API (admin)
+// ═══════════════════════════════════════════════════════════════════════════════
+export type EnvVarCategory = 'live' | 'restart' | 'readonly';
+export type EnvVarValueType = 'bool' | 'csv_extra' | 'string' | 'secret' | 'secret_regenerate';
+export type EnvVarSource = 'env' | 'override' | 'auto-detected' | 'default';
+
+export interface EnvVarItem {
+  key: string;
+  section: string;
+  category: EnvVarCategory;
+  value_type: EnvVarValueType;
+  requires_restart: boolean;
+  source: EnvVarSource;
+  value: string | boolean | string[];
+  base?: string[];
+}
+
+export const envVarsAPI = {
+  getAll: () => api.get<ApiResponse>('/api/env-vars/'),
+
+  update: (key: string, value: boolean | string | string[]) =>
+    api.patch<ApiResponse>(`/api/env-vars/${key}/`, { value }),
+
+  regenerateSecret: (key: string) =>
+    api.patch<ApiResponse>(`/api/env-vars/${key}/`, { confirm: true }),
+
+  reset: (key: string) => api.post<ApiResponse>(`/api/env-vars/${key}/reset/`),
+
+  resetAll: () => api.post<ApiResponse>('/api/env-vars/reset-all/'),
 };
 
 export default api;
