@@ -1,6 +1,7 @@
 'use client';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
 interface AdminModalProps {
   isOpen: boolean;
@@ -11,6 +12,8 @@ interface AdminModalProps {
 }
 
 export default function AdminModal({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' }: AdminModalProps) {
+  useBodyScrollLock(isOpen);
+
   return (
     <AnimatePresence>
       {isOpen && (

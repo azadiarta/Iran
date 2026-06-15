@@ -1,6 +1,7 @@
 'use client';
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
 export default function ImageLightbox({
   src,
@@ -13,6 +14,8 @@ export default function ImageLightbox({
   onClose: () => void;
   hintText?: string;
 }) {
+  useBodyScrollLock(true);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();

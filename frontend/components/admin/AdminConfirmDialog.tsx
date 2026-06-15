@@ -1,6 +1,7 @@
 'use client';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertTriangle } from 'lucide-react';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
 interface AdminConfirmDialogProps {
   isOpen: boolean;
@@ -23,6 +24,8 @@ export default function AdminConfirmDialog({
   cancelLabel = 'Cancel',
   loading = false,
 }: AdminConfirmDialogProps) {
+  useBodyScrollLock(isOpen);
+
   return (
     <AnimatePresence>
       {isOpen && (
