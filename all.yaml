@@ -13,7 +13,7 @@ rules:
   after_build: update exports + update imports with status
 
 progress:
-  current_phase: 13
+  current_phase: 14
   current_task: "complete (except phase 10 — deferred per project decision)"
   phases:
     1:
@@ -67,6 +67,10 @@ progress:
       name: "i18n cleanup, detail pages, 5-item pagination, image-modal Escape fix, admin System Status"
       status: done
       done: ["Fixed remaining hardcoded-English leaks on the Persian site: AdminTable Prev/Next/Page-N buttons gained optional bilingual prevLabel/nextLabel/pageLabel (default 'Prev'/'Next', back-compat); AdminFileUpload gained an isRTL prop for its hint text + 'Clear' button; admin/settings Save button aria-label is now bilingual; posts list pagination now uses common.prev/next/page_info; posts/[id] guest-comment placeholder and 'Submitting…' now use posts.comment_name_placeholder/common.submitting.", "Backend pagination consolidated into NEW backend/core/pagination.py (paginate(queryset, request, serializer_class, page_size=5)), replacing 4 duplicated `_paginate` helpers in fund/views.py, posts/views.py, accounts/member_views.py, logs/views.py. Page sizes: members/posts/contributions/expenses 10→5 (the 'show last 5 items' lists); comments(global)=10 and activity/system logs=25 kept unchanged but now explicit. All 7 admin list pages (members/contributions/expenses/posts/comments/logs-activity/logs-system) updated with totalCount state + bilingual prevLabel/nextLabel/pageLabel.", "NEW shared frontend/components/common/ImageLightbox.tsx (Escape key + backdrop + X to close) — extracted from posts/[id]'s old local Lightbox (which had NO Escape handler) and used to replace expenses/page.tsx's ad-hoc receipt modal (the reported 'hard to close' bug), plus the new expense detail page.", "NEW expense detail page frontend/app/[locale]/expenses/[id]/page.tsx (full description, amount, date, withdrawn-by, receipt lightbox, comments+rating form) — backed by NEW backend ExpenseDetailView (GET /api/fund/expenses/{id}/, permissions mirror ExpenseListView's expense_list_visibility logic) and 3 new fundAPI methods (getExpenseDetail/getExpenseComments/createExpenseComment). expenses/page.tsx rows are now Links to the detail page (receipt thumbnail still opens the lightbox via stopPropagation), pageSize 10→5, and 22 new bilingual `expenses.*` i18n keys added.", "NEW bilingual custom-listbox component frontend/components/admin/fields/AdminSelectWithDescription.tsx (label+description per option, click-outside/Escape to close) and NEW frontend/lib/settingsMeta.ts (SETTINGS_META) driving a rewritten /admin/settings: select-type settings (default_currency, expense/post/member_profile_list_visibility, default_group) now render as bilingual dropdowns-with-description (default_group's options come from groupsAPI.getList()), require_comment_approval renders as an AdminToggle, and unmapped keys keep the old plain-AdminInput fallback.", "NEW admin System Status page frontend/app/[locale]/admin/system/page.tsx (route /admin/system, superuser-only, AdminSidebar entry with a Database icon) backed by NEW backend SystemStatusView (GET /api/settings/system-status/, superuser-only) — shows DB engine+connection status, DEBUG mode (warns if on in Railway), environment, media storage (S3/local), Django version, and AdminStatCard counts for members/posts/contributions/expenses/pending-comments."]
+    14:
+      name: "Lion-and-Sun / Faravahar / Iranian-heritage visual redesign"
+      status: done
+      done: ["Replaced the emoji-based CulturalEmblem/LionAndSun with image-based components rendering Public Domain SVG assets in NEW frontend/public/symbols/: lion-and-sun.svg (Wikimedia Commons 'Lion and Sun.svg' — Iran's official historical Lion-and-Sun emblem) and faravahar.svg (Wikimedia Commons 'Faravahar-Gold.svg'). LionAndSun/FaravaharSimple keep their exact {size?, className?, animated?} SymbolProps signature (zero changes needed across all 17 LionAndSun consumers); LionAndSun wraps its non-square <img> in a size×size flex-centered div to preserve the square bounding-box contract.", "Added a shared internal GlowPulse({children}) helper in IranianSymbols.tsx (2s drop-shadow pulse, factored out of the previous per-component duplication), reused by LionAndSun/FaravaharSimple/the 5 new heritage icons' `animated` variant.", "REMOVED CulturalEmblem (emoji-in-medallion component, dead code) AND the landing page's dedicated 'Iranian Heritage' grid section (heading + 5-card grid). REMOVED the `heritage` i18n namespace from messages/en.json AND messages/fa.json (12 leaf keys each, 264→252 total, parity verified via python3 json diff).", "Added 5 NEW hand-drawn currentColor inline-SVG icon exports to IranianSymbols.tsx (viewBox 0 0 100 100, SymbolProps): PersepolisIcon, PasargadaeIcon, NaqsheRostamIcon, HafezIcon, SaadiIcon. Woven into frontend/app/[locale]/page.tsx as small/large low-opacity (0.06-0.07) absolutely-positioned background decorations in the Hero, Stats Bar, Recent Posts, How It Works, and CTA sections (pointer-events-none, hidden on small/medium breakpoints, logical start/end classes for RTL) — per the project requirement that these decorate without becoming a page focal point.", "Verified via `npm run build` (lint+typecheck pass, no warnings/errors) and Playwright full-page screenshots of localhost:3000 /en and /fa (Lion-and-Sun emblem renders correctly at navbar/hero/footer sizes, all 5 heritage icons render as subtle corner decorations, RTL logical start/end positioning confirmed correct in /fa)."]
 
 roadmap:
   # Task-oriented navigation index. When the user asks for a change, find the
@@ -97,21 +101,26 @@ roadmap:
     gotchas:
       - "fa.json MUST mirror en.json's key structure EXACTLY (i18n.invariant) — adding/renaming/removing a key in only one file breaks the OTHER locale's UI for that string (shows the raw key path)."
       - "the `common` namespace (loading/error/retry/close/prev/next/page_info/lightbox_hint/submitting) exists in both en.json/fa.json. As of Phase 13, prev/next/page_info/lightbox_hint/submitting ARE consumed (see i18n.namespaces.common.used_by — posts list pagination, posts/[id] and expenses[/[id]] comment-submit buttons + ImageLightbox hint); loading/error/retry/close remain UNUSED (verified via grep) — safe to extend, but don't assume those 4 are read anywhere."
-      - "`help.sections` and `heritage.items` are NESTED objects (per-key sub-objects), not flat string keys — see i18n.namespaces.help / i18n.namespaces.heritage for their inner shapes before editing."
+      - "`help.sections` is a NESTED object (per-key sub-objects), not a flat string key — see i18n.namespaces.help for its inner shape before editing."
     see_also: ["i18n", "change_public_page_layout_content"]
 
   change_heritage_emblem_visuals:
     description: >
       User wants to change how the Lion-and-Sun / Faravahar / geometric
-      pattern / generic cultural-emblem visuals look. ALL of these are
-      emoji+CSS (CulturalEmblem/LionAndSun) or inline SVG
-      (FaravaharSimple/GeometricPattern) — there are NO image files in the
-      project (frontend/public/ is empty except .gitkeep).
+      pattern / Iranian-heritage-landmark visuals look. LionAndSun and
+      FaravaharSimple are <img> tags pointing at Public Domain SVG assets in
+      frontend/public/symbols/ (lion-and-sun.svg, faravahar.svg).
+      GeometricPattern and the 5 heritage-landmark icons (PersepolisIcon,
+      PasargadaeIcon, NaqsheRostamIcon, HafezIcon, SaadiIcon) are hand-drawn
+      inline `currentColor` SVGs defined directly in IranianSymbols.tsx.
     entry_points:
       - "frontend/components/animations/IranianSymbols.tsx"
+      - "frontend/public/symbols/"   # lion-and-sun.svg, faravahar.svg
     typical_files:
-      - "frontend/components/animations/IranianSymbols.tsx"   # source of truth for all 4 exports
-      - "frontend/app/[locale]/page.tsx"                       # landing — uses ALL 4 exports
+      - "frontend/components/animations/IranianSymbols.tsx"   # source of truth for all 8 exports + shared internal GlowPulse helper
+      - "frontend/public/symbols/lion-and-sun.svg"             # LionAndSun source asset (PD, Wikimedia Commons "Lion and Sun.svg")
+      - "frontend/public/symbols/faravahar.svg"                # FaravaharSimple source asset (PD, Wikimedia Commons "Faravahar-Gold.svg")
+      - "frontend/app/[locale]/page.tsx"                       # landing — uses ALL 8 exports (LionAndSun, GeometricPattern, FaravaharSimple, PersepolisIcon, PasargadaeIcon, NaqsheRostamIcon, HafezIcon, SaadiIcon)
       - "frontend/components/layout/Navbar.tsx"                # LionAndSun only
       - "frontend/components/layout/Footer.tsx"                # LionAndSun only
       - "frontend/components/layout/AdminSidebar.tsx"           # LionAndSun only
@@ -121,14 +130,14 @@ roadmap:
       - "frontend/components/animations/PageTransition.tsx"     # LionAndSun — but UNUSED (see shared_components.IranianSymbols note)
     order_of_operations:
       - "1. Read shared_components.IranianSymbols for the FULL per-export needed_by list before editing — do not assume all consumers use all exports."
-      - "2. If changing ONLY the emoji/color/size defaults of CulturalEmblem/LionAndSun: edit IranianSymbols.tsx only — the medallion wrapper (CulturalEmblem) is shared, so a color/size prop default change ripples to every LionAndSun call site automatically; check call sites still pass the props they expect (most pass only `size`, some pass `animated`)."
-      - "3. If REPLACING an emoji/SVG with a real image asset: frontend/public/ is currently empty — would need to add image files there; next.config.mjs remotePatterns is NOT needed for local /public assets (only for next/image with external URLs); update IranianSymbols.tsx to use next/image, then verify every consumer's `size`/`className`/`animated` prop usage still makes sense for an <Image> element."
+      - "2. LionAndSun/FaravaharSimple are thin <img> wrappers around frontend/public/symbols/*.svg, sized via a fixed aspect-ratio constant (LION_AND_SUN_RATIO ~1.385 / FARAVAHAR_RATIO ~2.123) — to change the artwork itself, replace the SVG file in frontend/public/symbols/ (keep it Public Domain / properly licensed) and update the ratio constant if the new file's intrinsic viewBox aspect ratio differs. LionAndSun wraps its <img> in a size×size flex-centered <div> so the size×size bounding-box assumption all 17 consumers rely on still holds even though the source artwork itself is not square."
+      - "3. GeometricPattern and the 5 heritage-landmark icons (PersepolisIcon/PasargadaeIcon/NaqsheRostamIcon/HafezIcon/SaadiIcon) are hand-drawn inline `currentColor` SVGs (viewBox 0 0 100 100) — edit the <path>/<rect>/etc. elements directly in IranianSymbols.tsx. `animated=true` wraps any of these (except GeometricPattern) in the shared internal GlowPulse helper (2s drop-shadow pulse); GeometricPattern instead does a continuous 360°/20s rotation when animated."
       - "4. If adding a NEW symbol/export: add it to IranianSymbols.tsx, add a needed_by entry under shared_components.IranianSymbols.exports for the new export, and update files['frontend/components/animations/IranianSymbols.tsx'].exports."
     gotchas:
-      - "Landing page (page.tsx) is the ONLY consumer of CulturalEmblem/FaravaharSimple/GeometricPattern — changing their signature breaks ONLY that file, not the other consumers."
-      - "LionAndSun is used in 17 places (15 direct app/component consumers + SplashScreen + PageTransition) — changing its prop signature (size/className/animated) breaks all 17."
+      - "LionAndSun is used in 17 places (15 direct app/component consumers + SplashScreen + PageTransition) — changing its prop signature (size/className/animated) breaks all 17. The {size?, className?, animated?} SymbolProps signature was preserved across the <img>-based rewrite, so no consumer needed changes."
       - "PageTransition.tsx imports LionAndSun and is itself UNUSED (zero importers, orphaned despite status:done) — editing it has NO visible effect; do not waste effort there unless also wiring it up into ClientLayout.tsx."
-      - "All 'images' are emoji glyphs (🦁☀️🏛️🪦🗿📜📖) or inline SVG — there is no asset pipeline, no /public images, no next/image usage for these symbols today."
+      - "The 5 heritage-landmark icons are used ONLY on the landing page (frontend/app/[locale]/page.tsx), as small/large low-opacity (opacity 0.05-0.07) absolutely-positioned background decorations in the Hero, Stats Bar, Recent Posts, How It Works, and CTA sections (`pointer-events-none select-none`, `hidden sm:block`/`hidden md:block`, logical `start`/`end` positioning for RTL) — they are intentionally NOT a page focal point. There is no longer a dedicated 'Iranian Heritage' grid section (removed; the `heritage` i18n namespace was removed from en.json/fa.json along with it — see i18n.invariant)."
+      - "frontend/public/symbols/*.svg are referenced via plain <img src=\"/symbols/...svg\">, NOT next/image — avoids next.config.mjs dangerouslyAllowSVG changes. If migrating to next/image, dangerouslyAllowSVG + a CSP would need to be configured."
     see_also: ["shared_components.IranianSymbols", "change_public_page_layout_content", "change_navbar_footer"]
 
   add_admin_page_or_feature:
@@ -198,7 +207,7 @@ roadmap:
       - "4. For visual/symbol changes: check shared_components.IranianSymbols for this page's specific export usage (most pages use ONLY LionAndSun; landing page.tsx uniquely uses all 4 exports)."
       - "5. forbidden/unavailable/not-found pages are interceptor REDIRECT TARGETS (axios 403/503/404 in frontend/lib/api.ts) — changing their ROUTE path requires updating the interceptor's router.replace()/redirect target too."
     gotchas:
-      - "landing page.tsx (frontend/app/[locale]/page.tsx) is the single largest/most complex public page — multi-namespace root translator (landing/heritage/posts namespaces), all 4 IranianSymbols exports, AND auth-conditional CTA blocks. Treat a landing-page change as touching multiple roadmap categories at once."
+      - "landing page.tsx (frontend/app/[locale]/page.tsx) is the single largest/most complex public page — multi-namespace root translator (landing/posts namespaces), all 8 IranianSymbols exports, AND auth-conditional CTA blocks. Treat a landing-page change as touching multiple roadmap categories at once."
       - "posts/[id]/page.tsx and expenses/page.tsx both use next/image — if NEXT_PUBLIC_MEDIA_URL changes, check next.config.mjs remotePatterns (see change_deployment_env_config)."
       - "forbidden/unavailable/not-found have `imports.internal: []` — they are intentionally dependency-free interceptor targets; don't add app-wide state (authStore/etc.) to them without checking why the interceptor routes here while unauthenticated."
     see_also: ["change_ui_copy_translation", "change_heritage_emblem_visuals", "change_zustand_store"]
@@ -324,7 +333,7 @@ roadmap:
       - "5. Update DEPLOYMENT.md (Persian) to document any new required steps/vars."
     gotchas:
       - "5 severe pre-existing bugs were already found+fixed in this area (see progress.phases.11.done) — infinite redirect loops and 404s on /admin and /i18n/setlang/ came from next.config.mjs rewrites + middleware.ts matcher being out of sync. ANY new top-level route added to the Next.js app that should bypass next-intl locale prefixing (like /admin) MUST be added to middleware.ts's matcher exclusion AND, if proxied through Next to Django, to next.config.mjs rewrites()."
-      - "frontend/public/.gitkeep exists ONLY to make 'COPY --from=builder /frontend/public' succeed in both Dockerfiles — if real assets are EVER added to frontend/public/, this is no longer just a placeholder; don't delete .gitkeep casually since public/ might become empty again."
+      - "frontend/public/ now contains real assets (frontend/public/symbols/lion-and-sun.svg + faravahar.svg, see files entries) in addition to .gitkeep — don't delete .gitkeep regardless, since a hypothetical future removal of symbols/ would make public/ empty again and break 'COPY --from=builder /frontend/public' in both Dockerfiles."
       - "NEXT_PUBLIC_* vars are baked into the JS bundle AT BUILD TIME — changing them requires a rebuild, not just a container restart/env change."
     see_also: ["add_modify_payment_provider", "change_db_model_field"]
 
@@ -422,22 +431,44 @@ shared_components:
           - {file: "frontend/app/[locale]/admin/groups/page.tsx", context: "page header icon"}
           - {file: "frontend/components/animations/SplashScreen.tsx", context: "splash centerpiece, size=140, glow-pulse"}
           - {file: "frontend/components/animations/PageTransition.tsx", context: "transition overlay spinner, size=40 — NOTE: PageTransition itself is UNUSED (zero importers, orphaned), see its files entry"}
-        note: "17 consumers total (16 listed above excluding the definition file itself... actually 17 entries listed — count includes SplashScreen + PageTransition)."
-      CulturalEmblem:
-        signature: "{ emoji: string; size?: number; color?: string; animated?: boolean; className?: string }"
-        needed_by:
-          - {file: "frontend/app/[locale]/page.tsx", context: "Iranian Heritage grid (5 items: persepolis/pasargadae/naqshe_rostam/hafez/saadi, each its own emoji+color) — also the base component LionAndSun is built on"}
-        note: "LionAndSun is implemented AS a CulturalEmblem internally, but other files import LionAndSun directly, not CulturalEmblem — only page.tsx (landing) imports/uses CulturalEmblem directly."
+        note: "Renders <img src=\"/symbols/lion-and-sun.svg\"> (Public Domain — Wikimedia Commons 'Lion and Sun.svg', the official historical Iranian Lion-and-Sun emblem) inside a size×size flex-centered <div> (LION_AND_SUN_RATIO ~1.385 preserves the source's non-square aspect ratio within the square bounding box every consumer expects). `animated` wraps the result in the shared internal GlowPulse helper. 17 consumers total (16 listed above excluding the definition file itself — count includes SplashScreen + PageTransition)."
       FaravaharSimple:
         signature: "{ size?: number; className?: string; animated?: boolean }"
         needed_by:
           - {file: "frontend/app/[locale]/page.tsx", context: "CTA section decoration, size=80, animated — present for BOTH authenticated and guest CTA variants"}
+        note: "Renders <img src=\"/symbols/faravahar.svg\"> (Public Domain — Wikimedia Commons 'Faravahar-Gold.svg') at width=size, height=size/FARAVAHAR_RATIO (~2.123). `animated` wraps the result in the shared internal GlowPulse helper."
       GeometricPattern:
         signature: "{ size?: number; className?: string; animated?: boolean }"
         needed_by:
           - {file: "frontend/app/[locale]/page.tsx", context: "6 floating background patterns, rotating"}
           - {file: "frontend/components/animations/SplashScreen.tsx", context: "radiating-outward pattern, step>=4"}
-    consumer_count_note: "Only frontend/app/[locale]/page.tsx (landing) uses all 4 exports. All other 16 consumer files use ONLY LionAndSun. Verified per-file via JSX grep, not assumption."
+        note: "unchanged — hand-drawn inline currentColor SVG, 8-point geometric rosette, viewBox 0 0 100 100; `animated` = continuous 360° rotation over 20s (does NOT use GlowPulse)."
+      PersepolisIcon:
+        signature: "{ size?: number; className?: string; animated?: boolean }"
+        needed_by:
+          - {file: "frontend/app/[locale]/page.tsx", context: "Hero background corner decoration (size=220, opacity .06, color #d4a657, -bottom-8 -start-8) AND CTA section corner decoration (size=160, opacity .06, -bottom-10 -end-10)"}
+        note: "hand-drawn inline currentColor SVG (viewBox 0 0 100 100) — twin bull-headed ('Lamassu') columns from Persepolis' Gate of All Nations on a low-opacity mountain backdrop."
+      PasargadaeIcon:
+        signature: "{ size?: number; className?: string; animated?: boolean }"
+        needed_by:
+          - {file: "frontend/app/[locale]/page.tsx", context: "Hero background corner decoration (size=180, opacity .05, color #9ca3af, -top-6 -end-6) AND CTA section corner decoration (size=140, opacity .05, -top-8 -start-8)"}
+        note: "hand-drawn inline currentColor SVG (viewBox 0 0 100 100) — the Tomb of Cyrus the Great (Pasargadae), a gabled stone chamber atop a 6-tier stepped plinth."
+      NaqsheRostamIcon:
+        signature: "{ size?: number; className?: string; animated?: boolean }"
+        needed_by:
+          - {file: "frontend/app/[locale]/page.tsx", context: "Stats Bar section corner decoration, size=130, opacity .06, color #b45309, -bottom-6 -end-6"}
+        note: "hand-drawn inline currentColor SVG (viewBox 0 0 100 100) — cross-shaped Achaemenid rock-cut tomb facade (Naqsh-e Rostam) carved into a cliff face."
+      HafezIcon:
+        signature: "{ size?: number; className?: string; animated?: boolean }"
+        needed_by:
+          - {file: "frontend/app/[locale]/page.tsx", context: "Recent Posts section corner decoration, size=90, opacity .07, color #b91c1c, top-4 end-4"}
+        note: "hand-drawn inline currentColor SVG (viewBox 0 0 100 100) — open book topped by a singing nightingale, referencing Hafez's ghazals (nightingale-and-rose motif)."
+      SaadiIcon:
+        signature: "{ size?: number; className?: string; animated?: boolean }"
+        needed_by:
+          - {file: "frontend/app/[locale]/page.tsx", context: "How It Works section corner decoration, size=90, opacity .07, color #10b981, top-4 start-4"}
+        note: "hand-drawn inline currentColor SVG (viewBox 0 0 100 100) — open book topped by a rose blossom, referencing Saadi's 'Golestān' (The Rose Garden)."
+    consumer_count_note: "Only frontend/app/[locale]/page.tsx (landing) uses all 8 exports. All other 16 consumer files use ONLY LionAndSun, except SplashScreen.tsx which ALSO uses GeometricPattern. GlowPulse is an internal (non-exported) shared helper — used by the `animated` variant of LionAndSun, FaravaharSimple, and the 5 heritage-landmark icons (NOT GeometricPattern)."
 
   useAuthStore:
     file: "frontend/store/authStore.ts"
@@ -616,14 +647,17 @@ i18n:
   invariant: >
     frontend/messages/en.json and frontend/messages/fa.json MUST always have
     IDENTICAL top-level AND nested key structure (verified: both currently
-    have exactly the same 13 top-level keys in the same order: nav, landing,
-    heritage, auth, posts, expenses, contribute, profile, contact, help,
-    errors, footer, common). ANY key added/removed/renamed in en.json MUST be
-    mirrored in fa.json (Persian translation) in the SAME change — a missing
-    key falls back to the key path string itself at runtime (next-intl
-    behavior), producing visibly broken UI in whichever locale is missing it.
-    fa.json additionally requires RTL-correct phrasing, not a literal
-    translation when idiom differs.
+    have exactly the same 12 top-level keys in the same order: nav, landing,
+    auth, posts, expenses, contribute, profile, contact, help, errors,
+    footer, common — 252 leaf keys total each, verified via python3 json
+    diff. The former `heritage` namespace was REMOVED from both files in the
+    Lion-and-Sun/heritage-icon visual redesign — see
+    roadmap.change_heritage_emblem_visuals). ANY key added/removed/renamed in
+    en.json MUST be mirrored in fa.json (Persian translation) in the SAME
+    change — a missing key falls back to the key path string itself at
+    runtime (next-intl behavior), producing visibly broken UI in whichever
+    locale is missing it. fa.json additionally requires RTL-correct phrasing,
+    not a literal translation when idiom differs.
   namespaces:
     nav:
       keys: [home, posts, expenses, contribute, help, contact, login, logout, profile]
@@ -635,10 +669,6 @@ i18n:
       keys: [headline, tagline, cta_join, cta_profile, cta_contribute, cta_ready_title, cta_authed_title, cta_authed_desc, cta_view_posts, stats_members, stats_contributions, stats_balance, posts_title, how_title, step1_title, step1_desc, step1_title_member, step1_desc_member, step2_title, step2_desc, step3_title, step3_desc]
       used_by:
         - {file: "frontend/app/[locale]/page.tsx", via: "useTranslations() — NO namespace arg, root-level translator; calls t('landing.*')"}
-    heritage:
-      keys: ["title", "subtitle", "items.<persepolis|pasargadae|naqshe_rostam|hafez|saadi>.{name,desc}"]
-      used_by:
-        - {file: "frontend/app/[locale]/page.tsx", via: "useTranslations() root translator; calls t('heritage.title'), t('heritage.subtitle'), t(`heritage.items.${key}.name`/desc) for each of the 5 items"}
     auth:
       keys: [login_title, register_title, credential_label, password_label, confirm_password_label, full_name_label, display_name_label, phone_label, email_label, phone_or_email_hint, login_btn, register_btn, no_account, has_account, register_link, login_link]
       used_by:
@@ -1913,7 +1943,7 @@ files:
     status: done
     kind: page
     route: "/{locale}"
-    note: "landing — fundAPI.getBalance() + postsAPI.getList(1,'') (latest 3 posts). AUTH-CONDITIONAL UI (when isAuthenticated && member from useAuthStore): hero CTA replaces the 'Join the Group' register link with a 'My Profile' link (landing.cta_profile) to /{locale}/profile (Contribute Now link unchanged for everyone); 'How It Works' Step 1 card swaps its CheckCircle icon + 'Join'-copy for UserCheck + landing.step1_title_member/step1_desc_member ('You're a Member'); bottom CTA section swaps the 'Ready to join?'/register-button block for landing.cta_authed_title/cta_authed_desc ('Welcome back!') + a 'View Posts' button to /{locale}/posts (landing.cta_view_posts) — FaravaharSimple decoration stays for both states. Also fixed a pre-existing hardcoded-English 'Ready to join?' heading → landing.cta_ready_title for the logged-out case. NEW 'Iranian Heritage' section inserted between 'How It Works' and the CTA section: heading/subtitle (heritage.title/subtitle) + a grid of 5 CulturalEmblem cards (persepolis/pasargadae/naqshe_rostam/hafez/saadi, each with heritage.items.<key>.name/desc from messages/en.json+fa.json)."
+    note: "landing — fundAPI.getBalance() + postsAPI.getList(1,'') (latest 3 posts). AUTH-CONDITIONAL UI (when isAuthenticated && member from useAuthStore): hero CTA replaces the 'Join the Group' register link with a 'My Profile' link (landing.cta_profile) to /{locale}/profile (Contribute Now link unchanged for everyone); 'How It Works' Step 1 card swaps its CheckCircle icon + 'Join'-copy for UserCheck + landing.step1_title_member/step1_desc_member ('You're a Member'); bottom CTA section swaps the 'Ready to join?'/register-button block for landing.cta_authed_title/cta_authed_desc ('Welcome back!') + a 'View Posts' button to /{locale}/posts (landing.cta_view_posts) — FaravaharSimple decoration stays for both states. Also fixed a pre-existing hardcoded-English 'Ready to join?' heading → landing.cta_ready_title for the logged-out case. HERITAGE VISUAL REDESIGN (see roadmap.change_heritage_emblem_visuals): the old 'Iranian Heritage' grid section (heritage.title/subtitle + 5 CulturalEmblem cards) was REMOVED entirely, along with the `heritage` i18n namespace. Instead, 5 new hand-drawn currentColor icon components (PersepolisIcon, PasargadaeIcon, NaqsheRostamIcon, HafezIcon, SaadiIcon) are woven through the page as small/large low-opacity (0.05-0.07) absolutely-positioned background decorations, each section given `relative overflow-hidden`: Hero gets PersepolisIcon (size=220, -bottom-8 -start-8) + PasargadaeIcon (size=180, -top-6 -end-6); Stats Bar gets NaqsheRostamIcon (size=130, -bottom-6 -end-6); Recent Posts gets HafezIcon (size=90, top-4 end-4); How It Works gets SaadiIcon (size=90, top-4 start-4); CTA gets PersepolisIcon (size=160, -bottom-10 -end-10) + PasargadaeIcon (size=140, -top-8 -start-8). All use `pointer-events-none select-none hidden sm:block`/`hidden md:block` and logical start/end classes for RTL correctness."
     imports:
       external:
         - {from: react, items: [useState, useEffect, useRef]}
@@ -1923,12 +1953,12 @@ files:
         - {from: framer-motion, items: [motion, useInView]}
         - {from: lucide-react, items: [Users, TrendingUp, Wallet, ArrowRight, CheckCircle, UserCheck, User]}
       internal:
-        - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun, GeometricPattern, FaravaharSimple, CulturalEmblem], status: available}
+        - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun, GeometricPattern, FaravaharSimple, PersepolisIcon, PasargadaeIcon, NaqsheRostamIcon, HafezIcon, SaadiIcon], status: available}
         - {file: "frontend/lib/api.ts", items: [postsAPI, fundAPI, "types: PostSummary, FundBalance"], status: available}
         - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
     exports:
       - {name: default, kind: function, type: "React Server/Client Component (page)"}
-    i18n_namespace: "none (root translator, multi-namespace: landing, heritage, posts)"
+    i18n_namespace: "none (root translator, multi-namespace: landing, posts)"
     needed_by: []
 
   "frontend/app/[locale]/login/page.tsx":
@@ -2624,15 +2654,19 @@ files:
   "frontend/components/animations/IranianSymbols.tsx":
     status: done
     kind: component
-    note: "LionAndSun reimplemented (replacing the previous hand-drawn SVG, which was repeatedly rejected as 'ugly/childish' with no internet/image-gen available to source real artwork) on top of a new shared CulturalEmblem({emoji, size, color, animated}) component: a circular 'medallion' div (radial-gradient background tinted by color, 2px solid border) centered on a native full-color emoji glyph (professionally designed by Apple/Google/Microsoft, not hand-drawn) — optionally wrapped in the existing motion.div drop-shadow glow-pulse. LionAndSun = CulturalEmblem(emoji='🦁', color='#fbbf24') plus a small absolutely-positioned ☀️ badge in the top-right corner (the 'Lion and Sun' pairing); same size/className/animated prop signature as before, so every call site (Navbar, Footer, login, register, landing hero/CTA) needed no changes. CulturalEmblem is reused by the new 'Iranian Heritage' section on the landing page (5 items: persepolis 🏛️, pasargadae 🪦, naqshe_rostam 🗿, hafez 📜, saadi 📖). FaravaharSimple/GeometricPattern unchanged (hand-drawn SVG, viewBox 200x80 and 100x100 respectively)."
+    note: "Lion-and-Sun / Faravahar / heritage-icon visual redesign (see roadmap.change_heritage_emblem_visuals). LionAndSun and FaravaharSimple are now thin <img> wrappers around two Public Domain SVG assets in frontend/public/symbols/ (lion-and-sun.svg = Wikimedia Commons 'Lion and Sun.svg', the official historical Iranian emblem; faravahar.svg = Wikimedia Commons 'Faravahar-Gold.svg'), replacing the previous emoji-based CulturalEmblem/LionAndSun (CulturalEmblem REMOVED — dead code after the heritage grid section was removed from page.tsx). LionAndSun preserves its size×size square bounding box via a flex-centered wrapper <div> + LION_AND_SUN_RATIO (~1.385); FaravaharSimple sets width=size/height=size/FARAVAHAR_RATIO (~2.123). A new shared internal (non-exported) GlowPulse({children}) helper extracts the common 2s drop-shadow pulse motion.div, reused by LionAndSun/FaravaharSimple/the 5 new heritage-landmark icons' `animated` variant. GeometricPattern is unchanged (hand-drawn SVG, viewBox 0 0 100 100, 360°/20s rotation when animated). 5 NEW hand-drawn currentColor inline-SVG heritage-landmark icon exports added (all viewBox 0 0 100 100, SymbolProps {size?=100, className?, animated?=false}): PersepolisIcon (Gate of All Nations bull-headed columns), PasargadaeIcon (Tomb of Cyrus the Great, stepped plinth), NaqsheRostamIcon (cross-shaped rock-cut tomb facade), HafezIcon (open book + nightingale), SaadiIcon (open book + rose blossom) — woven into the landing page as low-opacity background decorations, NOT a dedicated grid section."
     imports:
       external: [{from: framer-motion, items: [motion]}]
     exports:
-      - {name: CulturalEmblem, kind: function, type: "React component", props: "CulturalEmblemProps {emoji, size?=64, color?='#fbbf24', animated?=false, className?} — circular medallion (radial-gradient + 2px border) around an emoji glyph; animated wraps in motion.div drop-shadow glow-pulse (2s loop)"}
-      - {name: LionAndSun, kind: function, type: "React component", props: "SymbolProps {size?=100, className?, animated?=false} — CulturalEmblem(emoji='🦁', color='#fbbf24', size) + absolutely-positioned ☀️ badge (top-right, ~32% size)"}
-      - {name: FaravaharSimple, kind: function, type: "React component", props: "SymbolProps — hand-drawn SVG Faravahar (viewBox 0 0 200 80, currentColor strokes), animated wraps in glow-pulse motion.div"}
+      - {name: LionAndSun, kind: function, type: "React component", props: "SymbolProps {size?=100, className?, animated?=false} — <img src=\"/symbols/lion-and-sun.svg\"> inside a size×size flex-centered div (LION_AND_SUN_RATIO ~1.385); animated wraps in GlowPulse"}
+      - {name: FaravaharSimple, kind: function, type: "React component", props: "SymbolProps — <img src=\"/symbols/faravahar.svg\"> at width=size, height=size/FARAVAHAR_RATIO (~2.123); animated wraps in GlowPulse"}
       - {name: GeometricPattern, kind: function, type: "React component", props: "SymbolProps — hand-drawn SVG 8-point geometric rosette (viewBox 0 0 100 100, currentColor strokes); animated = continuous 360° rotation over 20s"}
-    needed_by: "see shared_components.IranianSymbols for the full per-export consumer lists (LionAndSun: 17 files; CulturalEmblem/FaravaharSimple/GeometricPattern: frontend/app/[locale]/page.tsx ONLY)"
+      - {name: PersepolisIcon, kind: function, type: "React component", props: "SymbolProps — hand-drawn currentColor SVG (viewBox 0 0 100 100), Persepolis bull-headed columns; animated wraps in GlowPulse"}
+      - {name: PasargadaeIcon, kind: function, type: "React component", props: "SymbolProps — hand-drawn currentColor SVG (viewBox 0 0 100 100), Tomb of Cyrus the Great; animated wraps in GlowPulse"}
+      - {name: NaqsheRostamIcon, kind: function, type: "React component", props: "SymbolProps — hand-drawn currentColor SVG (viewBox 0 0 100 100), Naqsh-e Rostam rock-cut tomb facade; animated wraps in GlowPulse"}
+      - {name: HafezIcon, kind: function, type: "React component", props: "SymbolProps — hand-drawn currentColor SVG (viewBox 0 0 100 100), open book + nightingale; animated wraps in GlowPulse"}
+      - {name: SaadiIcon, kind: function, type: "React component", props: "SymbolProps — hand-drawn currentColor SVG (viewBox 0 0 100 100), open book + rose blossom; animated wraps in GlowPulse"}
+    needed_by: "see shared_components.IranianSymbols for the full per-export consumer lists (LionAndSun: 17 files; FaravaharSimple/GeometricPattern/PersepolisIcon/PasargadaeIcon/NaqsheRostamIcon/HafezIcon/SaadiIcon: frontend/app/[locale]/page.tsx ONLY, GeometricPattern also SplashScreen.tsx)"
 
   "frontend/components/animations/PageTransition.tsx":
     status: done
@@ -2825,14 +2859,14 @@ files:
   "frontend/messages/en.json":
     status: done
     kind: data
-    note: "13 top-level namespaces (nav, landing, heritage, auth, posts, expenses, contribute, profile, contact, help, errors, footer, common) — see top-level `i18n:` section for full namespace→keys→consumer map. EN is source-of-truth; fa.json MUST mirror its key structure exactly (see i18n.invariant)."
+    note: "12 top-level namespaces (nav, landing, auth, posts, expenses, contribute, profile, contact, help, errors, footer, common) — see top-level `i18n:` section for full namespace→keys→consumer map. EN is source-of-truth; fa.json MUST mirror its key structure exactly (see i18n.invariant)."
     exports: "see i18n: section"
     needed_by: "see i18n: section .namespaces.*.used_by"
 
   "frontend/messages/fa.json":
     status: done
     kind: data
-    note: "Persian mirror of en.json — RTL phrasing (not literal translation where idiom differs), MUST have identical key structure to en.json (verified currently true — 13 matching top-level keys, see top-level `i18n:` section). See frontend/messages/en.json for the full namespace→keys→consumer map."
+    note: "Persian mirror of en.json — RTL phrasing (not literal translation where idiom differs), MUST have identical key structure to en.json (verified currently true — 12 matching top-level keys, see top-level `i18n:` section). See frontend/messages/en.json for the full namespace→keys→consumer map."
     exports: "see frontend/messages/en.json"
     needed_by: "see frontend/messages/en.json"
 
@@ -2927,8 +2961,22 @@ files:
   "frontend/public/.gitkeep":
     status: done
     kind: config
-    note: "EMPTY placeholder — frontend/public/ contains NO image/icon/font assets anywhere in the project; exists so 'COPY --from=builder /frontend/public' succeeds in Docker builds (see Dockerfile.railway / frontend/Dockerfile)."
+    note: "Originally an EMPTY placeholder so 'COPY --from=builder /frontend/public' succeeds in Docker builds (see Dockerfile.railway / frontend/Dockerfile). frontend/public/ now ALSO contains a real asset subdirectory, frontend/public/symbols/ (lion-and-sun.svg, faravahar.svg) — .gitkeep is kept regardless since it costs nothing and Docker COPY of /frontend/public must not depend on symbols/ continuing to exist."
     needed_by: []
+
+  "frontend/public/symbols/lion-and-sun.svg":
+    status: done
+    kind: asset
+    note: "Public Domain (PD-self) SVG — cleaned export of Wikimedia Commons 'Lion and Sun.svg' (the official historical Iranian Lion-and-Sun emblem: a lion holding a curved sword in front of a rising sun, standing on a decorative platform). viewBox 0 0 270.00001 194.99977 (~1.385 aspect ratio, matches LION_AND_SUN_RATIO in IranianSymbols.tsx). Cleaned by stripping Inkscape/Sodipodi-specific defs/attributes from the original Commons file via a one-off regex pass — gold (#ffb81c) fill paths for the lion/sun/platform + black cutout-detail paths."
+    needed_by:
+      - {file: "frontend/components/animations/IranianSymbols.tsx", context: "LionAndSun renders this via <img src=\"/symbols/lion-and-sun.svg\">"}
+
+  "frontend/public/symbols/faravahar.svg":
+    status: done
+    kind: asset
+    note: "Public Domain (PD-self) SVG — direct copy of Wikimedia Commons 'Faravahar-Gold.svg' (the Faravahar, a winged figure holding a ring, gold/tan tones). viewBox 0 0 529.9035 249.62308 (~2.123 aspect ratio, matches FARAVAHAR_RATIO in IranianSymbols.tsx). Single compound <path>, already clean (no Inkscape cruft)."
+    needed_by:
+      - {file: "frontend/components/animations/IranianSymbols.tsx", context: "FaravaharSimple renders this via <img src=\"/symbols/faravahar.svg\">"}
   # ─── PHASE 7B — KNOWN BACKEND GAPS — RESOLVED ─────────────────────────────────
   # 1. RESOLVED: added `CommentGlobalListView` (GET /api/posts/comments/) in
   #    backend/posts/views.py — paginated via `_paginate()`, filterable by

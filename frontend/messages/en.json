@@ -34,17 +34,6 @@
     "step3_title": "Track",
     "step3_desc": "See exactly how funds are collected and spent"
   },
-  "heritage": {
-    "title": "Iranian Cultural Heritage",
-    "subtitle": "A glimpse into Iran's ancient civilization, art, and poetry",
-    "items": {
-      "persepolis": { "name": "Persepolis", "desc": "Ceremonial capital of the Achaemenid Empire" },
-      "pasargadae": { "name": "Pasargadae", "desc": "Tomb of Cyrus the Great" },
-      "naqshe_rostam": { "name": "Naqsh-e Rostam", "desc": "Ancient Achaemenid and Sassanid rock reliefs" },
-      "hafez": { "name": "Hafez", "desc": "Beloved Persian poet of the Divan" },
-      "saadi": { "name": "Saadi", "desc": "Author of the Gulistan and Bustan" }
-    }
-  },
   "auth": {
     "login_title": "Sign In",
     "register_title": "Create Account",

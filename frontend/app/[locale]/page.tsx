@@ -5,7 +5,16 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { motion, useInView } from 'framer-motion';
 import { Users, TrendingUp, Wallet, ArrowRight, CheckCircle, UserCheck, User } from 'lucide-react';
-import { LionAndSun, GeometricPattern, FaravaharSimple, CulturalEmblem } from '@/components/animations/IranianSymbols';
+import {
+  LionAndSun,
+  GeometricPattern,
+  FaravaharSimple,
+  PersepolisIcon,
+  PasargadaeIcon,
+  NaqsheRostamIcon,
+  HafezIcon,
+  SaadiIcon,
+} from '@/components/animations/IranianSymbols';
 import { postsAPI, fundAPI } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 import type { PostSummary, FundBalance } from '@/lib/api';
@@ -197,6 +206,22 @@ export default function LandingPage() {
           </motion.div>
         ))}
 
+        {/* Background: large heritage landmarks, low-opacity corner decoration */}
+        <div
+          className="absolute -bottom-8 -start-8 pointer-events-none select-none hidden sm:block"
+          style={{ color: '#d4a657', opacity: 0.06 }}
+          aria-hidden="true"
+        >
+          <PersepolisIcon size={220} />
+        </div>
+        <div
+          className="absolute -top-6 -end-6 pointer-events-none select-none hidden sm:block"
+          style={{ color: '#9ca3af', opacity: 0.05 }}
+          aria-hidden="true"
+        >
+          <PasargadaeIcon size={180} />
+        </div>
+
         {/* Hero content */}
         <div className="relative z-10 flex flex-col items-center text-center px-4 max-w-3xl mx-auto">
           <motion.div
@@ -319,9 +344,17 @@ export default function LandingPage() {
 
       {/* ─── Stats Bar ────────────────────────────────────────────────────── */}
       <section
-        className="py-12 px-4"
+        className="relative overflow-hidden py-12 px-4"
         style={{ background: 'rgba(255,255,255,0.02)', borderTop: '1px solid rgba(255,255,255,0.06)' }}
       >
+        <div
+          className="absolute -bottom-6 -end-6 pointer-events-none select-none hidden md:block"
+          style={{ color: '#b45309', opacity: 0.06 }}
+          aria-hidden="true"
+        >
+          <NaqsheRostamIcon size={130} />
+        </div>
+
         <FadeInSection>
           <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
             <StatCard
@@ -351,7 +384,15 @@ export default function LandingPage() {
       </section>
 
       {/* ─── Recent Posts ─────────────────────────────────────────────────── */}
-      <section className="py-16 px-4">
+      <section className="relative overflow-hidden py-16 px-4">
+        <div
+          className="absolute top-4 end-4 pointer-events-none select-none hidden md:block"
+          style={{ color: '#b91c1c', opacity: 0.07 }}
+          aria-hidden="true"
+        >
+          <HafezIcon size={90} />
+        </div>
+
         <FadeInSection>
           <div className="max-w-6xl mx-auto">
             <h2
@@ -428,9 +469,17 @@ export default function LandingPage() {
 
       {/* ─── How It Works ─────────────────────────────────────────────────── */}
       <section
-        className="py-16 px-4"
+        className="relative overflow-hidden py-16 px-4"
         style={{ background: 'rgba(255,255,255,0.02)', borderTop: '1px solid rgba(255,255,255,0.06)' }}
       >
+        <div
+          className="absolute top-4 start-4 pointer-events-none select-none hidden md:block"
+          style={{ color: '#10b981', opacity: 0.07 }}
+          aria-hidden="true"
+        >
+          <SaadiIcon size={90} />
+        </div>
+
         <FadeInSection delay={0.1}>
           <div className="max-w-5xl mx-auto">
             <h2
@@ -501,47 +550,23 @@ export default function LandingPage() {
         </FadeInSection>
       </section>
 
-      {/* ─── Iranian Heritage ─────────────────────────────────────────────── */}
-      <section className="py-16 px-4">
-        <FadeInSection delay={0.1}>
-          <div className="max-w-5xl mx-auto text-center">
-            <h2
-              className="text-3xl font-bold mb-3"
-              style={{ color: '#00ffff', textShadow: '0 0 10px rgba(0,255,255,0.6)' }}
-            >
-              {t('heritage.title')}
-            </h2>
-            <p className="text-white/50 mb-12 max-w-2xl mx-auto">
-              {t('heritage.subtitle')}
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-              {[
-                { key: 'persepolis', emoji: '🏛️', color: '#d4a657' },
-                { key: 'pasargadae', emoji: '🪦', color: '#9ca3af' },
-                { key: 'naqshe_rostam', emoji: '🗿', color: '#b45309' },
-                { key: 'hafez', emoji: '📜', color: '#b91c1c' },
-                { key: 'saadi', emoji: '📖', color: '#10b981' },
-              ].map((item) => (
-                <div
-                  key={item.key}
-                  className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-5 flex flex-col items-center gap-3"
-                >
-                  <CulturalEmblem emoji={item.emoji} color={item.color} size={56} />
-                  <h3 className="text-white font-bold text-sm">
-                    {t(`heritage.items.${item.key}.name`)}
-                  </h3>
-                  <p className="text-white/50 text-xs">
-                    {t(`heritage.items.${item.key}.desc`)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </FadeInSection>
-      </section>
-
       {/* ─── CTA Section ──────────────────────────────────────────────────── */}
-      <section className="py-16 px-4">
+      <section className="relative overflow-hidden py-16 px-4">
+        <div
+          className="absolute -bottom-10 -end-10 pointer-events-none select-none hidden sm:block"
+          style={{ color: '#d4a657', opacity: 0.06 }}
+          aria-hidden="true"
+        >
+          <PersepolisIcon size={160} />
+        </div>
+        <div
+          className="absolute -top-8 -start-8 pointer-events-none select-none hidden sm:block"
+          style={{ color: '#9ca3af', opacity: 0.05 }}
+          aria-hidden="true"
+        >
+          <PasargadaeIcon size={140} />
+        </div>
+
         <FadeInSection delay={0.1}>
           <div className="max-w-2xl mx-auto text-center">
             <div style={{ color: '#fbbf24', display: 'inline-block', marginBottom: '1.5rem' }}>
