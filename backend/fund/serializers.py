@@ -1,3 +1,4 @@
+from django.utils.html import strip_tags
 from rest_framework import serializers
 
 from core.models import DefaultSetting
@@ -29,7 +30,14 @@ class ContributionCreateSerializer(serializers.ModelSerializer):
         fields = [
             'guest_name', 'amount', 'currency',
             'payment_method', 'notes',
+            'show_in_public_list', 'display_name_choice', 'public_display_name', 'message',
         ]
+        extra_kwargs = {
+            'show_in_public_list': {'required': False},
+            'display_name_choice': {'required': False},
+            'public_display_name': {'required': False},
+            'message': {'required': False},
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -41,6 +49,12 @@ class ContributionCreateSerializer(serializers.ModelSerializer):
         if value <= 0:
             raise serializers.ValidationError('Amount must be a positive number.')
         return value
+
+    def validate_message(self, value):
+        return strip_tags(value).strip()
+
+    def validate_public_display_name(self, value):
+        return strip_tags(value).strip()
 
     def validate(self, data):
         request = self.context.get('request')
@@ -100,6 +114,70 @@ class ContributionStatusSerializer(serializers.ModelSerializer):
         if value not in allowed:
             raise serializers.ValidationError('Status must be completed or failed.')
         return value
+
+
+class ContributionPublicListSerializer(serializers.ModelSerializer):
+    display_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Contribution
+        fields = ['id', 'display_name', 'amount', 'currency', 'message', 'created_at']
+
+    def get_display_name(self, obj):
+        choice = obj.display_name_choice
+        if choice == Contribution.DisplayNameChoice.CUSTOM:
+            return obj.public_display_name or None
+        if choice == Contribution.DisplayNameChoice.FULL_NAME:
+            return obj.contributor.full_name if obj.contributor else (obj.guest_name or None)
+        if choice == Contribution.DisplayNameChoice.HIDDEN:
+            return None
+        if obj.contributor:
+            return obj.contributor.display_name or obj.contributor.full_name
+        return obj.guest_name or None
+
+
+class ContributionAdminDetailSerializer(serializers.ModelSerializer):
+    contributor = MemberMinimalSerializer(read_only=True)
+    receipt_image = RelativeImageField()
+
+    class Meta:
+        model = Contribution
+        fields = [
+            'id', 'contributor', 'guest_name', 'amount', 'currency',
+            'payment_method', 'status', 'notes', 'receipt_image',
+            'show_in_public_list', 'display_name_choice', 'public_display_name',
+            'message', 'rejection_reason', 'created_at', 'updated_at',
+        ]
+
+
+class ContributionAdminEditSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Contribution
+        fields = [
+            'amount', 'currency', 'guest_name', 'payment_method', 'status', 'notes',
+            'rejection_reason', 'show_in_public_list', 'display_name_choice',
+            'public_display_name', 'message',
+        ]
+
+    def validate_amount(self, value):
+        if value <= 0:
+            raise serializers.ValidationError('Amount must be a positive number.')
+        return value
+
+    def validate_message(self, value):
+        return strip_tags(value).strip()
+
+    def validate_public_display_name(self, value):
+        return strip_tags(value).strip()
+
+
+class MyContributionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Contribution
+        fields = [
+            'id', 'amount', 'currency', 'payment_method', 'status',
+            'rejection_reason', 'message', 'created_at',
+        ]
 
 
 class ExpenseSerializer(serializers.ModelSerializer):

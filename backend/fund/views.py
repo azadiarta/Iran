@@ -11,13 +11,17 @@ from core.pagination import paginate
 from core.utils import api_error, api_success
 from fund.models import Contribution, Expense
 from fund.serializers import (
+    ContributionAdminDetailSerializer,
+    ContributionAdminEditSerializer,
     ContributionCreateSerializer,
     ContributionManualCreateSerializer,
+    ContributionPublicListSerializer,
     ContributionSerializer,
     ContributionStatusSerializer,
     ExpenseCreateSerializer,
     ExpenseSerializer,
     FundBalanceSerializer,
+    MyContributionSerializer,
 )
 from logs.models import ActivityLog
 
@@ -119,11 +123,16 @@ class ContributionStatusUpdateView(APIView):
         except Contribution.DoesNotExist:
             return api_error('Contribution not found.', status_code=404)
 
+        before_status = contribution.status
         serializer = ContributionStatusSerializer(contribution, data=request.data, partial=True)
         if not serializer.is_valid():
             return api_error('Validation failed.', errors=serializer.errors)
         serializer.save()
-        _log(request.user, 'contribution_status_updated', target=contribution, ip=_get_ip(request))
+        _log(
+            request.user, 'contribution_status_updated', target=contribution,
+            extra_data={'before': before_status, 'after': contribution.status},
+            ip=_get_ip(request),
+        )
         return api_success(ContributionSerializer(contribution).data, message='Status updated.')
 
 
@@ -136,9 +145,84 @@ class ContributionDeleteView(APIView):
         except Contribution.DoesNotExist:
             return api_error('Contribution not found.', status_code=404)
 
-        _log(request.user, 'contribution_deleted', target=contribution, ip=_get_ip(request))
+        _log(
+            request.user, 'contribution_deleted', target=contribution,
+            extra_data={
+                'amount': str(contribution.amount),
+                'currency': contribution.currency,
+                'contributor': str(contribution.contributor) if contribution.contributor else (contribution.guest_name or 'Guest'),
+                'status': contribution.status,
+            },
+            ip=_get_ip(request),
+        )
         contribution.delete()
         return api_success(message='Contribution deleted.')
+
+
+class ContributionPublicListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        qs = Contribution.objects.filter(
+            status=Contribution.Status.COMPLETED,
+            show_in_public_list=True,
+        ).select_related('contributor').order_by('-created_at')
+        return paginate(qs, request, ContributionPublicListSerializer)
+
+
+class ContributionAdminDetailView(APIView):
+    permission_classes = [IsAuthenticated, HasGroupPermission('can_manage_permissions')]
+
+    def get(self, request, pk):
+        try:
+            contribution = Contribution.objects.select_related('contributor').get(pk=pk)
+        except Contribution.DoesNotExist:
+            return api_error('Contribution not found.', status_code=404)
+        return api_success(ContributionAdminDetailSerializer(contribution, context={'request': request}).data)
+
+
+class ContributionAdminEditView(APIView):
+    permission_classes = [IsAuthenticated, HasGroupPermission('can_manage_permissions')]
+
+    EDITABLE_FIELDS = [
+        'amount', 'currency', 'guest_name', 'payment_method', 'status', 'notes',
+        'rejection_reason', 'show_in_public_list', 'display_name_choice',
+        'public_display_name', 'message',
+    ]
+
+    def patch(self, request, pk):
+        try:
+            contribution = Contribution.objects.select_related('contributor').get(pk=pk)
+        except Contribution.DoesNotExist:
+            return api_error('Contribution not found.', status_code=404)
+
+        before = {field: str(getattr(contribution, field)) for field in self.EDITABLE_FIELDS}
+
+        serializer = ContributionAdminEditSerializer(contribution, data=request.data, partial=True)
+        if not serializer.is_valid():
+            return api_error('Validation failed.', errors=serializer.errors)
+        serializer.save()
+
+        after = {field: str(getattr(contribution, field)) for field in self.EDITABLE_FIELDS}
+        _log(
+            request.user, 'contribution_edited_by_admin', target=contribution,
+            extra_data={'before': before, 'after': after},
+            ip=_get_ip(request),
+        )
+        return api_success(ContributionAdminDetailSerializer(contribution, context={'request': request}).data, message='Contribution updated.')
+
+
+class MyContributionsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        qs = Contribution.objects.filter(contributor=request.user).order_by('-created_at')
+        total_approved = qs.filter(status=Contribution.Status.COMPLETED).aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal('0.00')
+        response = paginate(qs, request, MyContributionSerializer)
+        response.data['total_approved'] = str(total_approved)
+        return response
 
 
 # ─── Expense ──────────────────────────────────────────────────────────────────

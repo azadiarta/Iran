@@ -87,6 +87,10 @@ class PaymentInitiateView(APIView):
             payment_method=payment_method,
             notes=data.get('notes', ''),
             status=Contribution.Status.PENDING,
+            show_in_public_list=data.get('show_in_public_list', False),
+            display_name_choice=data.get('display_name_choice', Contribution.DisplayNameChoice.DISPLAY_NAME),
+            public_display_name=data.get('public_display_name', ''),
+            message=data.get('message', ''),
         )
 
         instructions = provider.initiate_payment(contribution)

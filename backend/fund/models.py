@@ -22,12 +22,27 @@ class Contribution(models.Model):
         null=True, blank=True, related_name='contributions',
     )
     guest_name = models.CharField(max_length=50, blank=True)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    amount = models.DecimalField(max_digits=11, decimal_places=2)
     currency = models.CharField(max_length=3, default='GBP')
     payment_method = models.CharField(max_length=20, choices=PaymentMethod.choices)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     notes = models.TextField(blank=True)
     receipt_image = models.ImageField(upload_to='contribution_receipts/', blank=True)
+
+    class DisplayNameChoice(models.TextChoices):
+        HIDDEN       = 'hidden',       'Hidden'
+        DISPLAY_NAME = 'display_name', 'Display Name'
+        FULL_NAME    = 'full_name',    'Full Name'
+        CUSTOM       = 'custom',       'Custom'
+
+    show_in_public_list = models.BooleanField(default=False)
+    display_name_choice = models.CharField(
+        max_length=20, choices=DisplayNameChoice.choices, default=DisplayNameChoice.DISPLAY_NAME,
+    )
+    public_display_name = models.CharField(max_length=100, blank=True)
+    message = models.CharField(max_length=150, blank=True)
+    rejection_reason = models.TextField(blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
