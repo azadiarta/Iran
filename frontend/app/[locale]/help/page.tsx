@@ -41,6 +41,7 @@ const SECTIONS: HelpSection[] = [
   { key: 'settings', group: 'admin', permission: 'can_manage_permissions' },
   { key: 'activity_log', group: 'admin', permission: 'can_manage_permissions' },
   { key: 'system_log', group: 'admin', superuserOnly: true },
+  { key: 'env_vars', group: 'admin', permission: 'can_manage_env_vars' },
 ];
 
 export default function HelpPage() {
