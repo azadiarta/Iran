@@ -13,7 +13,7 @@ rules:
   after_build: update exports + update imports with status
 
 progress:
-  current_phase: 17
+  current_phase: 18
   current_task: "complete (except phase 10 — deferred per project decision)"
   phases:
     1:
@@ -83,6 +83,10 @@ progress:
       name: "env-vars panel removal, hamburger language-switcher order, admin-access baseline-permission rule, first-load hydration fix, deactivated-member quick-logout fix + reason/admin display"
       status: done
       done: ["item a — completely removed the Phase 15 env-vars admin panel: deleted backend/core/runtime_config.py, backend/core/middleware.py (RuntimeConfigMiddleware, also removed from settings.py MIDDLEWARE), backend/core/env_vars_views.py, backend/core/env_vars_urls.py (and its `path('api/env-vars/', ...)` include in groupfund/urls.py), the EnvVarOverride model (+ its admin.py registration) and the AUTO_DETECTED_DEFAULTS settings.py snapshot; NEW migration backend/core/migrations/0004_remove_envvaroverride.py drops the EnvVarOverride table AND deletes the can_manage_env_vars Permission row (now 11 seeded permissions again). Frontend: deleted frontend/lib/envVarsMeta.ts, frontend/app/[locale]/admin/env-vars/page.tsx, the envVarsAPI/EnvVar* types from lib/api.ts, the can_manage_env_vars entry in lib/permissionsMeta.ts, the env-vars entry in adminNav.ts's ADMIN_NAV_ITEMS (and its Server icon import), and the help.sections env_vars entry + its 2 i18n keys in messages/en.json and fa.json.", "item b — hamburger drawer language-switcher reordered: in frontend/components/layout/Navbar.tsx's mobile drawer, the language-switcher button is now rendered LAST (after the admin-panel-entry/profile/login block), instead of at the top of the post-divider section, so it is always the final item in the menu on every page.", "items c/e/f — default-group baseline permissions now drive admin-panel access: NEW backend/accounts/models.py constant BASELINE_GROUP_PERMISSIONS = ['can_contribute','can_comment','can_view_balance','can_view_posts'] is the single source of truth, used by seed_initial_data.py (DEFAULT_GROUP_PERMISSIONS = BASELINE_GROUP_PERMISSIONS, was ['can_contribute','can_comment'] — the seeded default 'Members' group and any group created with no explicit permissions now get all 4 baseline permissions) and by accounts/serializers.py AccessGroupCreateSerializer (defaults permission_ids to BASELINE_GROUP_PERMISSIONS only when none are submitted — no forced additions on top of an explicit selection) and AccessGroupUpdateSerializer (now sets exactly the submitted permission set with no forced union, so an admin CAN manually disable any of the 4 baseline permissions for a given group — item f). Admin-panel access is now gated by a NEW frontend/lib/adminNav.ts export `hasAdminAccess({isSuperuser, groupPermissions})` (replaces the old ADMIN_PERMISSIONS export, also exporting BASELINE_PERMISSIONS = the same 4 codenames): superusers always pass; everyone else passes only if their group has at least one permission OUTSIDE the 4-item BASELINE_PERMISSIONS set — a member whose group grants ONLY some/all of those 4 'default plan' permissions is denied admin-panel access (admin/layout.tsx redirects to /forbidden) and the 'Admin Panel' entry is hidden from Navbar.tsx entirely (items c/e). admin/groups/page.tsx's create-group modal now seeds its permission checkboxes from BASELINE_PERMISSIONS instead of a hardcoded ['can_contribute','can_comment'].", "item d — fixed garbled/broken first-load text: frontend/app/layout.tsx (a redundant second root layout that ALSO rendered <html>/<body>, nesting inside frontend/app/[locale]/layout.tsx's own <html>/<body> and causing a hydration mismatch that briefly rendered broken/unstyled text on first paint) was DELETED entirely; frontend/app/[locale]/layout.tsx is now the SOLE root layout and gained the `metadata` export ({title:'Group Fund', description:'Transparent community fund management'}) and the `@/styles/globals.css` import that the deleted file used to provide.", "item g — fixed quick-logout for deactivated members + dedicated deactivated experience: backend/groupfund/settings.py SIMPLE_JWT gained CHECK_USER_IS_ACTIVE: False, so a deactivated member's existing JWT access token is no longer rejected by simplejwt's own authentication layer on every request (previously this caused an immediate logout loop right after login, even though accounts/backends.py already allowed a deactivated member's credentials to authenticate) — DRF permission classes (IsActiveMember/HasGroupPermission/IsSuperuser) are UNCHANGED and still require is_active=True, so the Phase 15 DeactivatedGuard + Navbar's home/contact-only nav for deactivated members continue to fully apply (deactivated members can reach only '/{locale}' and '/{locale}/contact'). NEW Member fields deactivation_reason (TextField, blank) and deactivated_by (FK to self, SET_NULL, related_name='+'), via migration 0004_member_deactivated_by_member_deactivation_reason; MemberToggleActiveView now records/clears both fields (and logs the reason in extra_data) on deactivate/reactivate; MemberProfileSerializer and MemberDetailSerializer expose deactivation_reason + a computed deactivated_by_name (display_name||full_name of the deactivating admin). The landing page's existing deactivation banner now also shows the admin-supplied reason (new common.deactivated_reason_label) and the deactivating admin's name (new common.deactivated_by_label) when present — 2 new i18n keys in messages/en.json and fa.json. admin/members/[id]/page.tsx's deactivate-confirmation AdminConfirmDialog gained a children slot containing an AdminTextarea for the reason (shown only when about to deactivate), and a new amber 'Danger Zone' info block on already-deactivated members' detail pages displays the stored reason and deactivating admin's name."]
+    18:
+      name: "bugfix — /api/auth/token/refresh/ 500 error for deleted-member refresh tokens"
+      status: done
+      done: ["Root cause: rest_framework_simplejwt.serializers.TokenRefreshSerializer.validate() looks up get_user_model().objects.get(**{USER_ID_FIELD: user_id}) with NO exception handling (unlike JWTAuthentication.get_user(), which catches DoesNotExist and raises AuthenticationFailed) — a refresh token (valid up to 7 days per SIMPLE_JWT.REFRESH_TOKEN_LIFETIME) belonging to a Member deleted in the meantime (e.g. via admin/members MemberDeleteView) raised an uncaught Member.DoesNotExist, producing a 500 Internal Server Error on POST /api/auth/token/refresh/ (visible in /admin/logs/system).", "backend/accounts/views.py — NEW SafeTokenRefreshSerializer(TokenRefreshSerializer) catches Member.DoesNotExist from .validate() and re-raises InvalidToken('No account found for this token.'); NEW SafeTokenRefreshView(TokenRefreshView) with serializer_class=SafeTokenRefreshSerializer.", "backend/accounts/urls.py — token/refresh/ now routes to SafeTokenRefreshView instead of the bare rest_framework_simplejwt.views.TokenRefreshView.", "Result: the endpoint now returns a normal 401 {detail: 'No account found for this token.', code: 'token_not_valid'} for a deleted member's refresh token, which the frontend's existing 401 refresh-failure handling (logout) already covers; active members' refresh flow is unaffected. Verified end-to-end with a live dev server (deleted-member token -> 401 no traceback; active-member token -> 200 with fresh access/refresh tokens)."]
 
 roadmap:
   # Task-oriented navigation index. When the user asks for a change, find the
@@ -1431,6 +1435,7 @@ files:
 
   "backend/accounts/views.py":
     status: done
+    note: "Phase 18 (bugfix) — added SafeTokenRefreshSerializer + SafeTokenRefreshView, wrapping simplejwt's TokenRefreshSerializer.validate(). simplejwt's TokenRefreshSerializer.validate() does `get_user_model().objects.get(**{USER_ID_FIELD: user_id})` with NO exception handling (unlike JWTAuthentication.get_user(), which catches it) — if the refresh token's user_id refers to a Member that has since been deleted (e.g. by an admin via MemberDeleteView, while the member's browser still holds an up-to-7-day-old refresh token), this raised an uncaught Member.DoesNotExist, producing a 500 Internal Server Error on POST /api/auth/token/refresh/ (visible in /admin/logs/system). SafeTokenRefreshSerializer catches Member.DoesNotExist and re-raises InvalidToken, so the endpoint now returns a normal 401 {detail: 'No account found for this token.'} — the frontend's existing 401 refresh-failure handling (logout) then applies."
     imports:
       external:
         - {from: django.contrib.auth, items: [authenticate]}
@@ -1438,7 +1443,9 @@ files:
         - {from: rest_framework.response, items: [Response]}
         - {from: rest_framework.views, items: [APIView]}
         - {from: rest_framework_simplejwt.tokens, items: [RefreshToken]}
-        - {from: rest_framework_simplejwt.exceptions, items: [TokenError]}
+        - {from: rest_framework_simplejwt.exceptions, items: [InvalidToken, TokenError]}
+        - {from: rest_framework_simplejwt.serializers, items: [TokenRefreshSerializer]}
+        - {from: rest_framework_simplejwt.views, items: [TokenRefreshView]}
       internal:
         - {from: "backend/accounts/models.py",      items: [{name: Member, status: available}]}
         - {from: "backend/accounts/serializers.py", items: [{name: RegisterSerializer, status: available}, {name: LoginSerializer, status: available}, {name: MemberProfileSerializer, status: available}]}
@@ -1448,15 +1455,18 @@ files:
       - {name: LoginView,    kind: class, type: DRF APIView, endpoint: "POST /api/auth/login/",    auth: public,         logs: login / failed_login}
       - {name: LogoutView,   kind: class, type: DRF APIView, endpoint: "POST /api/auth/logout/",   auth: required,       logs: logout, note: "blacklists refresh token"}
       - {name: ProfileView,  kind: class, type: DRF APIView, endpoint: "GET /api/auth/profile/",   auth: required}
+      - {name: SafeTokenRefreshSerializer, kind: class, type: "subclass of rest_framework_simplejwt.serializers.TokenRefreshSerializer", note: "NEW (Phase 18) — see file note above"}
+      - {name: SafeTokenRefreshView, kind: class, type: "subclass of rest_framework_simplejwt.views.TokenRefreshView", endpoint: "POST /api/auth/token/refresh/", auth: public, note: "NEW (Phase 18) — serializer_class = SafeTokenRefreshSerializer; replaces the bare simplejwt TokenRefreshView in urls.py"}
     needed_by:
-      - {file: "backend/accounts/urls.py", items: [RegisterView, LoginView, LogoutView, ProfileView], status: available}
+      - {file: "backend/accounts/urls.py", items: [RegisterView, LoginView, LogoutView, ProfileView, SafeTokenRefreshView], status: available}
 
   "backend/accounts/urls.py":
     status: done
+    note: "Phase 18 (bugfix) — token/refresh/ now routes to SafeTokenRefreshView (backend/accounts/views.py) instead of the bare rest_framework_simplejwt.views.TokenRefreshView, to avoid an uncaught Member.DoesNotExist → 500 when a refresh token references a deleted member."
     imports:
-      external: [{from: django.urls, items: [path]}, {from: rest_framework_simplejwt.views, items: [TokenRefreshView]}]
+      external: [{from: django.urls, items: [path]}]
       internal:
-        - {from: "backend/accounts/views.py", items: [{name: RegisterView, status: available}, {name: LoginView, status: available}, {name: LogoutView, status: available}, {name: ProfileView, status: available}]}
+        - {from: "backend/accounts/views.py", items: [{name: RegisterView, status: available}, {name: LoginView, status: available}, {name: LogoutView, status: available}, {name: ProfileView, status: available}, {name: SafeTokenRefreshView, status: available}]}
     exports:
       - {name: urlpatterns, kind: constant, type: list, routes: ["POST register/", "POST login/", "POST logout/", "GET profile/", "POST token/refresh/"]}
     needed_by:
