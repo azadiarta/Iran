@@ -4,6 +4,7 @@
     "posts": "Posts",
     "expenses": "Expenses",
     "contribute": "Contribute",
+    "contributions": "Contributors",
     "help": "Help",
     "contact": "Contact",
     "login": "Login",
@@ -171,7 +172,32 @@
     "receipt_desc": "Upload a photo or scan of your payment receipt for verification.",
     "click_to_upload": "Click to upload or drag and drop",
     "error_generic": "Something went wrong. Please try again.",
-    "upload_error": "Failed to upload receipt. Please try again."
+    "upload_error": "Failed to upload receipt. Please try again.",
+    "show_in_public_list_label": "List me on the public contributors page",
+    "show_in_public_list_hint": "Once approved, your contribution will appear on the public contributors page.",
+    "display_name_choice_label": "How should your name appear?",
+    "display_name_choice_my_name": "My name",
+    "display_name_choice_display_name": "My account display name",
+    "display_name_choice_full_name": "My full name",
+    "display_name_choice_custom": "A custom name",
+    "custom_name_placeholder": "Enter the name to display",
+    "message_label": "Message (optional)",
+    "message_placeholder": "Add a short public message...",
+    "amount_invalid": "Amount can have at most 9 digits before and 2 digits after the decimal point.",
+    "take_photo": "Take Photo",
+    "choose_file": "Choose File"
+  },
+  "contributions": {
+    "title": "Contributors",
+    "subtitle": "Everyone who has generously supported the group fund",
+    "no_contributions": "No public contributions to show yet.",
+    "anonymous": "Anonymous",
+    "amount_label": "Amount",
+    "date_label": "Date",
+    "message_label": "Message",
+    "prev": "Previous",
+    "next": "Next",
+    "page_info": "Page {page} of {total}"
   },
   "profile": {
     "title": "My Profile",
@@ -196,7 +222,15 @@
     "profile_updated": "Profile updated successfully.",
     "password_changed": "Password changed successfully.",
     "save_error": "Failed to save changes. Please try again.",
-    "password_error": "Failed to change password. Please check your current password."
+    "password_error": "Failed to change password. Please check your current password.",
+    "my_contributions_title": "My Contributions",
+    "my_contributions_total_approved": "Total approved",
+    "my_contributions_empty": "You haven't made any contributions yet.",
+    "my_contributions_rejection_reason": "Reason",
+    "status_pending": "Pending",
+    "status_pending_review": "Pending Review",
+    "status_completed": "Completed",
+    "status_failed": "Rejected"
   },
   "contact": {
     "title": "Contact Us",
@@ -242,7 +276,9 @@
       "payments": { "title": "Payment Review", "desc": "Inspect incoming contributions, verify uploaded receipts, and confirm or reject manual payments." },
       "settings": { "title": "System Settings", "desc": "Configure site-wide defaults such as the default currency, visibility rules, and other global options." },
       "activity_log": { "title": "Activity Log", "desc": "A searchable, filterable history of actions performed by members across the platform — logins, posts, approvals, and more." },
-      "system_log": { "title": "System Log", "desc": "Low-level system events and diagnostics, visible to superusers only." }
+      "system_log": { "title": "System Log", "desc": "Low-level system events and diagnostics, visible to superusers only." },
+      "contributions_public": { "title": "Contributors", "desc": "A public page listing everyone who has chosen to be shown after their contribution is approved, along with their optional message." },
+      "my_contributions": { "title": "My Contributions", "desc": "See the status of every contribution you've made, including the total approved so far and the reason for any that were rejected." }
     }
   },
   "errors": {

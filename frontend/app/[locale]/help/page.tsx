@@ -20,12 +20,14 @@ const SECTIONS: HelpSection[] = [
   { key: 'posts', group: 'guest' },
   { key: 'expenses', group: 'guest' },
   { key: 'contribute', group: 'guest' },
+  { key: 'contributions_public', group: 'guest' },
   { key: 'comment', group: 'guest' },
   { key: 'contact', group: 'guest' },
 
   // ─── Member-only ─────────────────────────────────────────────────
   { key: 'auth', group: 'member' },
   { key: 'profile', group: 'member' },
+  { key: 'my_contributions', group: 'member' },
   { key: 'logout', group: 'member' },
 
   // ─── Admin panel — gated by permission ───────────────────────────

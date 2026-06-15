@@ -7,14 +7,19 @@ import {
   Copy,
   CreditCard,
   Upload,
+  Camera,
   ChevronRight,
   ChevronLeft,
   AlertTriangle,
   Building2,
   Check,
 } from 'lucide-react';
-import { paymentsAPI } from '@/lib/api';
+import { paymentsAPI, ContributionDisplayNameChoice } from '@/lib/api';
+import { getPaymentMethodLabel, getPaymentMethodUnavailableMessage } from '@/lib/paymentMethodsMeta';
+import AdminToggle from '@/components/admin/fields/AdminToggle';
 import useAuthStore from '@/store/authStore';
+
+const AMOUNT_REGEX = /^\d{0,9}(\.\d{0,2})?$/;
 
 interface PaymentMethod {
   method: string;
@@ -59,10 +64,12 @@ export default function ContributePage() {
   const params = useParams();
   const router = useRouter();
   const locale = (params?.locale as string) || 'en';
+  const isRTL = locale === 'fa';
   const { isAuthenticated } = useAuthStore();
 
   const [step, setStep] = useState<Step>(1);
   const [amount, setAmount] = useState('');
+  const [amountError, setAmountError] = useState<string | null>(null);
   const [guestName, setGuestName] = useState('');
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
@@ -76,6 +83,12 @@ export default function ContributePage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  const [showInPublicList, setShowInPublicList] = useState(false);
+  const [displayNameChoice, setDisplayNameChoice] = useState<ContributionDisplayNameChoice>('display_name');
+  const [customDisplayName, setCustomDisplayName] = useState('');
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
     const fetchMethods = async () => {
@@ -108,12 +121,28 @@ export default function ContributePage() {
     setInitiating(true);
     setError(null);
     try {
-      const payload: { amount: number; payment_method: string; guest_name?: string } = {
+      const payload: {
+        amount: number;
+        payment_method: string;
+        guest_name?: string;
+        show_in_public_list?: boolean;
+        display_name_choice?: ContributionDisplayNameChoice;
+        public_display_name?: string;
+        message?: string;
+      } = {
         amount: parseFloat(amount),
         payment_method: selectedMethod,
+        show_in_public_list: showInPublicList,
+        display_name_choice: displayNameChoice,
       };
       if (!isAuthenticated && guestName.trim()) {
         payload.guest_name = guestName.trim();
+      }
+      if (showInPublicList && displayNameChoice === 'custom') {
+        payload.public_display_name = customDisplayName.trim();
+      }
+      if (message.trim()) {
+        payload.message = message.trim();
       }
       const res = await paymentsAPI.initiate(payload);
       const data = res.data as unknown as {
@@ -125,7 +154,7 @@ export default function ContributePage() {
         unavailable_message?: string;
       };
       if (!data.is_available) {
-        setError(data.unavailable_message || t('contribute.unavailable_msg'));
+        setError(getPaymentMethodUnavailableMessage(data.payment_method || selectedMethod, data.unavailable_message, isRTL) || t('contribute.unavailable_msg'));
         return;
       }
       setContributionId(data.contribution_id);
@@ -159,11 +188,36 @@ export default function ContributePage() {
     return `${symbol}${Number(amount).toFixed(2)}`;
   };
 
+  const handleAmountChange = (value: string) => {
+    if (value === '' || AMOUNT_REGEX.test(value)) {
+      setAmount(value);
+      setAmountError(null);
+      return;
+    }
+    setAmountError(t('contribute.amount_invalid'));
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate(120);
+    }
+    setTimeout(() => setAmountError(null), 3000);
+  };
+
+  const nameChoices: ContributionDisplayNameChoice[] = isAuthenticated
+    ? ['display_name', 'full_name', 'custom']
+    : ['display_name', 'custom'];
+
+  const nameChoiceLabel = (choice: ContributionDisplayNameChoice) => {
+    if (!isAuthenticated && choice === 'display_name') {
+      return t('contribute.display_name_choice_my_name');
+    }
+    return t(`contribute.display_name_choice_${choice}`);
+  };
+
   const allUnavailable = methods.length > 0 && methods.every((m) => !m.is_available);
   const canProceed =
     parseFloat(amount) > 0 &&
     selectedMethod !== null &&
-    (isAuthenticated || guestName.trim().length > 0);
+    (isAuthenticated || guestName.trim().length > 0) &&
+    (!showInPublicList || displayNameChoice !== 'custom' || customDisplayName.trim().length > 0);
 
   const manualInstructions = instructions as ManualInstructions | null;
   const paypalInstructions = instructions as PaypalInstructions | null;
@@ -235,15 +289,17 @@ export default function ContributePage() {
             £
           </span>
           <input
-            type="number"
-            min="0.01"
-            step="0.01"
+            type="text"
+            inputMode="decimal"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) => handleAmountChange(e.target.value)}
             placeholder="0.00"
             className="w-full pl-10 pr-4 py-4 text-xl font-bold rounded-2xl bg-white/5 border border-white/10 text-white placeholder-white/20 outline-none focus:border-[#00ffff] focus:ring-1 focus:ring-[#00ffff]/30 transition-all"
           />
         </div>
+        {amountError && (
+          <p className="mt-2 text-xs" style={{ color: '#ef4444' }}>{amountError}</p>
+        )}
       </div>
 
       {/* Guest name (unauthenticated only) */}
@@ -286,7 +342,7 @@ export default function ContributePage() {
                   key={m.method}
                   onClick={() => m.is_available && setSelectedMethod(m.method)}
                   disabled={!m.is_available}
-                  title={!m.is_available ? m.unavailable_message : undefined}
+                  title={!m.is_available ? getPaymentMethodUnavailableMessage(m.method, m.unavailable_message, isRTL) : undefined}
                   className="relative rounded-2xl border p-5 text-left transition-all group"
                   style={{
                     borderColor: isSelected
@@ -310,11 +366,13 @@ export default function ContributePage() {
                       className="font-semibold text-sm"
                       style={{ color: isSelected ? '#00ffff' : 'rgba(255,255,255,0.8)' }}
                     >
-                      {m.label}
+                      {getPaymentMethodLabel(m.method, m.label, isRTL)}
                     </span>
                   </div>
-                  {!m.is_available && m.unavailable_message && (
-                    <p className="text-xs text-white/40 mt-1 truncate">{m.unavailable_message}</p>
+                  {!m.is_available && (
+                    <p className="text-xs text-white/40 mt-1 truncate">
+                      {getPaymentMethodUnavailableMessage(m.method, m.unavailable_message, isRTL)}
+                    </p>
                   )}
                 </button>
               );
@@ -328,6 +386,66 @@ export default function ContributePage() {
             <p className="text-sm" style={{ color: '#f59e0b' }}>
               {t('contribute.unavailable_msg')}
             </p>
+          </div>
+        )}
+      </div>
+
+      {/* Public contributors list */}
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+        <AdminToggle
+          checked={showInPublicList}
+          onChange={setShowInPublicList}
+          label={t('contribute.show_in_public_list_label')}
+          description={t('contribute.show_in_public_list_hint')}
+        />
+
+        {showInPublicList && (
+          <div className="mt-5 pt-5 border-t border-white/10 space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">
+                {t('contribute.display_name_choice_label')}
+              </label>
+              <div className="flex flex-col gap-2">
+                {nameChoices.map((choice) => (
+                  <label key={choice} className="flex items-center gap-2 cursor-pointer text-sm text-white/70">
+                    <input
+                      type="radio"
+                      name="display_name_choice"
+                      value={choice}
+                      checked={displayNameChoice === choice}
+                      onChange={() => setDisplayNameChoice(choice)}
+                      className="accent-[#00ffff] w-4 h-4"
+                    />
+                    {nameChoiceLabel(choice)}
+                  </label>
+                ))}
+              </div>
+              {displayNameChoice === 'custom' && (
+                <input
+                  type="text"
+                  value={customDisplayName}
+                  onChange={(e) => setCustomDisplayName(e.target.value)}
+                  maxLength={100}
+                  placeholder={t('contribute.custom_name_placeholder')}
+                  className="mt-3 w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-white/20 outline-none focus:border-[#00ffff] focus:ring-1 focus:ring-[#00ffff]/30 transition-all"
+                />
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">
+                {t('contribute.message_label')}
+              </label>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value.slice(0, 150))}
+                maxLength={150}
+                rows={3}
+                placeholder={t('contribute.message_placeholder')}
+                className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-white/20 outline-none focus:border-[#00ffff] focus:ring-1 focus:ring-[#00ffff]/30 transition-all resize-none"
+              />
+              <p className="text-xs text-white/30 mt-1 text-right">{message.length}/150</p>
+            </div>
           </div>
         )}
       </div>
@@ -493,9 +611,8 @@ export default function ContributePage() {
         <p className="text-white/60 text-sm mb-5">{t('contribute.receipt_desc')}</p>
 
         {/* Upload area */}
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="w-full border-2 border-dashed rounded-2xl p-10 flex flex-col items-center gap-4 transition-all hover:border-[#00ffff]/50 hover:bg-[#00ffff]/5"
+        <div
+          className="w-full border-2 border-dashed rounded-2xl p-10 flex flex-col items-center gap-4 transition-all"
           style={{
             borderColor: selectedFile ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.15)',
           }}
@@ -521,11 +638,43 @@ export default function ContributePage() {
               <p className="text-xs text-white/30 mt-1">JPG, PNG, PDF</p>
             </div>
           )}
-        </button>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border border-white/10 bg-white/5 hover:bg-white/10 text-white/80 transition-all"
+            >
+              <Upload className="w-4 h-4" />
+              {t('contribute.choose_file')}
+            </button>
+            <button
+              type="button"
+              onClick={() => cameraInputRef.current?.click()}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border border-white/10 bg-white/5 hover:bg-white/10 text-white/80 transition-all"
+            >
+              <Camera className="w-4 h-4" />
+              {t('contribute.take_photo')}
+            </button>
+          </div>
+        </div>
         <input
           ref={fileInputRef}
           type="file"
           accept=".jpg,.jpeg,.png,.pdf"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              setSelectedFile(file);
+              setUploadError(null);
+            }
+          }}
+        />
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
