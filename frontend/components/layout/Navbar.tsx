@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { Menu, X, User, LogOut, ChevronDown, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
+import BalanceIndicator from '@/components/common/BalanceIndicator';
 import useAuthStore from '@/store/authStore';
 import useLangStore from '@/store/langStore';
 import { authAPI } from '@/lib/api';
@@ -197,6 +198,11 @@ export default function Navbar({ locale }: NavbarProps) {
 
           {/* Right section */}
           <div className="flex items-center gap-2">
+            {/* Fund balance indicator */}
+            <div className="hidden md:block">
+              <BalanceIndicator />
+            </div>
+
             {/* Language switcher */}
             <button
               onClick={handleLanguageSwitch}
@@ -488,6 +494,9 @@ export default function Navbar({ locale }: NavbarProps) {
                 >
                   {locale === 'en' ? 'فارسی' : 'English'}
                 </button>
+
+                {/* Fund balance indicator */}
+                <BalanceIndicator className="self-start" />
 
                 {mounted && isAuthenticated && member ? (
                   <>

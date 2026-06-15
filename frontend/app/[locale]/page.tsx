@@ -23,7 +23,7 @@ function useCountUp(target: number, duration: number = 1500, enabled: boolean = 
     const step = (timestamp: number) => {
       if (!start) start = timestamp;
       const progress = Math.min((timestamp - start) / duration, 1);
-      setValue(Math.floor(progress * target));
+      setValue(progress >= 1 ? target : Math.floor(progress * target * 100) / 100);
       if (progress < 1) requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
@@ -81,7 +81,7 @@ function StatCard({
           className="text-3xl font-bold"
           style={{ color: '#00ffff', textShadow: '0 0 10px #00ffff' }}
         >
-          {typeof value === 'string' ? value : `${prefix}${counted.toLocaleString()}`}
+          {typeof value === 'string' ? value : `${prefix}${counted.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
         </p>
       )}
       <p className="text-white/60 text-sm text-center">{label}</p>

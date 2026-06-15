@@ -140,7 +140,7 @@ export default function ExpensesPage() {
         {canViewBalance && (
           <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 mb-8">
             <div className="flex items-center gap-3 mb-2">
-              <Wallet className="w-5 h-5" style={{ color: '#10b981' }} />
+              <Wallet className="w-5 h-5" style={{ color: (balance?.balance ?? 0) >= 0 ? '#10b981' : '#ef4444' }} />
               <span className="text-white/60 text-sm">{t('balance_label')}</span>
             </div>
             {loadingBalance ? (
@@ -150,7 +150,10 @@ export default function ExpensesPage() {
             ) : balance ? (
               <p
                 className="text-4xl font-bold"
-                style={{ color: '#10b981', textShadow: '0 0 16px rgba(16,185,129,0.5)' }}
+                style={{
+                  color: balance.balance >= 0 ? '#10b981' : '#ef4444',
+                  textShadow: balance.balance >= 0 ? '0 0 16px rgba(16,185,129,0.5)' : '0 0 16px rgba(239,68,68,0.5)',
+                }}
               >
                 {formatAmount(balance.balance, balance.currency)}
               </p>

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, Bell, User, Home, LogOut, ChevronDown } from 'lucide-react';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
+import BalanceIndicator from '@/components/common/BalanceIndicator';
 import useAuthStore from '@/store/authStore';
 import useLangStore from '@/store/langStore';
 import { authAPI } from '@/lib/api';
@@ -98,6 +99,11 @@ export default function AdminTopBar({ locale, onToggleSidebar, pendingCommentCou
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Fund balance indicator */}
+        <div className="hidden sm:block">
+          <BalanceIndicator />
+        </div>
+
         {/* Language switcher */}
         <button
           onClick={handleLanguageSwitch}

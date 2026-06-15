@@ -124,6 +124,7 @@ export default function AdminDashboardPage() {
           icon={Wallet}
           color="#00ffff"
           suffix={` ${data.fund.currency}`}
+          decimals={2}
         />
         <AdminStatCard
           title={isRTL ? 'مجموع مشارکت‌ها' : 'Total Contributions'}
@@ -131,6 +132,7 @@ export default function AdminDashboardPage() {
           icon={TrendingUp}
           color="#10b981"
           suffix={` ${data.fund.currency}`}
+          decimals={2}
         />
         <AdminStatCard
           title={isRTL ? 'مجموع هزینه‌ها' : 'Total Expenses'}
@@ -138,6 +140,7 @@ export default function AdminDashboardPage() {
           icon={TrendingDown}
           color="#ef4444"
           suffix={` ${data.fund.currency}`}
+          decimals={2}
         />
         <AdminStatCard
           title={isRTL ? 'اعضا' : 'Members'}
