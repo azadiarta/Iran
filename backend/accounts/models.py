@@ -36,9 +36,16 @@ def get_default_group_id():
         return None
 
 
+# Baseline permissions every group/plan is expected to have by default — a
+# member whose group has no permission outside this set is treated as a
+# regular member (see frontend/lib/adminNav.ts BASELINE_PERMISSIONS and
+# hasAdminAccess()). New groups are pre-populated with these permissions, but
+# an admin may manually remove any of them from a group.
+BASELINE_GROUP_PERMISSIONS = ['can_contribute', 'can_comment', 'can_view_balance', 'can_view_posts']
+
+
 # Superuser bypasses ALL permission checks — never enforce group perms for superuser.
 # No group can modify or delete the superuser account.
-# can_contribute + can_comment must be assigned to every new group by default.
 class AccessGroup(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=20, unique=True)
@@ -78,6 +85,13 @@ class Member(AbstractBaseUser):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
+    # Set when an admin deactivates this member (MemberToggleActiveView);
+    # cleared again on reactivation. Shown to the member on the home page.
+    deactivation_reason = models.TextField(blank=True)
+    deactivated_by = models.ForeignKey(
+        'self', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='+',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

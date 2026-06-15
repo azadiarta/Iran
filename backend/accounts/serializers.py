@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from accounts.models import AccessGroup, Member
+from accounts.models import BASELINE_GROUP_PERMISSIONS, AccessGroup, Member
 from core.models import Permission
 
 
@@ -94,12 +94,14 @@ class LoginSerializer(serializers.Serializer):
 class MemberProfileSerializer(serializers.ModelSerializer):
     group_name = serializers.CharField(source='group.name', read_only=True, default=None)
     group_permissions = serializers.SerializerMethodField()
+    deactivated_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Member
         fields = [
             'id', 'full_name', 'display_name', 'email', 'phone',
             'group_name', 'group_permissions', 'is_active', 'is_superuser', 'created_at',
+            'deactivation_reason', 'deactivated_by_name',
         ]
         read_only_fields = fields
 
@@ -109,6 +111,11 @@ class MemberProfileSerializer(serializers.ModelSerializer):
         if not obj.group:
             return []
         return list(obj.group.permissions.values_list('codename', flat=True))
+
+    def get_deactivated_by_name(self, obj):
+        if not obj.deactivated_by:
+            return None
+        return obj.deactivated_by.display_name or obj.deactivated_by.full_name
 
 
 # ─── Member management serializers ────────────────────────────────────────────
@@ -125,17 +132,24 @@ class MemberListSerializer(serializers.ModelSerializer):
 class MemberDetailSerializer(serializers.ModelSerializer):
     group_name = serializers.CharField(source='group.name', read_only=True, default=None)
     group_permissions = serializers.SerializerMethodField()
+    deactivated_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Member
         fields = ['id', 'full_name', 'display_name', 'email', 'phone',
-                  'group_name', 'group_permissions', 'is_active', 'created_at']
+                  'group_name', 'group_permissions', 'is_active', 'created_at',
+                  'deactivation_reason', 'deactivated_by_name']
         read_only_fields = fields
 
     def get_group_permissions(self, obj):
         if not obj.group:
             return []
         return list(obj.group.permissions.values_list('codename', flat=True))
+
+    def get_deactivated_by_name(self, obj):
+        if not obj.deactivated_by:
+            return None
+        return obj.deactivated_by.display_name or obj.deactivated_by.full_name
 
 
 class MemberUpdateSerializer(serializers.ModelSerializer):
@@ -212,12 +226,10 @@ class AccessGroupCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         permission_ids = validated_data.pop('permission_ids', [])
+        if not permission_ids:
+            permission_ids = list(BASELINE_GROUP_PERMISSIONS)
         group = AccessGroup.objects.create(**validated_data)
-        required = Permission.objects.filter(codename__in=['can_contribute', 'can_comment'])
-        group.permissions.set(required)
-        if permission_ids:
-            extra = Permission.objects.filter(codename__in=permission_ids)
-            group.permissions.add(*extra)
+        group.permissions.set(Permission.objects.filter(codename__in=permission_ids))
         return group
 
 
@@ -240,7 +252,5 @@ class AccessGroupUpdateSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         if permission_ids is not None:
-            required_codenames = {'can_contribute', 'can_comment'}
-            all_codenames = set(permission_ids) | required_codenames
-            instance.permissions.set(Permission.objects.filter(codename__in=all_codenames))
+            instance.permissions.set(Permission.objects.filter(codename__in=permission_ids))
         return instance
