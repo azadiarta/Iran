@@ -5,6 +5,7 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import SplashScreen from '@/components/animations/SplashScreen';
 import DeactivatedGuard from '@/components/layout/DeactivatedGuard';
+import AuthSync from '@/components/layout/AuthSync';
 import useLangStore from '@/store/langStore';
 
 interface ClientLayoutProps {
@@ -28,6 +29,7 @@ export default function ClientLayout({ children, locale }: ClientLayoutProps) {
   if (isAdminRoute) {
     return (
       <>
+        <AuthSync />
         <DeactivatedGuard locale={locale} />
         {!splashDone && (
           <SplashScreen locale={locale} onComplete={() => setSplashDone(true)} />
@@ -39,6 +41,7 @@ export default function ClientLayout({ children, locale }: ClientLayoutProps) {
 
   return (
     <>
+      <AuthSync />
       <DeactivatedGuard locale={locale} />
       {!splashDone && (
         <SplashScreen locale={locale} onComplete={() => setSplashDone(true)} />

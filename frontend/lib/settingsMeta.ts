@@ -11,7 +11,7 @@ export interface SettingOption {
 export interface SettingMeta {
   label: { en: string; fa: string };
   description: { en: string; fa: string };
-  type: 'select' | 'toggle' | 'number';
+  type: 'select' | 'toggle' | 'number' | 'text';
   options?: SettingOption[];
 }
 
@@ -140,6 +140,22 @@ export const SETTINGS_META: Record<string, SettingMeta> = {
       fa: 'حداکثر حجم مجاز برای تصاویر رسید آپلودشده، بر حسب مگابایت.',
     },
     type: 'number',
+  },
+  contact_email: {
+    label: { en: 'Contact Email', fa: 'ایمیل تماس' },
+    description: {
+      en: 'Public contact email shown on the Contact Us page.',
+      fa: 'ایمیل تماسی که در صفحه تماس با ما نمایش داده می‌شود.',
+    },
+    type: 'text',
+  },
+  contact_phone: {
+    label: { en: 'Contact Phone', fa: 'تلفن تماس' },
+    description: {
+      en: 'Public contact phone number shown on the Contact Us page.',
+      fa: 'شماره تلفن تماسی که در صفحه تماس با ما نمایش داده می‌شود.',
+    },
+    type: 'text',
   },
 };
 

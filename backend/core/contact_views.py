@@ -38,10 +38,22 @@ def _get_ip(request):
     return forwarded.split(',')[0].strip() if forwarded else request.META.get('REMOTE_ADDR')
 
 
+MAX_PENDING_MESSAGES = 4
+
+
 class ContactMessageCreateView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        if request.user.is_authenticated:
+            pending_count = ContactMessage.objects.filter(sender=request.user, is_handled=False).count()
+            if pending_count >= MAX_PENDING_MESSAGES:
+                return api_error(
+                    'You have reached the maximum of 4 unresolved messages. '
+                    'Please wait until they are handled before submitting a new one.',
+                    status_code=429,
+                )
+
         serializer = ContactMessageCreateSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid():
             return api_error('Validation failed.', errors=serializer.errors)
@@ -49,6 +61,14 @@ class ContactMessageCreateView(APIView):
         actor = request.user if request.user.is_authenticated else None
         _log(actor, 'contact_message_submitted', target=message, ip=_get_ip(request))
         return api_success(ContactMessageSerializer(message).data, message='Message submitted.', status_code=201)
+
+
+class MyContactMessagesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        qs = ContactMessage.objects.filter(sender=request.user).order_by('-created_at')
+        return paginate(qs, request, ContactMessageSerializer)
 
 
 class ContactMessageListView(APIView):

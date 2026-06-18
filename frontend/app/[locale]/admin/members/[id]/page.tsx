@@ -245,11 +245,29 @@ export default function AdminMemberDetailPage() {
             {target.full_name}
             <AdminBadge status={target.is_active ? 'active' : 'inactive'} />
           </h1>
-          <p className="text-sm text-white/40 mt-1">{target.display_name} · #{target.member_number} · {target.group_name || '—'}</p>
+          <p className="text-sm text-white/40 mt-1">
+            {target.display_name} · #{target.member_number} ·{' '}
+            {target.is_superuser ? (
+              <span className="font-bold" style={{ color: '#fbbf24' }}>{isRTL ? 'سوپریوزر' : 'Superuser'}</span>
+            ) : (
+              target.group_name || '—'
+            )}
+          </p>
         </div>
       </div>
 
-      {canManage && (
+      {canManage && target.is_superuser && (
+        <div className="admin-glass-card p-5 flex items-center gap-3" style={{ border: '1px solid rgba(251,191,36,0.3)' }}>
+          <ShieldCheck className="w-5 h-5 flex-shrink-0" style={{ color: '#fbbf24' }} />
+          <p className="text-sm text-white/70">
+            {isRTL
+              ? 'این یک حساب سوپریوزر است. حساب‌های سوپریوزر را نمی‌توان از طریق پنل ادمین ویرایش، تغییر گروه، غیرفعال یا حذف کرد.'
+              : 'This is a superuser account. Superuser accounts cannot be edited, have their group changed, deactivated, or deleted from the admin panel.'}
+          </p>
+        </div>
+      )}
+
+      {canManage && !target.is_superuser && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Profile form */}
         <form onSubmit={saveProfile} className="admin-glass-card p-5 flex flex-col gap-4">

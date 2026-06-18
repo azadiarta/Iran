@@ -240,7 +240,12 @@
     "my_comments_text_required": "Enter the comment text.",
     "my_comments_save_error": "Failed to save the comment. Please try again.",
     "my_comments_delete_error": "Failed to delete the comment. Please try again.",
-    "my_comments_delete_confirm": "Are you sure you want to delete this comment?"
+    "my_comments_delete_confirm": "Are you sure you want to delete this comment?",
+    "my_messages_title": "My Messages",
+    "my_messages_empty": "You haven't sent any messages yet.",
+    "my_messages_status_pending": "Pending",
+    "my_messages_status_handled": "Handled",
+    "my_messages_handled_by": "Handled by"
   },
   "contact": {
     "title": "Contact Us",
@@ -257,7 +262,9 @@
     "send_button": "Send Message",
     "success_msg": "Your message has been sent. We'll get back to you soon.",
     "send_another": "Send Another Message",
-    "submit_error": "Failed to send your message. Please try again."
+    "submit_error": "Failed to send your message. Please try again.",
+    "pending_limit_error": "You already have 4 unresolved messages. Please wait until they are handled before sending a new one.",
+    "member_id_label": "Member ID"
   },
   "help": {
     "title": "Site Guide",
@@ -360,6 +367,10 @@
       "my_comments": {
         "title": "My Comments",
         "desc": "See the status of every comment you've posted, edit or delete them, and view the reason for any that were rejected."
+      },
+      "my_messages": {
+        "title": "My Messages",
+        "desc": "See every message you've sent through the Contact Us form and whether it has been handled. You can have at most 4 unresolved messages at a time."
       }
     }
   },

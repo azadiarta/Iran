@@ -29,6 +29,7 @@ const SECTIONS: HelpSection[] = [
   { key: 'profile', group: 'member' },
   { key: 'my_contributions', group: 'member' },
   { key: 'my_comments', group: 'member' },
+  { key: 'my_messages', group: 'member' },
   { key: 'logout', group: 'member' },
 
   // ─── Admin panel — gated by permission ───────────────────────────

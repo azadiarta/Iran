@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { User, Edit2, Save, X, Lock, Eye, EyeOff, CheckCircle, AlertTriangle, ChevronRight, HeartHandshake, MessageSquare } from 'lucide-react';
+import { User, Edit2, Save, X, Lock, Eye, EyeOff, CheckCircle, AlertTriangle, ChevronRight, HeartHandshake, MessageSquare, Mail } from 'lucide-react';
 import { membersAPI } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 import type { Member } from '@/store/authStore';
@@ -537,6 +537,16 @@ export default function ProfilePage() {
             <span className="font-bold text-white flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-white/50" />
               {t('my_comments_title')}
+            </span>
+            <ChevronRight className="w-4 h-4 text-white/30" />
+          </Link>
+          <Link
+            href={`/${locale}/profile/contact-messages`}
+            className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-5 flex items-center justify-between hover:bg-white/10 transition-colors"
+          >
+            <span className="font-bold text-white flex items-center gap-2">
+              <Mail className="w-4 h-4 text-white/50" />
+              {t('my_messages_title')}
             </span>
             <ChevronRight className="w-4 h-4 text-white/30" />
           </Link>

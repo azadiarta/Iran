@@ -597,6 +597,7 @@ export interface MemberListItem {
   member_number: number | null;
   group_name: string | null;
   is_active: boolean;
+  is_superuser: boolean;
   created_at: string;
 }
 
@@ -816,16 +817,9 @@ export interface DefaultSettingItem {
 }
 
 export const settingsAPI = {
-  // Bypasses the shared `api` instance — its interceptor force-redirects on
-  // 403, but regular visitors hitting this superuser-only endpoint must be
-  // able to fail silently so the public contact page keeps rendering.
   getPublicSettings: async () => {
     try {
-      const response = await axios.get<ApiResponse>(
-        `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'}/api/settings/`,
-        { headers: { 'Content-Type': 'application/json' } }
-      );
-      return unwrapApiResponse(response);
+      return await api.get<ApiResponse>('/api/settings/public/');
     } catch {
       return null;
     }
@@ -898,6 +892,9 @@ export const contactAPI = {
 
   toggleHandled: (id: string) =>
     api.patch<ApiResponse>(`/api/contact/${id}/toggle-handled/`),
+
+  // ── Member ─────────────────────────────────────────────────────────────
+  getMine: (page = 1) => api.get<ApiResponse>(`/api/contact/mine/?page=${page}`),
 };
 
 export default api;

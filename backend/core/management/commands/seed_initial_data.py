@@ -36,6 +36,9 @@ DEFAULT_SETTINGS = {
     'post_list_visibility':        ('members_only', 'Who can view posts: all, members_only, group_based.'),
     'member_profile_visibility':   ('members_only', 'Who can view member profiles: all, members_only, group_based.'),
 
+    'contact_email':               ('', 'Public contact email shown on the Contact Us page.'),
+    'contact_phone':               ('', 'Public contact phone number shown on the Contact Us page.'),
+
     'payment_manual_enabled':         ('false', 'Whether the manual bank transfer payment method is available.'),
     'payment_manual_bank_name':       ('', 'Bank name shown to contributors for manual bank transfers.'),
     'payment_manual_account_name':    ('', 'Account holder name shown to contributors for manual bank transfers.'),

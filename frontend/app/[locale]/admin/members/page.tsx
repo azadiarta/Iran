@@ -143,7 +143,16 @@ export default function AdminMembersPage() {
     { key: 'full_name', header: isRTL ? 'نام کامل' : 'Full Name', render: (m) => <span className="text-white/80">{m.full_name}</span> },
     { key: 'display_name', header: isRTL ? 'نام نمایشی' : 'Display Name', render: (m) => <span className="text-white/60">{m.display_name}</span> },
     { key: 'member_number', header: isRTL ? 'شناسه' : 'ID', render: (m) => <span className="text-white/40 text-xs font-mono">#{m.member_number}</span> },
-    { key: 'group', header: isRTL ? 'گروه' : 'Group', render: (m) => <span className="text-white/60">{m.group_name || '—'}</span> },
+    {
+      key: 'group',
+      header: isRTL ? 'گروه' : 'Group',
+      render: (m) =>
+        m.is_superuser ? (
+          <span className="text-xs font-bold" style={{ color: '#fbbf24' }}>{isRTL ? 'سوپریوزر' : 'Superuser'}</span>
+        ) : (
+          <span className="text-white/60">{m.group_name || '—'}</span>
+        ),
+    },
     { key: 'status', header: isRTL ? 'وضعیت' : 'Status', render: (m) => <AdminBadge status={m.is_active ? 'active' : 'inactive'} /> },
     {
       key: 'created_at',
