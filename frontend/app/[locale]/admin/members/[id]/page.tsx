@@ -212,7 +212,7 @@ export default function AdminMemberDetailPage() {
             {target.full_name}
             <AdminBadge status={target.is_active ? 'active' : 'inactive'} />
           </h1>
-          <p className="text-sm text-white/40 mt-1">{target.display_name} · {target.group_name || '—'}</p>
+          <p className="text-sm text-white/40 mt-1">{target.display_name} · #{target.member_number} · {target.group_name || '—'}</p>
         </div>
       </div>
 

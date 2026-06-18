@@ -85,4 +85,11 @@ export const PERMISSION_META: Record<string, PermissionMeta> = {
       fa: 'دسترسی کامل مدیریتی: اعضا، گروه‌ها، دسترسی‌ها، تنظیمات، پرداخت‌ها و نظارت بر محتوا.',
     },
   },
+  can_manage_contact_messages: {
+    label: { en: 'Can Manage Contact Messages', fa: 'مدیریت پیام‌های تماس' },
+    description: {
+      en: 'View submitted contact form messages and mark them as handled.',
+      fa: 'مشاهده پیام‌های ارسالی فرم تماس و علامت‌گذاری آن‌ها به‌عنوان رسیدگی‌شده.',
+    },
+  },
 };

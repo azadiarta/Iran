@@ -18,6 +18,7 @@ export default function AdminLayout({ locale, children }: AdminLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [pendingCommentCount, setPendingCommentCount] = useState(0);
   const [pendingContributionCount, setPendingContributionCount] = useState(0);
+  const [pendingContactMessageCount, setPendingContactMessageCount] = useState(0);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -35,6 +36,9 @@ export default function AdminLayout({ locale, children }: AdminLayoutProps) {
         }
         if (typeof data.pending_contributions_count === 'number') {
           setPendingContributionCount(data.pending_contributions_count);
+        }
+        if (typeof data.pending_contact_messages_count === 'number') {
+          setPendingContactMessageCount(data.pending_contact_messages_count);
         }
       })
       .catch(() => {
@@ -67,6 +71,7 @@ export default function AdminLayout({ locale, children }: AdminLayoutProps) {
         onMobileClose={() => setMobileOpen(false)}
         pendingCommentCount={pendingCommentCount}
         pendingContributionCount={pendingContributionCount}
+        pendingContactMessageCount={pendingContactMessageCount}
       />
       <main className={`transition-[padding] duration-200 ps-4 pe-4 md:pe-6 ${desktopPadStart}`} style={{ paddingTop: 'calc(56px + 1.5rem)', paddingBottom: '2rem' }}>
         <div className="mx-auto max-w-7xl">{children}</div>

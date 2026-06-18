@@ -12,8 +12,13 @@ from fund.models import Expense
 from logs.models import ActivityLog
 from posts.models import Comment, Post, PostImage
 from posts.serializers import (
+    CommentAdminDetailSerializer,
+    CommentAdminEditSerializer,
     CommentCreateSerializer,
+    CommentOwnerEditSerializer,
     CommentSerializer,
+    CommentStatusSerializer,
+    MyCommentSerializer,
     PostCreateSerializer,
     PostImageSerializer,
     PostSerializer,
@@ -80,6 +85,16 @@ def _can_modify_post(request, post):
     return False
 
 
+def _can_modify_comment(request, comment):
+    if request.user.is_superuser:
+        return True
+    if comment.author and comment.author == request.user:
+        return True
+    if request.user.group and request.user.group.permissions.filter(codename='can_manage_permissions').exists():
+        return True
+    return False
+
+
 # ─── Post ─────────────────────────────────────────────────────────────────────
 
 class PostListView(APIView):
@@ -108,7 +123,7 @@ class PostDetailView(APIView):
         comments = Comment.objects.select_related('author').filter(
             content_type=ContentType.objects.get_for_model(Post),
             object_id=pk,
-            is_approved=True,
+            status=Comment.Status.APPROVED,
         ).order_by('created_at')
 
         return api_success({
@@ -267,9 +282,9 @@ class CommentGlobalListView(APIView):
     def get(self, request):
         qs = Comment.objects.select_related('author').order_by('-created_at')
 
-        is_approved = request.query_params.get('is_approved')
-        if is_approved is not None:
-            qs = qs.filter(is_approved=is_approved.lower() in ('true', '1'))
+        status_filter = request.query_params.get('status')
+        if status_filter in (Comment.Status.PENDING, Comment.Status.APPROVED, Comment.Status.REJECTED):
+            qs = qs.filter(status=status_filter)
 
         target_type = request.query_params.get('target_type')
         if target_type in ('post', 'expense'):
@@ -296,7 +311,7 @@ class CommentListView(APIView):
         if err:
             return err
         comments = Comment.objects.filter(
-            content_type=ct, object_id=object_id, is_approved=True,
+            content_type=ct, object_id=object_id, status=Comment.Status.APPROVED,
         ).select_related('author').order_by('created_at')
         return api_success(CommentSerializer(comments, many=True).data)
 
@@ -322,7 +337,7 @@ class CommentCreateView(APIView):
         return api_success(CommentSerializer(comment).data, message='Comment submitted for approval.', status_code=201)
 
 
-class CommentApproveView(APIView):
+class CommentStatusUpdateView(APIView):
     permission_classes = [IsAuthenticated, HasGroupPermission('can_approve_comments')]
 
     def patch(self, request, pk):
@@ -331,20 +346,89 @@ class CommentApproveView(APIView):
         except Comment.DoesNotExist:
             return api_error('Comment not found.', status_code=404)
 
-        comment.is_approved = True
-        comment.save(update_fields=['is_approved'])
-        _log(request.user, 'comment_approved', target=comment, ip=_get_ip(request))
-        return api_success(CommentSerializer(comment).data, message='Comment approved.')
+        before_status = comment.status
+        serializer = CommentStatusSerializer(comment, data=request.data, partial=True)
+        if not serializer.is_valid():
+            return api_error('Validation failed.', errors=serializer.errors)
+        serializer.save()
+        _log(
+            request.user, 'comment_status_updated', target=comment,
+            extra_data={'before': before_status, 'after': comment.status},
+            ip=_get_ip(request),
+        )
+        return api_success(CommentSerializer(comment).data, message='Status updated.')
+
+
+class CommentAdminDetailView(APIView):
+    permission_classes = [IsAuthenticated, HasGroupPermission('can_approve_comments')]
+
+    def get(self, request, pk):
+        try:
+            comment = Comment.objects.select_related('author').get(pk=pk)
+        except Comment.DoesNotExist:
+            return api_error('Comment not found.', status_code=404)
+        return api_success(CommentAdminDetailSerializer(comment).data)
+
+
+class CommentAdminEditView(APIView):
+    permission_classes = [IsAuthenticated, HasGroupPermission('can_approve_comments')]
+
+    EDITABLE_FIELDS = ['text', 'rating', 'status', 'rejection_reason']
+
+    def patch(self, request, pk):
+        try:
+            comment = Comment.objects.select_related('author').get(pk=pk)
+        except Comment.DoesNotExist:
+            return api_error('Comment not found.', status_code=404)
+
+        before = {field: str(getattr(comment, field)) for field in self.EDITABLE_FIELDS}
+
+        serializer = CommentAdminEditSerializer(comment, data=request.data, partial=True)
+        if not serializer.is_valid():
+            return api_error('Validation failed.', errors=serializer.errors)
+        serializer.save()
+
+        after = {field: str(getattr(comment, field)) for field in self.EDITABLE_FIELDS}
+        _log(
+            request.user, 'comment_edited_by_admin', target=comment,
+            extra_data={'before': before, 'after': after},
+            ip=_get_ip(request),
+        )
+        return api_success(CommentAdminDetailSerializer(comment).data, message='Comment updated.')
+
+
+class CommentUpdateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        try:
+            comment = Comment.objects.get(pk=pk)
+        except Comment.DoesNotExist:
+            return api_error('Comment not found.', status_code=404)
+
+        if comment.author_id != request.user.id:
+            return api_error('Permission denied.', status_code=403)
+
+        serializer = CommentOwnerEditSerializer(comment, data=request.data, partial=True)
+        if not serializer.is_valid():
+            return api_error('Validation failed.', errors=serializer.errors)
+        serializer.save()
+
+        _log(request.user, 'comment_edited_by_owner', target=comment, ip=_get_ip(request))
+        return api_success(CommentSerializer(comment).data, message='Comment updated and resubmitted for approval.')
 
 
 class CommentDeleteView(APIView):
-    permission_classes = [IsAuthenticated, HasGroupPermission('can_manage_permissions')]
+    permission_classes = [IsAuthenticated]
 
     def delete(self, request, pk):
         try:
             comment = Comment.objects.get(pk=pk)
         except Comment.DoesNotExist:
             return api_error('Comment not found.', status_code=404)
+
+        if not _can_modify_comment(request, comment):
+            return api_error('Permission denied.', status_code=403)
 
         _log(request.user, 'comment_deleted', target=comment, ip=_get_ip(request), extra_data={
             'text': comment.text,
@@ -355,3 +439,11 @@ class CommentDeleteView(APIView):
         })
         comment.delete()
         return api_success(message='Comment deleted.')
+
+
+class MyCommentsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        qs = Comment.objects.filter(author=request.user).order_by('-created_at')
+        return paginate(qs, request, MyCommentSerializer)

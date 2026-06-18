@@ -14,6 +14,7 @@ interface AdminSidebarProps {
   onMobileClose: () => void;
   pendingCommentCount?: number;
   pendingContributionCount?: number;
+  pendingContactMessageCount?: number;
 }
 
 export default function AdminSidebar({
@@ -23,6 +24,7 @@ export default function AdminSidebar({
   onMobileClose,
   pendingCommentCount = 0,
   pendingContributionCount = 0,
+  pendingContactMessageCount = 0,
 }: AdminSidebarProps) {
   const pathname = usePathname();
   const { member, hasPermission } = useAuthStore();
@@ -33,6 +35,7 @@ export default function AdminSidebar({
   const badgeCounts = {
     pendingCommentCount,
     pendingContributionCount,
+    pendingContactMessageCount,
   };
 
   function isVisible(item: (typeof ADMIN_NAV_ITEMS)[number]) {

@@ -35,13 +35,13 @@ class PostImageInline(admin.TabularInline):
 
 class PostCommentInline(GenericTabularInline):
     model = Comment
-    fields = ['author', 'guest_name', 'text', 'rating', 'is_approved', 'created_at']
-    readonly_fields = ['author', 'guest_name', 'text', 'rating', 'is_approved', 'created_at']
+    fields = ['author', 'guest_name', 'text', 'rating', 'status', 'created_at']
+    readonly_fields = ['author', 'guest_name', 'text', 'rating', 'status', 'created_at']
     extra = 0
     verbose_name_plural = 'Approved Comments'
 
     def get_queryset(self, request):
-        return super().get_queryset(request).filter(is_approved=True).order_by('-created_at')
+        return super().get_queryset(request).filter(status=Comment.Status.APPROVED).order_by('-created_at')
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -68,7 +68,7 @@ class PostAdmin(admin.ModelAdmin):
 
     def comment_count(self, obj):
         ct = ContentType.objects.get_for_model(obj)
-        return Comment.objects.filter(content_type=ct, object_id=obj.pk, is_approved=True).count()
+        return Comment.objects.filter(content_type=ct, object_id=obj.pk, status=Comment.Status.APPROVED).count()
     comment_count.short_description = 'Approved Comments'
 
 
@@ -92,15 +92,15 @@ class PostImageAdmin(admin.ModelAdmin):
 
 @admin.register(Comment)
 class CommentAdmin(admin.ModelAdmin):
-    list_display = ['author_display', 'text_preview', 'target', 'rating', 'is_approved', 'created_at']
-    list_filter = ['is_approved', 'created_at']
+    list_display = ['author_display', 'text_preview', 'target', 'rating', 'status', 'created_at']
+    list_filter = ['status', 'created_at']
     search_fields = ['text', 'guest_name']
     readonly_fields = ['id', 'created_at', 'updated_at']
     actions = ['approve_comments', 'reject_comments']
 
     fieldsets = [
         (_('Author'),   {'fields': ['author', 'guest_name']}),
-        (_('Content'),  {'fields': ['content_type', 'object_id', 'text', 'rating', 'is_approved']}),
+        (_('Content'),  {'fields': ['content_type', 'object_id', 'text', 'rating', 'status', 'rejection_reason']}),
         (_('Meta'),     {'fields': ['id', 'created_at', 'updated_at'], 'classes': ['collapse']}),
     ]
 
@@ -125,7 +125,7 @@ class CommentAdmin(admin.ModelAdmin):
 
     @admin.action(description='Approve selected comments')
     def approve_comments(self, request, queryset):
-        updated = queryset.update(is_approved=True)
+        updated = queryset.update(status=Comment.Status.APPROVED)
         for obj in queryset:
             ActivityLog.objects.create(
                 actor=request.user,
@@ -140,7 +140,7 @@ class CommentAdmin(admin.ModelAdmin):
 
     @admin.action(description='Reject selected comments')
     def reject_comments(self, request, queryset):
-        updated = queryset.update(is_approved=False)
+        updated = queryset.update(status=Comment.Status.REJECTED)
         for obj in queryset:
             ActivityLog.objects.create(
                 actor=request.user,

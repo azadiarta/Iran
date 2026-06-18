@@ -1,6 +1,7 @@
+from django.utils.html import strip_tags
 from rest_framework import serializers
 
-from core.models import DefaultSetting, Permission
+from core.models import ContactMessage, DefaultSetting, Permission
 
 
 class RelativeImageField(serializers.ImageField):
@@ -43,3 +44,43 @@ class DefaultSettingSerializer(serializers.ModelSerializer):
 
     def get_updated_by_name(self, obj):
         return str(obj.updated_by) if obj.updated_by else None
+
+
+class ContactMessageCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContactMessage
+        fields = ['name', 'contact_info', 'message']
+
+    def validate_name(self, value):
+        return strip_tags(value).strip()
+
+    def validate_contact_info(self, value):
+        return strip_tags(value).strip()
+
+    def validate_message(self, value):
+        return strip_tags(value).strip()
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            validated_data['sender'] = request.user
+        return super().create(validated_data)
+
+
+class ContactMessageSerializer(serializers.ModelSerializer):
+    sender_label = serializers.SerializerMethodField()
+    handled_by_label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ContactMessage
+        fields = [
+            'id', 'name', 'contact_info', 'message', 'sender_label',
+            'is_handled', 'handled_by_label', 'handled_at', 'created_at',
+        ]
+        read_only_fields = fields
+
+    def get_sender_label(self, obj):
+        return str(obj.sender) if obj.sender else None
+
+    def get_handled_by_label(self, obj):
+        return str(obj.handled_by) if obj.handled_by else None

@@ -1,8 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
-import { Mail, Phone, Send, CheckCircle } from 'lucide-react';
-import { settingsAPI } from '@/lib/api';
+import { Mail, Phone, Send, CheckCircle, AlertTriangle } from 'lucide-react';
+import { settingsAPI, contactAPI } from '@/lib/api';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
 import useAuthStore from '@/store/authStore';
 
@@ -19,6 +19,8 @@ export default function ContactPage() {
   const [contactInfo, setContactInfo] = useState<ContactInfo>({ email: null, phone: null });
   const [formData, setFormData] = useState({ name: '', contact: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -44,17 +46,22 @@ export default function ContactPage() {
     fetchSettings();
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const subject = encodeURIComponent('Contact Form');
-    const body = encodeURIComponent(
-      `Name: ${formData.name}\nContact: ${formData.contact}\n\nMessage:\n${formData.message}`
-    );
-    const mailto = contactInfo.email
-      ? `mailto:${contactInfo.email}?subject=${subject}&body=${body}`
-      : `mailto:?subject=${subject}&body=${body}`;
-    window.open(mailto, '_blank');
-    setSubmitted(true);
+    setSubmitError('');
+    setSubmitting(true);
+    try {
+      await contactAPI.submit({
+        name: formData.name,
+        contact_info: formData.contact,
+        message: formData.message,
+      });
+      setSubmitted(true);
+    } catch {
+      setSubmitError(t('submit_error'));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const hasContactInfo = contactInfo.email || contactInfo.phone;
@@ -210,10 +217,22 @@ export default function ContactPage() {
                 />
               </div>
 
+              {/* Error */}
+              {submitError && (
+                <div
+                  className="rounded-xl border p-3 flex items-start gap-2 text-sm"
+                  style={{ borderColor: 'rgba(239,68,68,0.3)', backgroundColor: 'rgba(239,68,68,0.08)', color: '#ef4444' }}
+                >
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{submitError}</span>
+                </div>
+              )}
+
               {/* Submit */}
               <button
                 type="submit"
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all"
+                disabled={submitting}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-50"
                 style={{
                   backgroundColor: '#00ffff',
                   color: '#0a0a0f',
@@ -221,7 +240,7 @@ export default function ContactPage() {
                 }}
               >
                 <Send className="w-4 h-4" />
-                {t('send_button')}
+                {submitting ? tCommon('submitting') : t('send_button')}
               </button>
             </form>
           )}

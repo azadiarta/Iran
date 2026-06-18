@@ -7,6 +7,7 @@ export interface Member {
   display_name: string;
   email: string | null;
   phone: string | null;
+  member_number: number | null;
   group_name: string | null;
   group_permissions: string[];
   is_active: boolean;
