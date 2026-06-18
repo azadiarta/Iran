@@ -27,6 +27,12 @@ export default function ContactPage() {
   }, []);
 
   useEffect(() => {
+    if (mounted && member) {
+      setFormData((d) => ({ ...d, name: member.full_name }));
+    }
+  }, [mounted, member]);
+
+  useEffect(() => {
     const fetchSettings = async () => {
       try {
         const res = await settingsAPI.getPublicSettings();
@@ -57,8 +63,13 @@ export default function ContactPage() {
         message: formData.message,
       });
       setSubmitted(true);
-    } catch {
-      setSubmitError(t('submit_error'));
+    } catch (err: unknown) {
+      const status =
+        err && typeof err === 'object' && 'response' in err && err.response &&
+        typeof err.response === 'object' && 'status' in err.response
+          ? (err.response as { status?: number }).status
+          : undefined;
+      setSubmitError(status === 429 ? t('pending_limit_error') : t('submit_error'));
     } finally {
       setSubmitting(false);
     }
@@ -183,9 +194,23 @@ export default function ContactPage() {
                   value={formData.name}
                   onChange={(e) => setFormData((d) => ({ ...d, name: e.target.value }))}
                   placeholder={t('name_placeholder')}
-                  className={inputClass}
+                  disabled={mounted && !!member}
+                  className={inputClass + (mounted && member ? ' opacity-60 cursor-not-allowed' : '')}
                 />
               </div>
+
+              {/* Member ID (read-only, shown only when logged in) */}
+              {mounted && member && (
+                <div>
+                  <label className="block text-xs text-white/50 mb-1.5">{t('member_id_label')}</label>
+                  <input
+                    type="text"
+                    value={`#${member.member_number ?? ''}`}
+                    disabled
+                    className={inputClass + ' opacity-60 cursor-not-allowed'}
+                  />
+                </div>
+              )}
 
               {/* Email or phone */}
               <div>

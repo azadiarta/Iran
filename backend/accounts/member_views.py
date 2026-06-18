@@ -183,6 +183,9 @@ class MemberUpdateView(APIView):
         if not is_owner and not _is_admin(request.user):
             return api_error('Permission denied.', status_code=403)
 
+        if member.is_superuser and not is_owner:
+            return api_error('Cannot edit superuser profile.', status_code=403)
+
         before = {
             'full_name': member.full_name,
             'display_name': member.display_name,

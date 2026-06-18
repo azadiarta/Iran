@@ -3,7 +3,7 @@ import os
 import django
 from django.conf import settings as django_settings
 from django.db import connection
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
 from accounts.models import AccessGroup, Member
@@ -56,6 +56,20 @@ class DefaultSettingListView(APIView):
     def get(self, request):
         settings = DefaultSetting.objects.select_related('updated_by').all()
         return api_success(DefaultSettingSerializer(settings, many=True).data)
+
+
+# Settings safe to expose to anyone, including guests (e.g. for the public
+# Contact Us page) — deliberately a tiny allowlist, never the full settings list.
+PUBLIC_SETTING_KEYS = ['contact_email', 'contact_phone']
+
+
+class PublicSettingListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        settings = DefaultSetting.objects.filter(key__in=PUBLIC_SETTING_KEYS)
+        data = [{'key': s.key, 'value': s.value} for s in settings]
+        return api_success(data)
 
 
 class DefaultSettingUpdateView(APIView):
