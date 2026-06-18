@@ -606,6 +606,14 @@ export interface MemberDetail extends MemberListItem {
   deactivated_by_name?: string | null;
 }
 
+export interface MemberFullProfile {
+  member: MemberDetail;
+  comments: CommentDetail[];
+  contributions: Contribution[];
+  contact_messages: ContactMessage[];
+  activity_logs: ActivityLogEntry[];
+}
+
 export const membersAPI = {
   getProfile: (id: string) => api.get<ApiResponse>(`/api/members/${id}/`),
 
@@ -658,6 +666,8 @@ export const membersAPI = {
     api.patch<ApiResponse>(`/api/members/${id}/toggle-active/`, reason !== undefined ? { reason } : undefined),
 
   delete: (id: string) => api.delete<ApiResponse>(`/api/members/${id}/delete/`),
+
+  getFullProfile: (id: string) => api.get<ApiResponse>(`/api/members/${id}/full-profile/`),
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
