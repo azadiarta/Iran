@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Eye, CheckCircle2, RotateCcw } from 'lucide-react';
 import AdminTable, { AdminTableColumn } from '@/components/admin/AdminTable';
 import AdminBadge from '@/components/admin/AdminBadge';
@@ -13,6 +13,8 @@ import { contactAPI, ContactMessage, Paginated } from '@/lib/api';
 
 export default function AdminContactMessagesPage() {
   const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const locale = (params?.locale as 'en' | 'fa') || 'en';
   const isRTL = locale === 'fa';
   const { hasPermission, member: currentMember } = useAuthStore();
@@ -30,6 +32,8 @@ export default function AdminContactMessagesPage() {
   const [searchInput, setSearchInput] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
   const [handledFilter, setHandledFilter] = useState<'' | 'true' | 'false'>('');
+  const [memberFilterId, setMemberFilterId] = useState(searchParams.get('member') || '');
+  const [memberFilterName, setMemberFilterName] = useState(searchParams.get('name') || '');
 
   const [toggleLoadingId, setToggleLoadingId] = useState<string | null>(null);
 
@@ -39,7 +43,7 @@ export default function AdminContactMessagesPage() {
   function load() {
     setLoading(true);
     contactAPI
-      .getList(page, { search: appliedSearch || undefined, is_handled: handledFilter || undefined })
+      .getList(page, { search: appliedSearch || undefined, is_handled: handledFilter || undefined, sender: memberFilterId || undefined })
       .then((res) => {
         const data = res.data as unknown as Paginated<ContactMessage>;
         setMessages(data.results);
@@ -54,12 +58,19 @@ export default function AdminContactMessagesPage() {
     if (canManage) load();
     else setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canManage, page, appliedSearch, handledFilter]);
+  }, [canManage, page, appliedSearch, handledFilter, memberFilterId]);
 
   function applySearch(e: React.FormEvent) {
     e.preventDefault();
     setPage(1);
     setAppliedSearch(searchInput.trim());
+  }
+
+  function clearMemberFilter() {
+    setMemberFilterId('');
+    setMemberFilterName('');
+    setPage(1);
+    router.replace(`/${locale}/admin/contact-messages`);
   }
 
   async function toggleHandled(m: ContactMessage) {
@@ -163,6 +174,17 @@ export default function AdminContactMessagesPage() {
           {isRTL ? 'پیام‌های ارسالی از فرم تماس با ما را بررسی کنید' : 'Review messages submitted through the Contact Us form'}
         </p>
       </div>
+
+      {memberFilterId && (
+        <div className="admin-glass-card p-3 flex items-center justify-between gap-3" style={{ border: '1px solid rgba(0,255,255,0.25)' }}>
+          <span className="text-sm text-white/70">
+            {isRTL ? `نمایش پیام‌های عضو: ${memberFilterName || memberFilterId}` : `Showing messages from member: ${memberFilterName || memberFilterId}`}
+          </span>
+          <button onClick={clearMemberFilter} className="text-xs font-medium underline" style={{ color: '#00ffff' }}>
+            {isRTL ? 'پاک‌کردن فیلتر' : 'Clear filter'}
+          </button>
+        </div>
+      )}
 
       <form onSubmit={applySearch} className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
         <AdminInput label={isRTL ? 'جست‌وجو' : 'Search'} value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />

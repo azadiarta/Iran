@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Save, KeyRound, ShieldCheck, Trash2, Power, MessageSquare, HandCoins, Mail, ScrollText } from 'lucide-react';
+import { ArrowLeft, Save, KeyRound, ShieldCheck, Trash2, Power, MessageSquare, HandCoins, Mail, ScrollText, ExternalLink } from 'lucide-react';
 import AdminBadge from '@/components/admin/AdminBadge';
 import AdminInput from '@/components/admin/fields/AdminInput';
 import AdminSelect from '@/components/admin/fields/AdminSelect';
@@ -371,16 +371,28 @@ export default function AdminMemberDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Comments */}
         <div className="admin-glass-card p-5 flex flex-col gap-3">
-          <h2 className="text-sm font-semibold text-white/80 flex items-center gap-2">
-            <MessageSquare className="w-4 h-4" style={{ color: '#00ffff' }} />
-            {isRTL ? 'نظرات' : 'Comments'}
-            <span className="text-white/30 text-xs font-normal">({comments.length})</span>
-          </h2>
-          <div className="flex flex-col gap-2 max-h-80 overflow-y-auto pr-1">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-white/80 flex items-center gap-2">
+              <MessageSquare className="w-4 h-4" style={{ color: '#00ffff' }} />
+              {isRTL ? 'نظرات' : 'Comments'}
+              <span className="text-white/30 text-xs font-normal">({comments.length})</span>
+            </h2>
+            {comments.length > 0 && (
+              <button
+                onClick={() => router.push(`/${locale}/admin/comments?member=${id}&name=${encodeURIComponent(target.full_name)}`)}
+                className="flex items-center gap-1 text-xs font-medium transition-opacity hover:opacity-80"
+                style={{ color: '#00ffff' }}
+              >
+                {isRTL ? 'مشاهده همه' : 'View all'}
+                <ExternalLink className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+          <div className="flex flex-col gap-2">
             {comments.length === 0 ? (
               <p className="text-xs text-white/40">{isRTL ? 'نظری ثبت نشده است.' : 'No comments yet.'}</p>
             ) : (
-              comments.map((c) => (
+              comments.slice(0, 3).map((c) => (
                 <div key={c.id} className="rounded-lg p-3 text-xs flex flex-col gap-1" style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-white/40">{c.target_label || '—'}</span>
@@ -402,16 +414,28 @@ export default function AdminMemberDetailPage() {
 
         {/* Contributions */}
         <div className="admin-glass-card p-5 flex flex-col gap-3">
-          <h2 className="text-sm font-semibold text-white/80 flex items-center gap-2">
-            <HandCoins className="w-4 h-4" style={{ color: '#10b981' }} />
-            {isRTL ? 'مشارکت‌ها' : 'Contributions'}
-            <span className="text-white/30 text-xs font-normal">({contributions.length})</span>
-          </h2>
-          <div className="flex flex-col gap-2 max-h-80 overflow-y-auto pr-1">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-white/80 flex items-center gap-2">
+              <HandCoins className="w-4 h-4" style={{ color: '#10b981' }} />
+              {isRTL ? 'مشارکت‌ها' : 'Contributions'}
+              <span className="text-white/30 text-xs font-normal">({contributions.length})</span>
+            </h2>
+            {contributions.length > 0 && (
+              <button
+                onClick={() => router.push(`/${locale}/admin/contributions?member=${id}&name=${encodeURIComponent(target.full_name)}`)}
+                className="flex items-center gap-1 text-xs font-medium transition-opacity hover:opacity-80"
+                style={{ color: '#10b981' }}
+              >
+                {isRTL ? 'مشاهده همه' : 'View all'}
+                <ExternalLink className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+          <div className="flex flex-col gap-2">
             {contributions.length === 0 ? (
               <p className="text-xs text-white/40">{isRTL ? 'مشارکتی ثبت نشده است.' : 'No contributions yet.'}</p>
             ) : (
-              contributions.map((c) => (
+              contributions.slice(0, 3).map((c) => (
                 <div key={c.id} className="rounded-lg p-3 text-xs flex flex-col gap-1" style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-white/70 font-medium">{fmt(c.amount)} {c.currency}</span>
@@ -430,16 +454,28 @@ export default function AdminMemberDetailPage() {
 
         {/* Contact messages */}
         <div className="admin-glass-card p-5 flex flex-col gap-3">
-          <h2 className="text-sm font-semibold text-white/80 flex items-center gap-2">
-            <Mail className="w-4 h-4" style={{ color: '#fbbf24' }} />
-            {isRTL ? 'پیام‌های تماس' : 'Contact Messages'}
-            <span className="text-white/30 text-xs font-normal">({contactMessages.length})</span>
-          </h2>
-          <div className="flex flex-col gap-2 max-h-80 overflow-y-auto pr-1">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-white/80 flex items-center gap-2">
+              <Mail className="w-4 h-4" style={{ color: '#fbbf24' }} />
+              {isRTL ? 'پیام‌های تماس' : 'Contact Messages'}
+              <span className="text-white/30 text-xs font-normal">({contactMessages.length})</span>
+            </h2>
+            {contactMessages.length > 0 && (
+              <button
+                onClick={() => router.push(`/${locale}/admin/contact-messages?member=${id}&name=${encodeURIComponent(target.full_name)}`)}
+                className="flex items-center gap-1 text-xs font-medium transition-opacity hover:opacity-80"
+                style={{ color: '#fbbf24' }}
+              >
+                {isRTL ? 'مشاهده همه' : 'View all'}
+                <ExternalLink className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+          <div className="flex flex-col gap-2">
             {contactMessages.length === 0 ? (
               <p className="text-xs text-white/40">{isRTL ? 'پیامی ثبت نشده است.' : 'No contact messages yet.'}</p>
             ) : (
-              contactMessages.map((m) => (
+              contactMessages.slice(0, 3).map((m) => (
                 <div key={m.id} className="rounded-lg p-3 text-xs flex flex-col gap-1" style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-white/40">{m.contact_info}</span>
@@ -458,16 +494,28 @@ export default function AdminMemberDetailPage() {
 
         {/* Activity log */}
         <div className="admin-glass-card p-5 flex flex-col gap-3">
-          <h2 className="text-sm font-semibold text-white/80 flex items-center gap-2">
-            <ScrollText className="w-4 h-4" style={{ color: '#8b5cf6' }} />
-            {isRTL ? 'گزارش فعالیت' : 'Activity Log'}
-            <span className="text-white/30 text-xs font-normal">({activityLogs.length})</span>
-          </h2>
-          <div className="flex flex-col gap-2 max-h-80 overflow-y-auto pr-1">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-white/80 flex items-center gap-2">
+              <ScrollText className="w-4 h-4" style={{ color: '#8b5cf6' }} />
+              {isRTL ? 'گزارش فعالیت' : 'Activity Log'}
+              <span className="text-white/30 text-xs font-normal">({activityLogs.length})</span>
+            </h2>
+            {activityLogs.length > 0 && (
+              <button
+                onClick={() => router.push(`/${locale}/admin/logs/activity?member=${id}&name=${encodeURIComponent(target.full_name)}`)}
+                className="flex items-center gap-1 text-xs font-medium transition-opacity hover:opacity-80"
+                style={{ color: '#8b5cf6' }}
+              >
+                {isRTL ? 'مشاهده همه' : 'View all'}
+                <ExternalLink className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+          <div className="flex flex-col gap-2">
             {activityLogs.length === 0 ? (
               <p className="text-xs text-white/40">{isRTL ? 'فعالیتی ثبت نشده است.' : 'No activity yet.'}</p>
             ) : (
-              activityLogs.map((l) => (
+              activityLogs.slice(0, 3).map((l) => (
                 <div key={l.id} className="rounded-lg p-3 text-xs flex flex-col gap-1" style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <span className="text-white/70 font-medium">{l.action.replace(/_/g, ' ')}</span>
                   {l.target_display && <span className="text-white/40">{l.target_display}</span>}

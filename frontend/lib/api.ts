@@ -341,13 +341,14 @@ export const postsAPI = {
 export const commentsAPI = {
   getList: (
     page = 1,
-    filters: { status?: CommentStatus; target_type?: 'post' | 'expense'; search?: string } = {}
+    filters: { status?: CommentStatus; target_type?: 'post' | 'expense'; search?: string; author?: string } = {}
   ) => {
     const params = new URLSearchParams();
     params.set('page', String(page));
     if (filters.status) params.set('status', filters.status);
     if (filters.target_type) params.set('target_type', filters.target_type);
     if (filters.search) params.set('search', filters.search);
+    if (filters.author) params.set('author', filters.author);
     return api.get<ApiResponse>(`/api/posts/comments/?${params.toString()}`);
   },
 
@@ -451,7 +452,7 @@ export const fundAPI = {
 
   getContributions: (
     page = 1,
-    filters: { status?: string; payment_method?: string; date_from?: string; date_to?: string } = {}
+    filters: { status?: string; payment_method?: string; date_from?: string; date_to?: string; contributor?: string } = {}
   ) => {
     const params = new URLSearchParams();
     params.set('page', String(page));
@@ -459,6 +460,7 @@ export const fundAPI = {
     if (filters.payment_method) params.set('payment_method', filters.payment_method);
     if (filters.date_from) params.set('date_from', filters.date_from);
     if (filters.date_to) params.set('date_to', filters.date_to);
+    if (filters.contributor) params.set('contributor', filters.contributor);
     return api.get<ApiResponse>(`/api/fund/contributions/?${params.toString()}`);
   },
 
@@ -884,12 +886,13 @@ export const contactAPI = {
   // ── Admin ──────────────────────────────────────────────────────────────
   getList: (
     page = 1,
-    filters: { is_handled?: 'true' | 'false'; search?: string } = {}
+    filters: { is_handled?: 'true' | 'false'; search?: string; sender?: string } = {}
   ) => {
     const params = new URLSearchParams();
     params.set('page', String(page));
     if (filters.is_handled) params.set('is_handled', filters.is_handled);
     if (filters.search) params.set('search', filters.search);
+    if (filters.sender) params.set('sender', filters.sender);
     return api.get<ApiResponse>(`/api/contact/?${params.toString()}`);
   },
 

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Eye } from 'lucide-react';
 import AdminTable, { AdminTableColumn } from '@/components/admin/AdminTable';
 import AdminModal from '@/components/admin/AdminModal';
@@ -11,6 +11,8 @@ import { logsAPI, ActivityLogEntry, Paginated } from '@/lib/api';
 
 export default function AdminActivityLogPage() {
   const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const locale = (params?.locale as 'en' | 'fa') || 'en';
   const isRTL = locale === 'fa';
   const { hasPermission, member: currentMember } = useAuthStore();
@@ -25,11 +27,13 @@ export default function AdminActivityLogPage() {
   const [totalCount, setTotalCount] = useState(0);
   const pageSize = 25;
 
-  const [actorFilter, setActorFilter] = useState('');
+  const initialMemberFilter = searchParams.get('member') || '';
+  const [actorFilter, setActorFilter] = useState(initialMemberFilter);
   const [actionFilter, setActionFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [appliedFilters, setAppliedFilters] = useState({ actor: '', action: '', date_from: '', date_to: '' });
+  const [appliedFilters, setAppliedFilters] = useState({ actor: initialMemberFilter, action: '', date_from: '', date_to: '' });
+  const [memberFilterName, setMemberFilterName] = useState(searchParams.get('name') || '');
 
   const [detail, setDetail] = useState<ActivityLogEntry | null>(null);
 
@@ -62,6 +66,14 @@ export default function AdminActivityLogPage() {
     e.preventDefault();
     setPage(1);
     setAppliedFilters({ actor: actorFilter.trim(), action: actionFilter.trim(), date_from: dateFrom, date_to: dateTo });
+  }
+
+  function clearMemberFilter() {
+    setActorFilter('');
+    setMemberFilterName('');
+    setPage(1);
+    setAppliedFilters((prev) => ({ ...prev, actor: '' }));
+    router.replace(`/${locale}/admin/logs/activity`);
   }
 
   if (!canView) {
@@ -104,6 +116,17 @@ export default function AdminActivityLogPage() {
         <h1 className="text-2xl font-bold text-white">{isRTL ? 'گزارش فعالیت' : 'Activity Log'}</h1>
         <p className="text-sm text-white/40 mt-1">{isRTL ? 'تاریخچه عملیات انجام‌شده توسط اعضا' : 'History of actions performed by members'}</p>
       </div>
+
+      {memberFilterName && (
+        <div className="admin-glass-card p-3 flex items-center justify-between gap-3" style={{ border: '1px solid rgba(0,255,255,0.25)' }}>
+          <span className="text-sm text-white/70">
+            {isRTL ? `نمایش فعالیت‌های عضو: ${memberFilterName}` : `Showing activity for member: ${memberFilterName}`}
+          </span>
+          <button onClick={clearMemberFilter} className="text-xs font-medium underline" style={{ color: '#00ffff' }}>
+            {isRTL ? 'پاک‌کردن فیلتر' : 'Clear filter'}
+          </button>
+        </div>
+      )}
 
       <form onSubmit={applyFilters} className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
         <AdminInput label={isRTL ? 'انجام‌دهنده' : 'Actor'} value={actorFilter} onChange={(e) => setActorFilter(e.target.value)} />
