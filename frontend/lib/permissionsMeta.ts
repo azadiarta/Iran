@@ -92,4 +92,11 @@ export const PERMISSION_META: Record<string, PermissionMeta> = {
       fa: 'مشاهده پیام‌های ارسالی فرم تماس و علامت‌گذاری آن‌ها به‌عنوان رسیدگی‌شده.',
     },
   },
+  can_view_member_details: {
+    label: { en: 'Can View Member Details', fa: 'مشاهده جزئیات اعضا' },
+    description: {
+      en: "View a member's full profile: their comments, contributions, contact messages and activity.",
+      fa: 'مشاهده پروفایل کامل یک عضو: نظرات، مشارکت‌ها، پیام‌های تماس و فعالیت‌های او.',
+    },
+  },
 };

@@ -28,7 +28,7 @@ export interface AdminNavItem {
 
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { key: 'dashboard', href: '', label: { en: 'Dashboard', fa: 'داشبورد' }, icon: LayoutDashboard, permission: 'can_view_dashboard' },
-  { key: 'members', href: 'members', label: { en: 'Members', fa: 'اعضا' }, icon: Users, permission: 'can_manage_permissions' },
+  { key: 'members', href: 'members', label: { en: 'Members', fa: 'اعضا' }, icon: Users, permission: ['can_manage_permissions', 'can_view_member_details'] },
   { key: 'groups', href: 'groups', label: { en: 'Groups', fa: 'گروه‌ها' }, icon: ShieldCheck, permission: 'can_manage_permissions' },
   { key: 'contributions', href: 'contributions', label: { en: 'Contributions', fa: 'مشارکت‌ها' }, icon: HandCoins, permission: 'can_view_balance', badgeKey: 'pendingContributionCount' },
   { key: 'expenses', href: 'expenses', label: { en: 'Expenses', fa: 'هزینه‌ها' }, icon: Receipt, permission: ['can_view_balance', 'can_expense'] },

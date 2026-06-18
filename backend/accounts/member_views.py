@@ -50,8 +50,20 @@ def _is_admin(user):
     )
 
 
+def _can_view_member_details(user):
+    """can_manage_permissions OR the narrower, view-only can_view_member_details."""
+    return user.is_superuser or (
+        user.group and user.group.permissions.filter(
+            codename__in=['can_manage_permissions', 'can_view_member_details']
+        ).exists()
+    )
+
+
 class MemberListView(APIView):
-    permission_classes = [IsAuthenticated, HasGroupPermission('can_manage_permissions')]
+    permission_classes = [
+        IsAuthenticated,
+        HasGroupPermission('can_manage_permissions') | HasGroupPermission('can_view_member_details'),
+    ]
 
     def get(self, request):
         qs = Member.objects.select_related('group').order_by('-created_at')
@@ -116,9 +128,46 @@ class MemberDetailView(APIView):
             return api_error('Member not found.', status_code=404)
 
         is_owner = request.user.pk == member.pk
-        if is_owner or _is_admin(request.user):
+        if is_owner or _can_view_member_details(request.user):
             return api_success(MemberDetailSerializer(member).data)
         return api_success(MemberListSerializer(member).data)
+
+
+class MemberFullProfileView(APIView):
+    """Aggregated, read-only view of everything tied to one member: their
+    comments, contributions, contact messages and recent activity — gated on
+    the narrower can_view_member_details permission (or full can_manage_permissions)."""
+    permission_classes = [
+        IsAuthenticated,
+        HasGroupPermission('can_manage_permissions') | HasGroupPermission('can_view_member_details'),
+    ]
+
+    def get(self, request, pk):
+        try:
+            member = Member.objects.select_related('group').get(pk=pk)
+        except Member.DoesNotExist:
+            return api_error('Member not found.', status_code=404)
+
+        from core.models import ContactMessage
+        from core.serializers import ContactMessageSerializer
+        from fund.models import Contribution
+        from fund.serializers import ContributionAdminDetailSerializer
+        from logs.serializers import ActivityLogSerializer
+        from posts.models import Comment
+        from posts.serializers import CommentAdminDetailSerializer
+
+        comments = Comment.objects.filter(author_id=member.pk).select_related('content_type').order_by('-created_at')
+        contributions = Contribution.objects.filter(contributor_id=member.pk).order_by('-created_at')
+        contact_messages = ContactMessage.objects.filter(sender_id=member.pk).select_related('handled_by').order_by('-created_at')
+        activity_logs = ActivityLog.objects.filter(actor_id=member.pk).order_by('-created_at')[:50]
+
+        return api_success({
+            'member': MemberDetailSerializer(member).data,
+            'comments': CommentAdminDetailSerializer(comments, many=True).data,
+            'contributions': ContributionAdminDetailSerializer(contributions, many=True).data,
+            'contact_messages': ContactMessageSerializer(contact_messages, many=True).data,
+            'activity_logs': ActivityLogSerializer(activity_logs, many=True).data,
+        })
 
 
 class MemberUpdateView(APIView):

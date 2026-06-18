@@ -6,6 +6,7 @@ from accounts.member_views import (
     MemberCreateView,
     MemberDeleteView,
     MemberDetailView,
+    MemberFullProfileView,
     MemberListView,
     MemberToggleActiveView,
     MemberUpdateView,
@@ -20,4 +21,5 @@ urlpatterns = [
     path('<uuid:pk>/toggle-active/',      MemberToggleActiveView.as_view(), name='member-toggle-active'),
     path('<uuid:pk>/delete/',             MemberDeleteView.as_view(),       name='member-delete'),
     path('<uuid:pk>/change-password/',    ChangePasswordView.as_view(),     name='member-change-password'),
+    path('<uuid:pk>/full-profile/',       MemberFullProfileView.as_view(),  name='member-full-profile'),
 ]

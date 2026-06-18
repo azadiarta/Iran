@@ -311,7 +311,7 @@
       },
       "members": {
         "title": "Member Management",
-        "desc": "View, search, and manage every registered member: edit their details, assign them to access groups, activate/deactivate accounts, or remove members."
+        "desc": "View, search, and manage every registered member: edit their details, assign them to access groups, activate/deactivate accounts, or remove members. Members with the narrower \"Can View Member Details\" permission can browse the list and open a member's full profile — comments, contributions, contact messages and activity — without being able to edit or manage anything."
       },
       "groups": {
         "title": "Access Groups",

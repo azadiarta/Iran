@@ -10,7 +10,7 @@ type Group = 'guest' | 'member' | 'admin';
 interface HelpSection {
   key: string;
   group: Group;
-  permission?: string;
+  permission?: string | string[];
   superuserOnly?: boolean;
 }
 
@@ -33,7 +33,7 @@ const SECTIONS: HelpSection[] = [
 
   // ─── Admin panel — gated by permission ───────────────────────────
   { key: 'dashboard', group: 'admin', permission: 'can_view_dashboard' },
-  { key: 'members', group: 'admin', permission: 'can_manage_permissions' },
+  { key: 'members', group: 'admin', permission: ['can_manage_permissions', 'can_view_member_details'] },
   { key: 'groups', group: 'admin', permission: 'can_manage_permissions' },
   { key: 'balance', group: 'admin', permission: 'can_view_balance' },
   { key: 'manage_posts', group: 'admin', permission: 'can_post' },
@@ -70,7 +70,12 @@ export default function HelpPage() {
     // Admin sections
     if (isSuperuser) return true;
     if (section.superuserOnly) return false;
-    if (section.permission) return mounted && hasPermission(section.permission);
+    if (section.permission) {
+      if (!mounted) return false;
+      return Array.isArray(section.permission)
+        ? section.permission.some(hasPermission)
+        : hasPermission(section.permission);
+    }
     return false;
   }
 

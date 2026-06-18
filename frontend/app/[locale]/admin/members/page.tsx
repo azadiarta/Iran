@@ -20,6 +20,7 @@ export default function AdminMembersPage() {
   const showToast = useToastStore((s) => s.show);
 
   const canManage = !!currentMember?.is_superuser || hasPermission('can_manage_permissions');
+  const canView = canManage || hasPermission('can_view_member_details');
 
   const [members, setMembers] = useState<MemberListItem[]>([]);
   const [groups, setGroups] = useState<AccessGroup[]>([]);
@@ -51,7 +52,7 @@ export default function AdminMembersPage() {
   }, []);
 
   function load() {
-    if (!canManage) {
+    if (!canView) {
       setLoading(false);
       return;
     }
@@ -76,7 +77,7 @@ export default function AdminMembersPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canManage, page, search, groupFilter, activeFilter]);
+  }, [canView, page, search, groupFilter, activeFilter]);
 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -130,10 +131,10 @@ export default function AdminMembersPage() {
     }
   }
 
-  if (!canManage) {
+  if (!canView) {
     return (
       <div className="admin-glass-card p-8 text-center text-white/50 text-sm">
-        {isRTL ? 'شما دسترسی مدیریت اعضا را ندارید.' : 'You do not have permission to manage members.'}
+        {isRTL ? 'شما دسترسی مشاهده اعضا را ندارید.' : 'You do not have permission to view members.'}
       </div>
     );
   }
@@ -172,14 +173,16 @@ export default function AdminMembersPage() {
           <h1 className="text-2xl font-bold text-white">{isRTL ? 'اعضا' : 'Members'}</h1>
           <p className="text-sm text-white/40 mt-1">{isRTL ? 'مدیریت اعضای سامانه' : 'Manage system members'}</p>
         </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all"
-          style={{ backgroundColor: '#00ffff', color: '#0a0a0f', boxShadow: '0 0 16px rgba(0,255,255,0.3)' }}
-        >
-          <Plus className="w-4 h-4" />
-          {isRTL ? 'افزودن عضو' : 'Add Member'}
-        </button>
+        {canManage && (
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all"
+            style={{ backgroundColor: '#00ffff', color: '#0a0a0f', boxShadow: '0 0 16px rgba(0,255,255,0.3)' }}
+          >
+            <Plus className="w-4 h-4" />
+            {isRTL ? 'افزودن عضو' : 'Add Member'}
+          </button>
+        )}
       </div>
 
       <div className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
