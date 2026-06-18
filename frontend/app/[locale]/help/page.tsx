@@ -28,6 +28,7 @@ const SECTIONS: HelpSection[] = [
   { key: 'auth', group: 'member' },
   { key: 'profile', group: 'member' },
   { key: 'my_contributions', group: 'member' },
+  { key: 'my_comments', group: 'member' },
   { key: 'logout', group: 'member' },
 
   // ─── Admin panel — gated by permission ───────────────────────────
@@ -40,6 +41,7 @@ const SECTIONS: HelpSection[] = [
   { key: 'payments', group: 'admin', permission: 'can_manage_permissions' },
   { key: 'settings', group: 'admin', permission: 'can_manage_permissions' },
   { key: 'activity_log', group: 'admin', permission: 'can_manage_permissions' },
+  { key: 'contact_messages', group: 'admin', permission: 'can_manage_contact_messages' },
   { key: 'system_log', group: 'admin', superuserOnly: true },
 ];
 

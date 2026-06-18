@@ -17,6 +17,7 @@ PERMISSIONS = {
     'can_delete_member':      ('Can Delete Members', 'Deactivate or remove member accounts.'),
     'can_change_any_password':('Can Change Any Password', "Change another member's password."),
     'can_manage_permissions': ('Can Manage Permissions', 'Full admin access: members, groups, permissions, settings, payments and content moderation.'),
+    'can_manage_contact_messages': ('Can Manage Contact Messages', 'View submitted contact form messages and mark them as handled.'),
 }
 
 # The default group (assigned to newly registered members) gets the same

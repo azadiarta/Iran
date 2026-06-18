@@ -179,7 +179,7 @@ export default function PostDetailPage() {
       .getComments(postId)
       .then((res) => {
         const data = res.data as unknown as Comment[];
-        setComments(data.filter((c) => c.is_approved));
+        setComments(data.filter((c) => c.status === 'approved'));
       })
       .catch(() => setComments([]))
       .finally(() => setCommentsLoading(false));

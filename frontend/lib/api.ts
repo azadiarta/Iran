@@ -253,6 +253,8 @@ export interface CommentAuthor {
   full_name: string;
 }
 
+export type CommentStatus = 'pending' | 'approved' | 'rejected';
+
 export interface Comment {
   id: string;
   author: CommentAuthor | null;
@@ -260,8 +262,21 @@ export interface Comment {
   guest_name: string | null;
   text: string;
   rating: number | null;
-  is_approved: boolean;
+  status: CommentStatus;
   created_at: string;
+}
+
+export interface CommentDetail extends Comment {
+  rejection_reason: string;
+  target_type: 'post' | 'expense';
+  target_label: string | null;
+  updated_at: string;
+}
+
+export interface MyComment extends Comment {
+  rejection_reason: string;
+  target_type: 'post' | 'expense';
+  target_label: string | null;
 }
 
 export interface Paginated<T> {
@@ -326,18 +341,36 @@ export const postsAPI = {
 export const commentsAPI = {
   getList: (
     page = 1,
-    filters: { is_approved?: 'true' | 'false'; target_type?: 'post' | 'expense'; search?: string } = {}
+    filters: { status?: CommentStatus; target_type?: 'post' | 'expense'; search?: string } = {}
   ) => {
     const params = new URLSearchParams();
     params.set('page', String(page));
-    if (filters.is_approved) params.set('is_approved', filters.is_approved);
+    if (filters.status) params.set('status', filters.status);
     if (filters.target_type) params.set('target_type', filters.target_type);
     if (filters.search) params.set('search', filters.search);
     return api.get<ApiResponse>(`/api/posts/comments/?${params.toString()}`);
   },
 
-  approve: (id: string) =>
-    api.patch<ApiResponse>(`/api/posts/comments/${id}/approve/`),
+  getDetail: (id: string) => api.get<ApiResponse>(`/api/posts/comments/${id}/`),
+
+  updateStatus: (id: string, status: 'approved' | 'rejected') =>
+    api.patch<ApiResponse>(`/api/posts/comments/${id}/status/`, { status }),
+
+  update: (id: string, data: Partial<{
+    text: string;
+    rating: number | null;
+    status: CommentStatus;
+    rejection_reason: string;
+  }>) => api.patch<ApiResponse>(`/api/posts/comments/${id}/edit/`, data),
+
+  updateMine: (id: string, data: Partial<{ text: string; rating: number | null }>) =>
+    api.patch<ApiResponse>(`/api/posts/comments/${id}/update/`, data),
+
+  getMine: (page = 1) => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    return api.get<ApiResponse>(`/api/posts/comments/mine/?${params.toString()}`);
+  },
 
   delete: (id: string) =>
     api.delete<ApiResponse>(`/api/posts/comments/${id}/delete/`),
@@ -559,6 +592,7 @@ export interface MemberListItem {
   id: string;
   full_name: string;
   display_name: string;
+  member_number: number | null;
   group_name: string | null;
   is_active: boolean;
   created_at: string;
@@ -693,6 +727,7 @@ export interface DashboardData {
   recent_posts: PostSummary[];
   pending_comments?: Comment[];
   pending_contributions_count?: number;
+  pending_contact_messages_count?: number;
 }
 
 export const dashboardAPI = {
@@ -815,6 +850,41 @@ export interface SystemStatus {
 
 export const systemAPI = {
   getStatus: () => api.get<ApiResponse>('/api/settings/system-status/'),
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Contact API
+// ═══════════════════════════════════════════════════════════════════════════════
+export interface ContactMessage {
+  id: string;
+  name: string;
+  contact_info: string;
+  message: string;
+  sender_label: string | null;
+  is_handled: boolean;
+  handled_by_label: string | null;
+  handled_at: string | null;
+  created_at: string;
+}
+
+export const contactAPI = {
+  submit: (data: { name: string; contact_info: string; message: string }) =>
+    api.post<ApiResponse>('/api/contact/submit/', data),
+
+  // ── Admin ──────────────────────────────────────────────────────────────
+  getList: (
+    page = 1,
+    filters: { is_handled?: 'true' | 'false'; search?: string } = {}
+  ) => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    if (filters.is_handled) params.set('is_handled', filters.is_handled);
+    if (filters.search) params.set('search', filters.search);
+    return api.get<ApiResponse>(`/api/contact/?${params.toString()}`);
+  },
+
+  toggleHandled: (id: string) =>
+    api.patch<ApiResponse>(`/api/contact/${id}/toggle-handled/`),
 };
 
 export default api;

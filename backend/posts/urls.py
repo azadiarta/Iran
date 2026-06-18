@@ -1,11 +1,15 @@
 from django.urls import path
 
 from posts.views import (
-    CommentApproveView,
+    CommentAdminDetailView,
+    CommentAdminEditView,
     CommentCreateView,
     CommentDeleteView,
     CommentGlobalListView,
     CommentListView,
+    CommentStatusUpdateView,
+    CommentUpdateView,
+    MyCommentsView,
     PostCreateView,
     PostDeleteView,
     PostDetailView,
@@ -33,8 +37,12 @@ urlpatterns = [
 
     # Global comment list (admin moderation — target-agnostic)
     path('comments/',                       CommentGlobalListView.as_view(), name='comment-global-list'),
+    path('comments/mine/',                  MyCommentsView.as_view(),        name='comment-mine'),
 
-    # Comment actions (approve/delete — target-agnostic)
-    path('comments/<uuid:pk>/approve/',     CommentApproveView.as_view(),   name='comment-approve'),
-    path('comments/<uuid:pk>/delete/',      CommentDeleteView.as_view(),    name='comment-delete'),
+    # Comment actions (target-agnostic) — suffixed routes before bare <uuid:pk>/
+    path('comments/<uuid:pk>/status/',      CommentStatusUpdateView.as_view(), name='comment-status'),
+    path('comments/<uuid:pk>/edit/',        CommentAdminEditView.as_view(),    name='comment-admin-edit'),
+    path('comments/<uuid:pk>/update/',      CommentUpdateView.as_view(),       name='comment-update'),
+    path('comments/<uuid:pk>/delete/',      CommentDeleteView.as_view(),       name='comment-delete'),
+    path('comments/<uuid:pk>/',             CommentAdminDetailView.as_view(),  name='comment-admin-detail'),
 ]

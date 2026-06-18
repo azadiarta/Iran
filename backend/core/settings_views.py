@@ -118,7 +118,7 @@ class SystemStatusView(APIView):
                 'posts': Post.objects.count(),
                 'contributions': Contribution.objects.count(),
                 'expenses': Expense.objects.count(),
-                'pending_comments': Comment.objects.filter(is_approved=False).count(),
+                'pending_comments': Comment.objects.filter(status=Comment.Status.PENDING).count(),
             },
         }
         return api_success(data)

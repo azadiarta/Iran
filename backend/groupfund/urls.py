@@ -19,6 +19,7 @@ urlpatterns = [
     path('api/dashboard/', include('core.dashboard_urls')),
     path('api/permissions/', include('core.urls')),
     path('api/payments/', include('payments.urls')),
+    path('api/contact/', include('core.contact_urls')),
 ]
 
 if settings.DEBUG and not settings.AWS_STORAGE_BUCKET_NAME:

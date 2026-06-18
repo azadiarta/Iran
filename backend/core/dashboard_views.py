@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 
 from accounts.models import Member
 from accounts.permissions import HasGroupPermission
-from core.models import DefaultSetting
+from core.models import ContactMessage, DefaultSetting
 from core.utils import api_success
 from fund.models import Contribution, Expense
 from fund.serializers import ContributionSerializer, ExpenseSerializer
@@ -78,7 +78,7 @@ class DashboardView(APIView):
         )
         if can_approve:
             pending = Comment.objects.select_related('author').filter(
-                is_approved=False
+                status=Comment.Status.PENDING
             ).order_by('-created_at')[:5]
             data['pending_comments'] = CommentSerializer(pending, many=True).data
 
@@ -90,5 +90,12 @@ class DashboardView(APIView):
             data['pending_contributions_count'] = Contribution.objects.filter(
                 status__in=[Contribution.Status.PENDING, Contribution.Status.PENDING_REVIEW]
             ).count()
+
+        can_manage_contact_messages = request.user.is_superuser or (
+            request.user.group and
+            request.user.group.permissions.filter(codename='can_manage_contact_messages').exists()
+        )
+        if can_manage_contact_messages:
+            data['pending_contact_messages_count'] = ContactMessage.objects.filter(is_handled=False).count()
 
         return api_success(data)

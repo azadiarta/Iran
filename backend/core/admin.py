@@ -6,7 +6,7 @@ from django.db.models import Q
 from django.utils.html import mark_safe
 from django.utils.translation import gettext_lazy as _
 
-from core.models import DefaultSetting, Permission
+from core.models import ContactMessage, DefaultSetting, Permission
 from logs.models import ActivityLog
 
 
@@ -92,3 +92,17 @@ class DefaultSettingAdmin(admin.ModelAdmin):
             ip_address=_get_ip(request),
             extra_data={'key': obj.key, 'value': obj.value},
         )
+
+
+@admin.register(ContactMessage)
+class ContactMessageAdmin(admin.ModelAdmin):
+    list_display = ['name', 'contact_info', 'is_handled', 'handled_by', 'created_at']
+    list_filter = ['is_handled']
+    search_fields = ['name', 'contact_info', 'message']
+    readonly_fields = ['id', 'sender', 'handled_by', 'handled_at', 'created_at']
+
+    fieldsets = [
+        (None,      {'fields': ['name', 'contact_info', 'message', 'sender']}),
+        (_('Status'), {'fields': ['is_handled', 'handled_by', 'handled_at']}),
+        (_('Meta'), {'fields': ['id', 'created_at'], 'classes': ['collapse']}),
+    ]

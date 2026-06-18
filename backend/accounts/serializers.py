@@ -99,7 +99,7 @@ class MemberProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Member
         fields = [
-            'id', 'full_name', 'display_name', 'email', 'phone',
+            'id', 'full_name', 'display_name', 'email', 'phone', 'member_number',
             'group_name', 'group_permissions', 'is_active', 'is_superuser', 'created_at',
             'deactivation_reason', 'deactivated_by_name',
         ]
@@ -125,7 +125,7 @@ class MemberListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Member
-        fields = ['id', 'full_name', 'display_name', 'group_name', 'is_active', 'created_at']
+        fields = ['id', 'full_name', 'display_name', 'member_number', 'group_name', 'is_active', 'created_at']
         read_only_fields = fields
 
 
@@ -136,7 +136,7 @@ class MemberDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Member
-        fields = ['id', 'full_name', 'display_name', 'email', 'phone',
+        fields = ['id', 'full_name', 'display_name', 'email', 'phone', 'member_number',
                   'group_name', 'group_permissions', 'is_active', 'created_at',
                   'deactivation_reason', 'deactivated_by_name']
         read_only_fields = fields

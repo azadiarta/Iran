@@ -34,9 +34,15 @@ class PostImage(models.Model):
 
 
 # Generic FK targets Post or Expense.
-# ALL comments (member AND guest) require approval — is_approved=False default.
+# ALL comments (member AND guest) require approval — status defaults to pending.
+# Editing a comment (CommentUpdateView) resets status back to pending.
 
 class Comment(models.Model):
+    class Status(models.TextChoices):
+        PENDING  = 'pending',  'Pending'
+        APPROVED = 'approved', 'Approved'
+        REJECTED = 'rejected', 'Rejected'
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     author = models.ForeignKey(
         'accounts.Member', on_delete=models.SET_NULL,
@@ -51,7 +57,8 @@ class Comment(models.Model):
         null=True, blank=True,
         validators=[MinValueValidator(1), MaxValueValidator(5)],
     )
-    is_approved = models.BooleanField(default=False)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    rejection_reason = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -1,5 +1,6 @@
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
+from django.db.models import Q
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
@@ -65,16 +66,15 @@ class MemberListView(APIView):
 
         search = request.query_params.get('search')
         if search:
-            qs = qs.filter(
-                full_name__icontains=search
-            ) | qs.filter(
-                display_name__icontains=search
-            ) | qs.filter(
-                email__icontains=search
-            ) | qs.filter(
-                phone__icontains=search
+            q = (
+                Q(full_name__icontains=search)
+                | Q(display_name__icontains=search)
+                | Q(email__icontains=search)
+                | Q(phone__icontains=search)
             )
-            qs = qs.distinct()
+            if search.isdigit():
+                q |= Q(member_number=int(search))
+            qs = qs.filter(q).distinct()
 
         return paginate(qs, request, MemberListSerializer)
 

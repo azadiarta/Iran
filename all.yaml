@@ -13,7 +13,7 @@ rules:
   after_build: update exports + update imports with status
 
 progress:
-  current_phase: 19
+  current_phase: 20
   current_task: "complete (except phase 10 — deferred per project decision)"
   phases:
     1:
@@ -91,6 +91,10 @@ progress:
       name: "bugfix — quiet routine 4xx 'Unauthorized'/'Not Found' WARNINGs in Railway console + /admin/logs/system"
       status: done
       done: ["Root cause: django.utils.log.log_response() (called from django.core.handlers.base.BaseHandler.get_response() for EVERY response with status_code>=400) logs via the 'django.request' logger at WARNING for any 4xx (e.g. 'Unauthorized: /api/posts/', 'Unauthorized: /api/fund/balance/', 'Unauthorized: /api/auth/token/refresh/') — these are routine, not errors: the homepage (frontend/app/[locale]/page.tsx) calls fundAPI.getBalance() and postsAPI.getList() on mount for EVERY visitor including anonymous ones, so any guest 401s on both; a stale/expired refresh token in localStorage similarly 401s POST /api/auth/token/refresh/ (handled gracefully by the axios interceptor -> logout()). Reported by the user as 'this warning always appears, on sqlite AND on postgres' — confirmed unrelated to the DB backend, purely an HTTP-status/logging-config issue.", "backend/core/logging_handlers.py — NEW Quiet4xxFilter(logging.Filter): reads record.status_code (set by log_response's extra=) and demotes record.levelno/levelname from WARNING to INFO when status_code<500; 5xx server errors pass through unchanged.", "backend/groupfund/settings.py LOGGING — added top-level 'filters': {quiet_4xx: {'()': 'core.logging_handlers.Quiet4xxFilter'}} and a new 'django.request' logger entry (handlers=[console, system_log], same level as 'django', propagate=False, filters=['quiet_4xx']).", "Result: routine 4xx responses now log at INFO in the Railway console (no longer shown as warnings) and fall below system_log's WARNING threshold, so they no longer create logs.SystemLog rows / clutter /admin/logs/system; genuine 5xx server errors are unaffected. Verified via manage.py check (clean) + a live Client().get('/api/fund/balance/') request: console line changed from 'WARNING django.request Unauthorized: ...' to 'INFO django.request Unauthorized: ...' and logs.SystemLog row count did not increase."]
+    20:
+      name: "comment moderation overhaul (Contribution-style status/edit/detail + My Comments page), unique 5-digit member_number, Contact Us backend persistence + admin review page"
+      status: done
+      done: ["part A — posts.Comment replaced its binary is_approved (Boolean) with a 3-state Comment.Status TextChoices (pending/approved/rejected, default pending) + rejection_reason (TextField, blank) — migration posts/0004_comment_status.py adds both fields, backfills status from the old is_approved (True→approved, False→pending) via RunPython, then drops is_approved entirely (no dual-field compat shim, per project convention). New per-action serializers mirroring fund/serializers.py's Contribution pattern exactly: CommentStatusSerializer (quick approve/reject, no reason), CommentAdminDetailSerializer (full detail incl. target_type/target_label SerializerMethodFields resolving Post.title or Expense.short_reason via content_object), CommentAdminEditSerializer (admin can edit text/rating/status/rejection_reason, freely re-editable in any status direction), CommentOwnerEditSerializer (author-only: text/rating, and update() unconditionally forces status back to pending + clears rejection_reason — 'editing reverts to pending review' per the explicit user requirement), MyCommentSerializer (for the new 'mine' list). New views: CommentStatusUpdateView (replaces the old CommentApproveView), CommentAdminDetailView, CommentAdminEditView (all gated can_approve_comments — chosen over can_manage_permissions specifically so an admin who can approve/reject can also attach a rejection_reason through the same permission tier, avoiding a UX inconsistency), CommentUpdateView (owner-only, 403s for non-owners), MyCommentsView (GET /comments/mine/, IsAuthenticated). CommentDeleteView's permission loosened from admin-only to IsAuthenticated + a new _can_modify_comment() helper (mirrors the existing _can_modify_post pattern) so the comment's own author can now delete it too, alongside the pre-existing admin-only path — behavior for admins is unchanged. posts/admin.py, core/dashboard_views.py (pending_comments query), and both public-facing comment-list filters (post/expense detail pages) updated from is_approved to status=='approved'. Frontend: admin/comments/page.tsx FULLY REWRITTEN to mirror admin/contributions/page.tsx (status/target_type filters, Details modal with inline approve/reject-with-reason, Edit modal with freely-editable status); 2 NEW profile sub-pages — frontend/app/[locale]/profile/comments/page.tsx ('My Comments': commentsAPI.getMine(), owner edit-reverts-to-pending, owner delete) and frontend/app/[locale]/profile/contributions/page.tsx (the pre-existing 'My Contributions' block extracted verbatim out of profile/page.tsx, which now shows just two small link-cards to the two sub-pages instead of inlining either list). help.sections gained a my_comments entry (group:member) next to my_contributions; messages/en.json+fa.json profile namespace gained status_approved/status_rejected/back_to_profile + 12 my_comments_* keys (46 keys total, was 31).", "part B — accounts.Member gained member_number (PositiveIntegerField, unique, null=True/blank=True only to permit the migration, editable=False) — assigned exactly once via a save() override calling the new staticmethod _generate_member_number() (random.randint(10000,99999) retried up to 20x against existing rows; the range alone guarantees both 'always 5 digits' and 'never starts with 0'). Migration accounts/0005_member_member_number.py adds the field then backfills every existing Member with a unique number via an equivalent RunPython routine (historical models can't call the custom save(), so the generation logic is duplicated inline in the migration — same one-off duplication pattern used by similar backfill migrations elsewhere in the project). member_number is now serialized (read-only) in MemberProfileSerializer/MemberListSerializer/MemberDetailSerializer, displayed in profile/page.tsx's header, admin/members/page.tsx (new monospace #NNNNN column) and admin/members/[id]/page.tsx's header subtitle, and searchable: MemberListView's search query was rewritten from chained qs.filter()|qs.filter() OR-ing to Q objects so an additional `if search.isdigit(): q |= Q(member_number=int(search))` exact-match clause could be added (exact match chosen over icontains specifically to avoid an IntegerField icontains cast risk that behaves differently between SQLite-dev and Postgres-prod).", "part C — the Contact Us form was previously 100% decorative (opened a mailto: link, nothing persisted server-side — confirmed zero backend model/view/url existed for it before this phase). NEW core.ContactMessage model (UUID pk, name/contact_info/message, sender FK→Member SET_NULL nullable — filled only when the submitter was authenticated, is_handled bool default False, handled_by FK→Member SET_NULL related_name='+', handled_at, created_at, ordering=['-created_at']) via migration core/0005_contactmessage.py. NEW ContactMessageCreateSerializer (strip_tags-sanitized, same pattern as fund/serializers.py's validate_message) + ContactMessageSerializer (admin read view, sender_label/handled_by_label SerializerMethodFields). NEW backend/core/contact_views.py (ContactMessageCreateView — POST, AllowAny; ContactMessageListView — GET, can_manage_contact_messages, filterable is_handled+search, paginated; ContactMessageToggleHandledView — PATCH .../toggle-handled/, same toggle pattern as accounts/member_views.py's MemberToggleActiveView) + backend/core/contact_urls.py, wired into groupfund/urls.py as /api/contact/. NEW 12th seeded permission can_manage_contact_messages (seed_initial_data.py) + matching entry in frontend/lib/permissionsMeta.ts. DashboardView gained pending_contact_messages_count (permission-gated, same badge pattern as pending_comments/pending_contributions), surfaced as a new AdminSidebar badge via adminNav.ts's badgeKey union + a new state read in AdminLayout.tsx. NEW admin page frontend/app/[locale]/admin/contact-messages/page.tsx (simpler than comments/contributions — no approve/reject, just a binary mark-handled/revert toggle + a read-only Details modal) wired into adminNav.ts. frontend/app/[locale]/contact/page.tsx's handleSubmit replaced the old mailto:-only no-op with a real async contactAPI.submit() call, with submitting/submitError state and a bilingual error box (new contact.submit_error i18n key, 15 keys total, was 14); help.sections gained a contact_messages entry (group:admin, permission can_manage_contact_messages) next to activity_log."]
 
 roadmap:
   # Task-oriented navigation index. When the user asks for a change, find the
@@ -720,8 +724,10 @@ i18n:
     IDENTICAL top-level AND nested key structure (verified: both currently
     have exactly the same 13 top-level keys in the same order: nav, landing,
     auth, posts, expenses, contribute, contributions, profile, contact, help,
-    errors, footer, common — 300 leaf keys total each, verified via python3
-    json diff. The former `heritage` namespace was REMOVED from both files in
+    errors, footer, common — 320 leaf keys total each, verified via python3
+    json diff showing zero keys present in only one of the two files; see
+    each namespace's own note below for its per-phase key-count breakdown.
+    The former `heritage` namespace was REMOVED from both files in
     the Lion-and-Sun/heritage-icon visual redesign — see
     roadmap.change_heritage_emblem_visuals). ANY key added/removed/renamed in
     en.json MUST be mirrored in fa.json (Persian translation) in the SAME
@@ -769,19 +775,22 @@ i18n:
         - {file: "frontend/app/[locale]/contributions/page.tsx", via: "useTranslations('contributions') — NEW (Phase 15, item E) public donors page at /[locale]/contributions, GET /api/fund/contributions/public/ (AllowAny, paginated). Lists only contributions with status=completed AND show_in_public_list=True; each row shows a computed display name (per display_name_choice: hidden never appears here, display_name, full_name, custom→public_display_name, guest→guest_name or anonymous), amount, date, and optional message. NEVER returns receipt_image (item F)."}
       note: "NEW namespace, 10 keys, added Phase 15 (item E). Linked from Navbar via nav.contributions."
     profile:
-      keys: [title, edit_btn, save_btn, cancel_btn, change_password, old_password, new_password, confirm_new_password, group, joined, edit_profile, edit, cancel, save, save_password, full_name, display_name, email, phone, profile_updated, password_changed, save_error, password_error, my_contributions_title, my_contributions_total_approved, my_contributions_empty, my_contributions_rejection_reason, status_pending, status_pending_review, status_completed, status_failed]
+      keys: [title, edit_btn, save_btn, cancel_btn, change_password, old_password, new_password, confirm_new_password, group, joined, edit_profile, edit, cancel, save, save_password, full_name, display_name, email, phone, profile_updated, password_changed, save_error, password_error, my_contributions_title, my_contributions_total_approved, my_contributions_empty, my_contributions_rejection_reason, status_pending, status_pending_review, status_completed, status_failed, status_approved, status_rejected, back_to_profile, my_comments_title, my_comments_empty, my_comments_rejection_reason, my_comments_target_post, my_comments_target_expense, my_comments_rating_label, my_comments_no_rating, my_comments_edit_notice, my_comments_text_required, my_comments_save_error, my_comments_delete_error, my_comments_delete_confirm]
       used_by:
-        - {file: "frontend/app/[locale]/profile/page.tsx", via: "useTranslations('profile')"}
-      note: "31 keys total (Phase 14: 22; Phase 15 +8 for items O/Z — 'My Contributions' section: my_contributions_* labels + status_* badges for pending/pending_review/completed/failed (rejected), sourced from GET /api/fund/contributions/mine/ → fundAPI.getMyContributions(), which also returns total_approved alongside the paginated results; rejected entries show their rejection_reason)."
+        - {file: "frontend/app/[locale]/profile/page.tsx", via: "useTranslations('profile') — Phase 20: only the two link-card labels + member_number header bit now come from here directly; the my_contributions_*/my_comments_* detail keys moved to the two new sub-pages below"}
+        - {file: "frontend/app/[locale]/profile/contributions/page.tsx", via: "useTranslations('profile') — NEW (Phase 20): my_contributions_*, status_pending/pending_review/completed/failed, back_to_profile"}
+        - {file: "frontend/app/[locale]/profile/comments/page.tsx", via: "useTranslations('profile') — NEW (Phase 20, part A): my_comments_*, status_pending/approved/rejected, back_to_profile"}
+      note: "46 keys total (Phase 14: 22; Phase 15 +8 for items O/Z — 'My Contributions' section: my_contributions_* labels + status_pending/pending_review/completed/failed badges, sourced from GET /api/fund/contributions/mine/ → fundAPI.getMyContributions(), which also returns total_approved alongside the paginated results; rejected entries show their rejection_reason. Phase 20 (part A) +16: status_approved/status_rejected (new 3-state Comment.Status badge colors, reusing the same status_* badge convention) + back_to_profile (shared 'back' link/button on both new profile/* sub-pages) + 12 my_comments_* keys mirroring my_contributions_* exactly, for the new 'My Comments' page (commentsAPI.getMine() — my_comments_target_post/_target_expense label which kind of item the comment was on, my_comments_rating_label/_no_rating for the optional 1-5 star rating, my_comments_edit_notice warns that saving an edit reverts status to pending, my_comments_text_required/_save_error/_delete_error/_delete_confirm are owner-edit/delete form copy)."
     contact:
-      keys: [title, email_label, phone_label, name_label, message_label, send_btn, no_contact, name_placeholder, contact_label, contact_placeholder, message_placeholder, send_button, success_msg, send_another]
+      keys: [title, email_label, phone_label, name_label, message_label, send_btn, no_contact, name_placeholder, contact_label, contact_placeholder, message_placeholder, send_button, success_msg, send_another, submit_error]
       used_by:
         - {file: "frontend/app/[locale]/contact/page.tsx", via: "useTranslations('contact')"}
+      note: "15 keys total (Phase 14: 14; Phase 20 part C +1 — submit_error, shown in a red AlertTriangle error box when the new real contactAPI.submit() call fails, replacing the old purely-decorative mailto:-only form which never had a failure path)."
     help:
-      keys: [title, subtitle, guest_heading, member_heading, admin_heading, guest_note, member_note, admin_note, "sections.<home|posts|expenses|contribute|contact|auth|comment|profile|logout|dashboard|members|groups|balance|manage_posts|manage_comments|payments|settings|activity_log|system_log|contributions_public|my_contributions>"]
+      keys: [title, subtitle, guest_heading, member_heading, admin_heading, guest_note, member_note, admin_note, "sections.<home|posts|expenses|contribute|contact|auth|comment|profile|logout|dashboard|members|groups|balance|manage_posts|manage_comments|payments|settings|activity_log|contact_messages|system_log|contributions_public|my_contributions|my_comments>"]
       used_by:
         - {file: "frontend/app/[locale]/help/page.tsx", via: "useTranslations('help')"}
-      note: "help.sections is a NESTED object with 21 keys (Phase 14: 19; Phase 15 +3: contributions_public — group:guest, no permission gate; my_contributions — group:member, IsAuthenticated; env_vars — group:admin, permission can_manage_env_vars; Phase 17 item a removed env_vars again, back to 21), one per guest/member/admin section heading — the set of sections actually RENDERED is filtered at runtime by useAuthStore permission checks (can_view_dashboard/can_manage_permissions/can_view_balance/can_post/can_approve_comments/is_superuser), mirroring AdminSidebar's gating."
+      note: "help.sections is a NESTED object with 23 keys (Phase 14: 19; Phase 15 +3: contributions_public — group:guest, no permission gate; my_contributions — group:member, IsAuthenticated; env_vars — group:admin, permission can_manage_env_vars; Phase 17 item a removed env_vars again, back to 21; Phase 20 +2: my_comments — group:member, IsAuthenticated, next to my_contributions; contact_messages — group:admin, permission can_manage_contact_messages, next to activity_log), one per guest/member/admin section heading — the set of sections actually RENDERED is filtered at runtime by useAuthStore permission checks (can_view_dashboard/can_manage_permissions/can_view_balance/can_post/can_approve_comments/can_manage_contact_messages/is_superuser), mirroring AdminSidebar's gating."
     errors:
       keys: [not_found_title, not_found_msg, forbidden_title, forbidden_msg, unavailable_title, unavailable_msg, back_home]
       used_by:
@@ -858,7 +867,7 @@ files:
 
   "backend/groupfund/urls.py":
     status: done
-    note: "added MEDIA_URL→MEDIA_ROOT serving (fixes a real gap: nothing served uploaded media before): static() helper when DEBUG and no S3 bucket; django.views.static.serve fallback when DEBUG=False and AWS_STORAGE_BUCKET_NAME is unset (ephemeral but functional out of the box); no-op (S3/CDN serves directly) when AWS_STORAGE_BUCKET_NAME is set. Also added path('i18n/', include('django.conf.urls.i18n')) as the first urlpattern (FIXED real gap — django-jazzmin's admin theme renders {% url 'set_language' %} in its language switcher since USE_I18N=True + 2 LANGUAGES are configured, but this URL was never registered, so EVERY /admin/ page raised NoReverseMatch/500 — discovered + fixed while end-to-end testing the Railway combined image; the corresponding /i18n/setlang/ POST is proxied to the backend via frontend/next.config.mjs and excluded from next-intl locale-redirects via frontend/middleware.ts)"
+    note: "added MEDIA_URL→MEDIA_ROOT serving (fixes a real gap: nothing served uploaded media before): static() helper when DEBUG and no S3 bucket; django.views.static.serve fallback when DEBUG=False and AWS_STORAGE_BUCKET_NAME is unset (ephemeral but functional out of the box); no-op (S3/CDN serves directly) when AWS_STORAGE_BUCKET_NAME is set. Also added path('i18n/', include('django.conf.urls.i18n')) as the first urlpattern (FIXED real gap — django-jazzmin's admin theme renders {% url 'set_language' %} in its language switcher since USE_I18N=True + 2 LANGUAGES are configured, but this URL was never registered, so EVERY /admin/ page raised NoReverseMatch/500 — discovered + fixed while end-to-end testing the Railway combined image; the corresponding /i18n/setlang/ POST is proxied to the backend via frontend/next.config.mjs and excluded from next-intl locale-redirects via frontend/middleware.ts). Phase 20 (part C) added path('api/contact/', include('core.contact_urls'))."
     imports:
       external: [{from: django.conf, items: [settings]}, {from: django.conf.urls.static, items: [static]}, {from: django.contrib, items: [admin]}, {from: django.urls, items: [path, include, re_path]}, {from: django.views.static, items: [serve]}]
       internal:
@@ -872,6 +881,7 @@ files:
         - {file: "backend/core/dashboard_urls.py",  items: [urlpatterns], status: available}
         - {file: "backend/core/urls.py",            items: [urlpatterns], status: available}
         - {file: "backend/payments/urls.py",         items: [urlpatterns], status: available}
+        - {file: "backend/core/contact_urls.py",     items: [urlpatterns], status: available}
     exports: []
     needed_by: []
 
@@ -964,12 +974,13 @@ files:
         - {from: django.db.models, items: [Q]}
         - {from: django.utils.html, items: [mark_safe]}
       internal:
-        - {from: "backend/core/models.py",  items: [{name: DefaultSetting, status: available}, {name: Permission, status: available}]}
+        - {from: "backend/core/models.py",  items: [{name: DefaultSetting, status: available}, {name: Permission, status: available}, {name: ContactMessage, status: available}]}
         - {from: "backend/logs/models.py",  items: [{name: ActivityLog, status: available}]}
     exports:
       - {name: PermissionAdmin,      kind: class, type: Django ModelAdmin, note: "list_display codename/label/desc; read-only in admin"}
       - {name: DefaultSettingAdmin,  kind: class, type: Django ModelAdmin, note: "auto-sets updated_by; logs setting_updated_via_admin; SettingCategoryFilter; key readonly on edit"}
       - {name: SettingCategoryFilter,kind: class, type: SimpleListFilter,  note: "filters by key prefix: general/visibility/payment_manual/paypal/stripe/google"}
+      - {name: ContactMessageAdmin,  kind: class, type: Django ModelAdmin, note: "Phase 20 (part C), new. list_display: name, contact_info, is_handled, handled_by, created_at; list_filter: is_handled; search_fields: name, contact_info, message."}
     needed_by: []
 
   "backend/accounts/admin.py":
@@ -1022,9 +1033,9 @@ files:
         - {from: "backend/logs/models.py",  items: [{name: ActivityLog, status: available}]}
         - {from: "backend/posts/models.py", items: [{name: Comment, status: available}, {name: Post, status: available}, {name: PostImage, status: available}]}
     exports:
-      - {name: PostAdmin,      kind: class, type: Django ModelAdmin, note: "inlines: PostImageInline (thumbnails, add/delete) + PostCommentInline (GenericTabularInline, readonly approved only); comment_count column"}
+      - {name: PostAdmin,      kind: class, type: Django ModelAdmin, note: "inlines: PostImageInline (thumbnails, add/delete) + PostCommentInline (GenericTabularInline, readonly approved only — Phase 20: queryset filter is_approved=True→status=Comment.Status.APPROVED); comment_count column (Phase 20: counts status=APPROVED, not is_approved=True)"}
       - {name: PostImageAdmin, kind: class, type: Django ModelAdmin, note: "image_preview column"}
-      - {name: CommentAdmin,   kind: class, type: Django ModelAdmin, note: "approve/reject actions; author_display + text_preview + target columns; logs to ActivityLog"}
+      - {name: CommentAdmin,   kind: class, type: Django ModelAdmin, note: "Phase 20 — list_display/list_filter/fieldsets and the approve_comments/reject_comments actions all switched from the old is_approved Boolean to status/Comment.Status.APPROVED/REJECTED; author_display + text_preview + target columns unchanged; logs to ActivityLog"}
     needed_by: []
 
   "backend/logs/admin.py":
@@ -1051,7 +1062,7 @@ files:
 
   "backend/core/models.py":
     status: done
-    note: "Phase 17 (item a) — REMOVED the EnvVarOverride model entirely (was added Phase 15, item A). NEW migration backend/core/migrations/0004_remove_envvaroverride.py drops the EnvVarOverride table AND deletes the can_manage_env_vars Permission row via RunPython (back to 11 seeded permissions)."
+    note: "Phase 17 (item a) — REMOVED the EnvVarOverride model entirely (was added Phase 15, item A). NEW migration backend/core/migrations/0004_remove_envvaroverride.py drops the EnvVarOverride table AND deletes the can_manage_env_vars Permission row via RunPython (back to 11 seeded permissions). Phase 20 (part C) — NEW ContactMessage model: real backend persistence for the previously decorative mailto:-only Contact Us form. Migration backend/core/migrations/0005_contactmessage.py."
     imports:
       external: [{from: uuid, items: [uuid4]}, {from: django.db, items: [models]}]
       internal: []
@@ -1079,10 +1090,26 @@ files:
           updated_at: datetime, auto
         seeds: [default_group=<UUID>, default_currency=GBP, require_comment_approval=true, max_receipt_image_size_mb=5]
         permission_seeds: [can_contribute(ON), can_comment(ON), can_post, can_expense, can_manage_permissions, can_approve_comments, can_view_balance]
+      - name: ContactMessage
+        kind: class
+        type: Django Model
+        note: "Phase 20 (part C), new. sender is filled when the submitter was logged in at submit time; the form itself still accepts free-text name/contact_info even from guests."
+        fields:
+          id: UUID, pk, auto
+          name: str(100)
+          contact_info: str(150)
+          message: text
+          sender: FK → accounts.Member, SET_NULL, null, blank, related_name=contact_messages
+          is_handled: bool, default False
+          handled_by: FK → accounts.Member, SET_NULL, null, blank, related_name="+"
+          handled_at: datetime, null, blank
+          created_at: datetime, auto
+        meta: {ordering: ["-created_at"]}
     needed_by:
       - {file: "backend/accounts/models.py",  items: [Permission], status: available}
-      - {file: "backend/core/serializers.py", items: [Permission, DefaultSetting], status: pending}
+      - {file: "backend/core/serializers.py", items: [Permission, DefaultSetting, ContactMessage], status: available}
       - {file: "backend/core/views.py",       items: [Permission, DefaultSetting], status: pending}
+      - {file: "backend/core/contact_views.py", items: [ContactMessage], status: available}
 
   "backend/core/apps.py":
     status: done
@@ -1125,6 +1152,11 @@ files:
       (can_contribute, can_comment, can_view_balance, can_view_posts), the
       same set frontend/lib/adminNav.ts's BASELINE_PERMISSIONS/hasAdminAccess()
       uses to decide admin-panel access.
+      Phase 20 (part C) added a 12th permission codename
+      can_manage_contact_messages (View submitted Contact Us messages and
+      mark them as handled) — gates backend/core/contact_views.py's list/
+      toggle-handled endpoints and the new admin/contact-messages frontend
+      page/nav item.
     imports:
       external: [{from: django.core.management.base, items: [BaseCommand]}, {from: django.db, items: [transaction]}]
       internal:
@@ -1197,18 +1229,21 @@ files:
   "backend/core/serializers.py":
     status: done
     imports:
-      external: [{from: rest_framework, items: [serializers]}]
+      external: [{from: django.utils.html, items: [strip_tags]}, {from: rest_framework, items: [serializers]}]
       internal:
-        - {from: "backend/core/models.py", items: [{name: Permission, status: available}, {name: DefaultSetting, status: available}]}
+        - {from: "backend/core/models.py", items: [{name: Permission, status: available}, {name: DefaultSetting, status: available}, {name: ContactMessage, status: available}]}
     exports:
       - {name: PermissionSerializer,      kind: class, type: DRF ModelSerializer, fields: [id, codename, label, description]}
       - {name: DefaultSettingSerializer,  kind: class, type: DRF ModelSerializer, fields: [id, key, value, description, updated_by_name, updated_at]}
+      - {name: ContactMessageCreateSerializer, kind: class, type: DRF ModelSerializer, fields: [name, contact_info, message], note: "Phase 20 (part C), new. validate_name/validate_contact_info/validate_message all strip_tags(...).strip() (same pattern as fund/serializers.py's validate_message). create() fills sender = request.user when the submitter is authenticated, else leaves it null (guest submission)."}
+      - {name: ContactMessageSerializer, kind: class, type: DRF ModelSerializer, fields: [id, name, contact_info, message, sender_label, is_handled, handled_by_label, handled_at, created_at], note: "Phase 20 (part C), new — admin-facing read serializer. sender_label/handled_by_label are SerializerMethodFields (str(obj.sender) / str(obj.handled_by), else None); read_only_fields=fields."}
     needed_by:
       - {file: "backend/core/settings_views.py",  items: [DefaultSettingSerializer], status: available}
+      - {file: "backend/core/contact_views.py",   items: [ContactMessageCreateSerializer, ContactMessageSerializer], status: available}
 
   "backend/core/settings_views.py":
     status: done
-    note: "Phase 13 added SystemStatusView (superuser-only infra/status endpoint) — see export below."
+    note: "Phase 13 added SystemStatusView (superuser-only infra/status endpoint) — see export below. Phase 20 (part A): SystemStatusView's pending_comments count updated from Comment.objects.filter(is_approved=False) to filter(status=Comment.Status.PENDING) (same meaning, field renamed/widened to 3 states)."
     imports:
       external:
         - {from: os, items: [environ]}
@@ -1246,7 +1281,7 @@ files:
 
   "backend/core/dashboard_views.py":
     status: done
-    note: "Phase 15 (item L): when the requesting member has can_view_balance (or is_superuser), the response gains pending_contributions_count = Contribution.objects.filter(status__in=[pending, pending_review]).count() — mirrors the existing pending_comments field. Consumed by frontend/components/layout/AdminLayout.tsx to badge the 'Contributions' item in AdminSidebar (badgeKey: 'pendingContributionCount', see frontend/lib/adminNav.ts)."
+    note: "Phase 15 (item L): when the requesting member has can_view_balance (or is_superuser), the response gains pending_contributions_count = Contribution.objects.filter(status__in=[pending, pending_review]).count() — mirrors the existing pending_comments field. Consumed by frontend/components/layout/AdminLayout.tsx to badge the 'Contributions' item in AdminSidebar (badgeKey: 'pendingContributionCount', see frontend/lib/adminNav.ts). Phase 20 (part A): pending_comments query updated from is_approved=False to status=Comment.Status.PENDING (same meaning, new field name). Phase 20 (part C): when the requesting member has can_manage_contact_messages (or is_superuser), the response gains pending_contact_messages_count = ContactMessage.objects.filter(is_handled=False).count() — same badge pattern, consumed by AdminSidebar's badgeKey 'pendingContactMessageCount'."
     imports:
       external:
         - {from: decimal, items: [Decimal]}
@@ -1257,14 +1292,14 @@ files:
       internal:
         - {from: "backend/accounts/models.py",   items: [{name: Member, status: available}]}
         - {from: "backend/accounts/permissions.py", items: [{name: HasGroupPermission, status: available}]}
-        - {from: "backend/core/models.py",       items: [{name: DefaultSetting, status: available}]}
+        - {from: "backend/core/models.py",       items: [{name: DefaultSetting, status: available}, {name: ContactMessage, status: available}]}
         - {from: "backend/core/utils.py",        items: [{name: api_success, status: available}]}
         - {from: "backend/fund/models.py",       items: [{name: Contribution, status: available}, {name: Expense, status: available}]}
         - {from: "backend/fund/serializers.py",  items: [{name: ContributionSerializer, status: available}, {name: ExpenseSerializer, status: available}]}
         - {from: "backend/posts/models.py",      items: [{name: Post, status: available}, {name: Comment, status: available}]}
         - {from: "backend/posts/serializers.py", items: [{name: PostSerializer, status: available}, {name: CommentSerializer, status: available}]}
     exports:
-      - {name: DashboardView, kind: class, type: DRF APIView, endpoint: "GET /api/dashboard/", auth: can_view_dashboard, note: "all numbers real-time; pending_comments only if can_approve_comments"}
+      - {name: DashboardView, kind: class, type: DRF APIView, endpoint: "GET /api/dashboard/", auth: can_view_dashboard, note: "all numbers real-time; pending_comments only if can_approve_comments; pending_contact_messages_count only if can_manage_contact_messages (Phase 20, part C)"}
     needed_by:
       - {file: "backend/core/dashboard_urls.py", items: [DashboardView], status: available}
 
@@ -1276,6 +1311,42 @@ files:
         - {from: "backend/core/dashboard_views.py", items: [{name: DashboardView, status: available}]}
     exports:
       - {name: urlpatterns, kind: constant, type: list, routes: ["GET /"]}
+    needed_by:
+      - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: available}
+
+  "backend/core/contact_views.py":
+    status: done
+    note: "Phase 20 (part C), new file. Repeats the same local _log(actor, action, target, extra_data, ip)/_get_ip(request) helper pattern used by every other app's views.py (e.g. backend/fund/views.py, backend/posts/views.py) rather than sharing a util — matches the project's established small-duplication-over-abstraction convention."
+    imports:
+      external:
+        - {from: django.contrib.contenttypes.models, items: [ContentType]}
+        - {from: django.db.models, items: [Q]}
+        - {from: django.utils, items: [timezone]}
+        - {from: rest_framework.permissions, items: [AllowAny, IsAuthenticated]}
+        - {from: rest_framework.views, items: [APIView]}
+      internal:
+        - {from: "backend/accounts/permissions.py", items: [{name: HasGroupPermission, status: available}]}
+        - {from: "backend/core/models.py",           items: [{name: ContactMessage, status: available}]}
+        - {from: "backend/core/pagination.py",       items: [{name: paginate, status: available}]}
+        - {from: "backend/core/serializers.py",      items: [{name: ContactMessageCreateSerializer, status: available}, {name: ContactMessageSerializer, status: available}]}
+        - {from: "backend/core/utils.py",            items: [{name: api_success, status: available}, {name: api_error, status: available}]}
+        - {from: "backend/logs/models.py",           items: [{name: ActivityLog, status: available}]}
+    exports:
+      - {name: ContactMessageCreateView,       kind: class, type: DRF APIView, endpoint: "POST  /api/contact/submit/",                auth: public, logs: contact_message_submitted, note: "actor is request.user if authenticated, else None (logged as 'guest')"}
+      - {name: ContactMessageListView,         kind: class, type: DRF APIView, endpoint: "GET   /api/contact/",                       auth: can_manage_contact_messages, note: "filterable by is_handled (true/false) and search (name/contact_info/message, icontains); paginated via core.pagination.paginate"}
+      - {name: ContactMessageToggleHandledView,kind: class, type: DRF APIView, endpoint: "PATCH /api/contact/{id}/toggle-handled/",   auth: can_manage_contact_messages, note: "same toggle pattern as accounts/member_views.py's MemberToggleActiveView — flips is_handled, sets/clears handled_by+handled_at, logs contact_message_toggled_handled with extra_data={previous_state, new_state}"}
+    needed_by:
+      - {file: "backend/core/contact_urls.py", items: [ContactMessageCreateView, ContactMessageListView, ContactMessageToggleHandledView], status: available}
+
+  "backend/core/contact_urls.py":
+    status: done
+    note: "Phase 20 (part C), new file."
+    imports:
+      external: [{from: django.urls, items: [path]}]
+      internal:
+        - {from: "backend/core/contact_views.py", items: [{name: ContactMessageCreateView, status: available}, {name: ContactMessageListView, status: available}, {name: ContactMessageToggleHandledView, status: available}]}
+    exports:
+      - {name: urlpatterns, kind: constant, type: list, routes: ["POST submit/", "GET /", "PATCH {id}/toggle-handled/"]}
     needed_by:
       - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: available}
 
@@ -1365,7 +1436,8 @@ files:
           updated_at: datetime, auto
           deactivation_reason: text, blank
           deactivated_by: FK → self (Member), SET_NULL, null=True, blank=True, related_name='+'
-        migration: "backend/accounts/migrations/0004_member_deactivated_by_member_deactivation_reason.py — NEW (Phase 17, item g) — adds deactivation_reason and deactivated_by."
+          member_number: PositiveIntegerField, unique, null=True, blank=True, editable=False — Phase 20 (part B), new. Always a random 5-digit number that never starts with 0 (random.randint(10000, 99999)); assigned once in save() the first time a Member is created and never changes after. null=True exists only to make the migration possible — in practice every Member always has one, since nothing else constructs a Member without going through save().
+        migration: "backend/accounts/migrations/0004_member_deactivated_by_member_deactivation_reason.py — NEW (Phase 17, item g) — adds deactivation_reason and deactivated_by. backend/accounts/migrations/0005_member_member_number.py — NEW (Phase 20, part B) — AddField member_number + RunPython backfill (re-implements the same random.randint(10000,99999) + uniqueness-retry logic directly in the migration, since historical models can't call the real save() override)."
         username_field: email
         required_fields: [full_name]
         validation: "clean() → phone OR email required"
@@ -1374,6 +1446,8 @@ files:
           - {signature: "get_user_permissions(obj=None) -> set()", note: "always empty — app permissions are via AccessGroup, not auth.Permission"}
           - {signature: "get_group_permissions(obj=None) -> set()", note: "always empty — see above"}
           - {signature: "get_all_permissions(obj=None) -> set[str]", note: "superuser → all 'app_label.codename' from auth.Permission (matches has_module_perms=True for superuser); everyone else → set(). FIXED CRITICAL pre-existing bug — Member(AbstractBaseUser) lacks PermissionsMixin, but django-jazzmin's admin theme calls user.get_all_permissions() to build its menu, so EVERY /admin/ page raised AttributeError/500 for ANY logged-in user, including superuser. Discovered + fixed during end-to-end testing of the Railway combined image but applies to ALL deploy modes. No migration needed (pure Python methods)."}
+          - {signature: "save(*args, **kwargs)", note: "Phase 20 (part B) — overridden only to assign self.member_number via _generate_member_number() the first time (member_number is None), before calling super().save()."}
+          - {signature: "_generate_member_number() -> int", kind: staticmethod, note: "Phase 20 (part B) — retries random.randint(10000, 99999) up to 20 times against Member.objects.filter(member_number=candidate).exists(), raising RuntimeError on exhaustion (practically unreachable at any realistic member count)."}
     needed_by:
       - {file: "backend/fund/models.py",          items: [Member], status: available}
       - {file: "backend/posts/models.py",         items: [Member], status: available}
@@ -1410,9 +1484,9 @@ files:
     exports:
       - {name: RegisterSerializer,         kind: class, type: DRF ModelSerializer, fields: [full_name, display_name, phone, email, password(write_only), password_confirm(write_only)]}
       - {name: LoginSerializer,            kind: class, type: DRF Serializer,      fields: [credential, password(write_only)]}
-      - {name: MemberProfileSerializer,    kind: class, type: DRF ModelSerializer, fields: [id, full_name, display_name, email, phone, group_name, group_permissions, is_active, is_superuser, created_at, deactivation_reason, deactivated_by_name], note: "group_permissions=['*'] for superuser. Phase 17 (item g): added deactivation_reason (plain field) and deactivated_by_name (SerializerMethodField → obj.deactivated_by.display_name or .full_name, else None) — read_only_fields=fields, so both are always included in GET /api/auth/profile/ for use by the landing-page deactivation banner."}
-      - {name: MemberListSerializer,       kind: class, type: DRF ModelSerializer, fields: [id, full_name, display_name, group_name, is_active, created_at]}
-      - {name: MemberDetailSerializer,     kind: class, type: DRF ModelSerializer, fields: [id, full_name, display_name, email, phone, group_name, group_permissions, is_active, created_at, deactivation_reason, deactivated_by_name], note: "Phase 17 (item g): same deactivation_reason/deactivated_by_name addition as MemberProfileSerializer, surfaced on admin/members/[id]/page.tsx's Danger Zone."}
+      - {name: MemberProfileSerializer,    kind: class, type: DRF ModelSerializer, fields: [id, full_name, display_name, email, phone, group_name, group_permissions, is_active, is_superuser, created_at, deactivation_reason, deactivated_by_name, member_number], note: "group_permissions=['*'] for superuser. Phase 17 (item g): added deactivation_reason (plain field) and deactivated_by_name (SerializerMethodField → obj.deactivated_by.display_name or .full_name, else None) — read_only_fields=fields, so both are always included in GET /api/auth/profile/ for use by the landing-page deactivation banner. Phase 20 (part B): added member_number — read_only_fields=fields already covers it, no other change needed."}
+      - {name: MemberListSerializer,       kind: class, type: DRF ModelSerializer, fields: [id, full_name, display_name, group_name, is_active, created_at, member_number], note: "Phase 20 (part B): added member_number, shown as a small searchable column in admin/members/page.tsx."}
+      - {name: MemberDetailSerializer,     kind: class, type: DRF ModelSerializer, fields: [id, full_name, display_name, email, phone, group_name, group_permissions, is_active, created_at, deactivation_reason, deactivated_by_name, member_number], note: "Phase 17 (item g): same deactivation_reason/deactivated_by_name addition as MemberProfileSerializer, surfaced on admin/members/[id]/page.tsx's Danger Zone. Phase 20 (part B): added member_number, shown in the page header subtitle."}
       - {name: MemberUpdateSerializer,     kind: class, type: DRF ModelSerializer, fields: [full_name, display_name, email, phone], note: "all optional; validates at least one of phone/email remains"}
       - {name: ChangePasswordSerializer,   kind: class, type: DRF Serializer,      fields: [old_password(optional), new_password, confirm_new_password]}
       - {name: AccessGroupSerializer,      kind: class, type: DRF ModelSerializer, fields: [id, name, description, is_default, permissions(codename+label), member_count, created_at], note: "Phase 15 (item P): get_member_count() = obj.members.filter(is_superuser=False).count() (was .count()) — superusers have group=NULL but were still being counted toward the default group's member total in /admin/groups; same fix mirrored in backend/accounts/admin.py AccessGroupAdmin.member_count."}
@@ -1494,7 +1568,7 @@ files:
         - {from: "backend/core/utils.py",           items: [{name: api_success, status: available}, {name: api_error, status: available}]}
         - {from: "backend/logs/models.py",          items: [{name: ActivityLog, status: available}]}
     exports:
-      - {name: MemberListView,         kind: class, type: DRF APIView, endpoint: "GET    /api/members/",                       auth: can_manage_permissions, note: "filterable by group/is_active/search; paginated page_size=5"}
+      - {name: MemberListView,         kind: class, type: DRF APIView, endpoint: "GET    /api/members/",                       auth: can_manage_permissions, note: "filterable by group/is_active/search; paginated page_size=5. Phase 20 (part B): search is now built with Q objects (was a `qs.filter(...) | qs.filter(...)` chain); when the search string is all-digits (`search.isdigit()`), an additional `Q(member_number=int(search))` exact-match clause is OR'd in, so admins can paste a member's 5-digit ID to jump straight to them. Exact match (not icontains) deliberately — icontains on an IntegerField needs a cast and could behave differently between local SQLite and production Postgres."}
       - {name: MemberCreateView,       kind: class, type: DRF APIView, endpoint: "POST   /api/members/create/",                auth: can_manage_permissions, note: "NEW (Phase 14) — admin manual member creation via MemberCreateSerializer; logs member_created_via_admin to ActivityLog; returns api_success(MemberDetailSerializer(member).data, message='Member created.', status_code=201)"}
       - {name: MemberDetailView,       kind: class, type: DRF APIView, endpoint: "GET    /api/members/{id}/",                  auth: dynamic(member_profile_visibility), note: "full detail to owner or admin only"}
       - {name: MemberUpdateView,       kind: class, type: DRF APIView, endpoint: "PATCH  /api/members/{id}/update/",           auth: owner or can_manage_permissions}
@@ -1726,7 +1800,8 @@ files:
           content_object: GenericFK (targets Post or Expense)
           text: text
           rating: "int(1-5), null — Phase 15 (item J): MaxValueValidator lowered 10→5 (was 1-10). Migration: backend/posts/migrations/0003_alter_comment_rating.py (AlterField on validators only, no schema change). Old rating values of 6-10 are NOT data-migrated; the frontend StarDisplay clamps with Math.min(rating, 5) when rendering."
-          is_approved: bool, default False
+          status: "Phase 20 — REPLACES the old `is_approved` Boolean entirely (removed, not kept alongside). New Status(TextChoices): pending/approved/rejected, default pending. Migration: backend/posts/migrations/0004_comment_status.py (AddField status+rejection_reason, RunPython backfill is_approved=True→approved else pending, RemoveField is_approved, in that order in one file)."
+          rejection_reason: "text, blank — Phase 20, new. Admin-supplied reason shown to the comment's owner when status=rejected; cleared automatically whenever the owner edits their own comment (see CommentOwnerEditSerializer in posts/serializers.py)."
           created_at: datetime, auto
           updated_at: datetime, auto
         meta: {ordering: [-created_at], indexes: [[content_type, object_id]]}
@@ -1745,10 +1820,15 @@ files:
       - {name: PostSerializer,         kind: class, type: DRF ModelSerializer, fields: [id, author(nested), title, body, images(nested), created_at, updated_at]}
       - {name: PostCreateSerializer,   kind: class, type: DRF ModelSerializer, note: "auto-sets author from request.user"}
       - {name: PostUpdateSerializer,   kind: class, type: DRF ModelSerializer, fields: [title, body], note: "all fields optional"}
-      - {name: CommentSerializer,      kind: class, type: DRF ModelSerializer, fields: [id, author(nested), author_label, guest_name, text, rating, is_approved, created_at]}
-      - {name: CommentCreateSerializer,kind: class, type: DRF ModelSerializer, note: "auto-sets author, always sets is_approved=False, requires content_type+object_id in context. Phase 15 (item J): validate_rating range lowered from 1-10 to 1-5 (error message updated to match)."}
+      - {name: CommentSerializer,      kind: class, type: DRF ModelSerializer, fields: [id, author(nested), author_label, guest_name, text, rating, status, created_at], note: "Phase 20 — `is_approved` field replaced by `status` ('pending'/'approved'/'rejected')."}
+      - {name: CommentCreateSerializer,kind: class, type: DRF ModelSerializer, note: "auto-sets author, always sets status=Comment.Status.PENDING (was is_approved=False), requires content_type+object_id in context. Phase 15 (item J): validate_rating range lowered from 1-10 to 1-5 (error message updated to match)."}
+      - {name: CommentStatusSerializer,     kind: class, type: DRF Serializer,      fields: [status], note: "Phase 20, new — lightweight quick-action serializer mirroring ContributionStatusSerializer; validate_status only allows 'approved'/'rejected' (no rejection_reason — used by the no-reason-required quick approve/reject endpoint)."}
+      - {name: CommentAdminDetailSerializer,kind: class, type: DRF ModelSerializer, fields: [id, author(nested), author_label, guest_name, text, rating, status, rejection_reason, target_type, target_label, created_at, updated_at], note: "Phase 20, new — read-only admin detail view; target_type/target_label are SerializerMethodFields reading obj.content_object (Post→.title, Expense→.short_reason)."}
+      - {name: CommentAdminEditSerializer,  kind: class, type: DRF ModelSerializer, fields: [text, rating, status, rejection_reason], note: "Phase 20, new — admin can freely edit text/rating/status/rejection_reason in either direction (mirrors ContributionAdminEditSerializer, no directional restriction on status); validate_rating repeats the 1-5 range check."}
+      - {name: CommentOwnerEditSerializer,  kind: class, type: DRF ModelSerializer, fields: [text, rating], note: "Phase 20, new — for the comment's own author (not admin). update() unconditionally resets status back to Status.PENDING and clears rejection_reason, so any owner edit re-enters moderation."}
+      - {name: MyCommentSerializer,         kind: class, type: DRF ModelSerializer, fields: [id, text, rating, status, rejection_reason, target_type, target_label, created_at], note: "Phase 20, new — powers GET /api/posts/comments/mine/; duplicates the same target_type/target_label SerializerMethodFields as CommentAdminDetailSerializer (small deliberate duplication, project convention, no shared mixin)."}
     needed_by:
-      - {file: "backend/posts/views.py", items: [PostSerializer, PostImageSerializer, PostCreateSerializer, PostUpdateSerializer, CommentSerializer, CommentCreateSerializer], status: available}
+      - {file: "backend/posts/views.py", items: [PostSerializer, PostImageSerializer, PostCreateSerializer, PostUpdateSerializer, CommentSerializer, CommentCreateSerializer, CommentStatusSerializer, CommentAdminDetailSerializer, CommentAdminEditSerializer, CommentOwnerEditSerializer, MyCommentSerializer], status: available}
       - {file: "backend/fund/urls.py",   items: [CommentListView, CommentCreateView], note: "views imported from posts/views.py", status: available}
 
   "backend/posts/views.py":
@@ -1777,13 +1857,18 @@ files:
       - {name: PostDeleteView,        kind: class, type: DRF APIView, endpoint: "DELETE /api/posts/{id}/delete/",              auth: author or can_manage_permissions, note: "Phase 15 (item U): _log extra_data now includes {title, body, author} snapshotted before .delete()."}
       - {name: PostImageUploadView,   kind: class, type: DRF APIView, endpoint: "POST   /api/posts/{id}/images/",             auth: author or can_manage_permissions}
       - {name: PostImageDeleteView,   kind: class, type: DRF APIView, endpoint: "DELETE /api/posts/{id}/images/{img_id}/delete/", auth: author or can_manage_permissions}
-      - {name: CommentListView,       kind: class, type: DRF APIView, endpoint: "GET    /api/posts/{id}/comments/ or /api/fund/expenses/{id}/comments/", auth: public}
-      - {name: CommentCreateView,     kind: class, type: DRF APIView, endpoint: "POST   /api/posts/{id}/comments/create/ or /api/fund/expenses/{id}/comments/create/", auth: optional(guests allowed), note: "always is_approved=False"}
-      - {name: CommentGlobalListView, kind: class, type: DRF APIView, endpoint: "GET    /api/posts/comments/", auth: can_approve_comments, note: "paginated (paginate, page_size=10), filterable by is_approved/target_type/search — closes Phase 7B gap #1"}
-      - {name: CommentApproveView,    kind: class, type: DRF APIView, endpoint: "PATCH  /api/posts/comments/{id}/approve/",   auth: can_approve_comments}
-      - {name: CommentDeleteView,     kind: class, type: DRF APIView, endpoint: "DELETE /api/posts/comments/{id}/delete/",    auth: can_manage_permissions, note: "Phase 15 (item U): _log extra_data now includes {text, rating, author (member str or guest_name or null), target_type, target_id} snapshotted before .delete()."}
+      - {name: CommentListView,       kind: class, type: DRF APIView, endpoint: "GET    /api/posts/{id}/comments/ or /api/fund/expenses/{id}/comments/", auth: public, note: "Phase 20 — filters status=Comment.Status.APPROVED (was is_approved=True)."}
+      - {name: CommentCreateView,     kind: class, type: DRF APIView, endpoint: "POST   /api/posts/{id}/comments/create/ or /api/fund/expenses/{id}/comments/create/", auth: optional(guests allowed), note: "always status=Comment.Status.PENDING (was is_approved=False)"}
+      - {name: CommentGlobalListView, kind: class, type: DRF APIView, endpoint: "GET    /api/posts/comments/", auth: can_approve_comments, note: "paginated (paginate, page_size=10), filterable by status (pending/approved/rejected, was is_approved bool)/target_type/search — closes Phase 7B gap #1"}
+      - {name: CommentStatusUpdateView, kind: class, type: DRF APIView, endpoint: "PATCH  /api/posts/comments/{id}/status/",  auth: can_approve_comments, note: "Phase 20, REPLACES CommentApproveView — quick approve/reject via CommentStatusSerializer (no rejection_reason); logs comment_status_updated with before/after."}
+      - {name: CommentAdminDetailView,  kind: class, type: DRF APIView, endpoint: "GET    /api/posts/comments/{id}/",         auth: can_approve_comments, note: "Phase 20, new — mirrors ContributionAdminDetailView; returns CommentAdminDetailSerializer."}
+      - {name: CommentAdminEditView,    kind: class, type: DRF APIView, endpoint: "PATCH  /api/posts/comments/{id}/edit/",    auth: can_approve_comments, note: "Phase 20, new — mirrors ContributionAdminEditView; EDITABLE_FIELDS=[text,rating,status,rejection_reason], snapshots before/after, logs comment_edited_by_admin. Deliberately stays on can_approve_comments (not can_manage_permissions) so anyone who can approve/reject can also attach a rejection_reason through this same endpoint."}
+      - {name: CommentUpdateView,       kind: class, type: DRF APIView, endpoint: "PATCH  /api/posts/comments/{id}/update/",  auth: "IsAuthenticated + comment.author_id==request.user.id (403 otherwise)", note: "Phase 20, new — comment owner's self-edit; applies CommentOwnerEditSerializer (always resets status to pending), logs comment_edited_by_owner."}
+      - {name: CommentDeleteView,     kind: class, type: DRF APIView, endpoint: "DELETE /api/posts/comments/{id}/delete/",    auth: "IsAuthenticated, then _can_modify_comment() check inside delete()", note: "Phase 20 — permission widened from a class-level can_manage_permissions-only gate to IsAuthenticated + a runtime _can_modify_comment() helper check (True for superuser, the comment's own author, or can_manage_permissions) so owners can now delete their own comment too, while preserving the exact prior admin behavior. _log extra_data unchanged (Phase 15 item U): {text, rating, author, target_type, target_id} snapshotted before .delete()."}
+      - {name: MyCommentsView,        kind: class, type: DRF APIView, endpoint: "GET    /api/posts/comments/mine/",           auth: IsAuthenticated, note: "Phase 20, new — mirrors MyContributionsView; Comment.objects.filter(author=request.user), paginate(..., MyCommentSerializer)."}
+      - {name: "_can_modify_comment", kind: function, type: "helper(request, comment) -> bool", note: "Phase 20, new — mirrors the existing _can_modify_post helper in this same file; True for superuser, comment.author_id==request.user.id, or can_manage_permissions."}
     needed_by:
-      - {file: "backend/posts/urls.py", items: [PostListView, PostDetailView, PostCreateView, PostUpdateView, PostDeleteView, PostImageUploadView, PostImageDeleteView, CommentListView, CommentCreateView, CommentApproveView, CommentDeleteView], status: available}
+      - {file: "backend/posts/urls.py", items: [PostListView, PostDetailView, PostCreateView, PostUpdateView, PostDeleteView, PostImageUploadView, PostImageDeleteView, CommentListView, CommentCreateView, CommentStatusUpdateView, CommentAdminDetailView, CommentAdminEditView, CommentUpdateView, CommentDeleteView, MyCommentsView], status: available}
       - {file: "backend/fund/urls.py",  items: [CommentListView, CommentCreateView], status: available}
 
   "backend/posts/urls.py":
@@ -1791,9 +1876,9 @@ files:
     imports:
       external: [{from: django.urls, items: [path]}]
       internal:
-        - {from: "backend/posts/views.py", items: [{name: PostListView, status: available}, {name: PostDetailView, status: available}, {name: PostCreateView, status: available}, {name: PostUpdateView, status: available}, {name: PostDeleteView, status: available}, {name: PostImageUploadView, status: available}, {name: PostImageDeleteView, status: available}, {name: CommentListView, status: available}, {name: CommentCreateView, status: available}, {name: CommentApproveView, status: available}, {name: CommentDeleteView, status: available}]}
+        - {from: "backend/posts/views.py", items: [{name: PostListView, status: available}, {name: PostDetailView, status: available}, {name: PostCreateView, status: available}, {name: PostUpdateView, status: available}, {name: PostDeleteView, status: available}, {name: PostImageUploadView, status: available}, {name: PostImageDeleteView, status: available}, {name: CommentListView, status: available}, {name: CommentCreateView, status: available}, {name: CommentStatusUpdateView, status: available}, {name: CommentAdminDetailView, status: available}, {name: CommentAdminEditView, status: available}, {name: CommentUpdateView, status: available}, {name: CommentDeleteView, status: available}, {name: MyCommentsView, status: available}]}
     exports:
-      - {name: urlpatterns, kind: constant, type: list, routes: ["GET /", "POST create/", "GET {id}/", "PATCH {id}/update/", "DELETE {id}/delete/", "POST {id}/images/", "DELETE {id}/images/{img_id}/delete/", "GET {id}/comments/", "POST {id}/comments/create/", "PATCH comments/{id}/approve/", "DELETE comments/{id}/delete/"]}
+      - {name: urlpatterns, kind: constant, type: list, routes: ["GET /", "POST create/", "GET {id}/", "PATCH {id}/update/", "DELETE {id}/delete/", "POST {id}/images/", "DELETE {id}/images/{img_id}/delete/", "GET {id}/comments/", "POST {id}/comments/create/", "GET comments/mine/", "PATCH comments/{id}/status/", "PATCH comments/{id}/edit/", "PATCH comments/{id}/update/", "DELETE comments/{id}/delete/", "GET comments/{id}/"], note: "Phase 20 — removed PATCH comments/{id}/approve/ (CommentApproveView deleted); specific suffixes (mine/, status/, edit/, update/, delete/) are registered BEFORE the bare comments/{id}/ detail route, same ordering convention as fund/urls.py."}
     needed_by:
       - {file: "backend/groupfund/urls.py", items: [urlpatterns], status: available}
 
@@ -2026,11 +2111,11 @@ files:
   "frontend/lib/api.ts":
     status: done
     kind: module
-    note: "axios instance + interceptors: attaches JWT, unwraps {success,message,data} → data (leaves raw paginated/auth payloads untouched), 401 refresh-queue, 403→/forbidden, 404→/not-found, 503→/unavailable. EXTENDED in Phase 7B with admin-only methods/types (additions only — no Phase 7A method signatures changed, except Comment.id corrected number→string/UUID). Phase 13 — added fundAPI.getExpenseDetail/getExpenseComments/createExpenseComment (mirrors postsAPI.getDetail/getComments/createComment, for the new expense detail page) and a new systemAPI. Phase 14 — added fundAPI.createManualContribution and membersAPI.create (both additive, admin-only). Phase 15 (items E/F/Z/A) — added 4 new fundAPI methods (getContributionsPublic, getContributionDetail, updateContribution, getMyContributions), a brand-new envVarsAPI object, extended paymentsAPI.initiate + the Contribution type with the 4 new fields (show_in_public_list, display_name_choice, public_display_name, message), added ContributionPublic/MyContribution/MemberMinimal/ContributionDisplayNameChoice + EnvVarItem/EnvVarCategory/EnvVarValueType/EnvVarSource types, and DashboardData gained pending_contributions_count (item L). Phase 17 (item a) REMOVED the entire envVarsAPI object and its 4 Env* types again. Phase 17 (item g) — membersAPI.toggleActive(id, reason?) now accepts an optional second `reason` argument, sent as body {reason} when provided (used only when deactivating); MemberDetail gained deactivation_reason?/deactivated_by_name? (mirrors MemberDetailSerializer)."
+    note: "axios instance + interceptors: attaches JWT, unwraps {success,message,data} → data (leaves raw paginated/auth payloads untouched), 401 refresh-queue, 403→/forbidden, 404→/not-found, 503→/unavailable. EXTENDED in Phase 7B with admin-only methods/types (additions only — no Phase 7A method signatures changed, except Comment.id corrected number→string/UUID). Phase 13 — added fundAPI.getExpenseDetail/getExpenseComments/createExpenseComment (mirrors postsAPI.getDetail/getComments/createComment, for the new expense detail page) and a new systemAPI. Phase 14 — added fundAPI.createManualContribution and membersAPI.create (both additive, admin-only). Phase 15 (items E/F/Z/A) — added 4 new fundAPI methods (getContributionsPublic, getContributionDetail, updateContribution, getMyContributions), a brand-new envVarsAPI object, extended paymentsAPI.initiate + the Contribution type with the 4 new fields (show_in_public_list, display_name_choice, public_display_name, message), added ContributionPublic/MyContribution/MemberMinimal/ContributionDisplayNameChoice + EnvVarItem/EnvVarCategory/EnvVarValueType/EnvVarSource types, and DashboardData gained pending_contributions_count (item L). Phase 17 (item a) REMOVED the entire envVarsAPI object and its 4 Env* types again. Phase 17 (item g) — membersAPI.toggleActive(id, reason?) now accepts an optional second `reason` argument, sent as body {reason} when provided (used only when deactivating); MemberDetail gained deactivation_reason?/deactivated_by_name? (mirrors MemberDetailSerializer). Phase 20 — commentsAPI REPLACED its old 2-method shape ({approve, delete}) with the full Contribution-style action set (getList, getDetail, updateStatus, update, updateMine, getMine, delete) mirroring fundAPI's contribution methods; Comment gained a `status: CommentStatus` field (REPLACES is_approved, removed not kept) plus new CommentDetail/MyComment types; MemberListItem gained member_number: number | null (part B); a brand-new contactAPI + ContactMessage type were added (part C); DashboardData gained pending_contact_messages_count?: number (part C)."
     exports:
       - {name: authAPI, kind: object, methods: [register, login, logout, getProfile, refreshToken]}
       - {name: postsAPI, kind: object, methods: [getList, getDetail, getComments, createComment, "(7B) create(multipart)", "(7B) update", "(7B) delete", "(7B) uploadImages(multipart)", "(7B) deleteImage"]}
-      - {name: commentsAPI, kind: object, "phase": 7B, methods: [approve, delete], note: "target-agnostic moderation actions only — no global list endpoint exists in backend"}
+      - {name: commentsAPI, kind: object, "phase": 20, methods: [getList(page, "{status?, target_type?, search?}"), getDetail, "updateStatus(id, 'approved'|'rejected')", "update(id, Partial<{text, rating, status, rejection_reason}>) — admin edit", "updateMine(id, Partial<{text, rating}>) — owner edit, reverts status to pending server-side", "getMine(page) — paginated MyComment[]", delete], note: "Phase 20 — REPLACES the old 2-method {approve, delete} shape entirely, mirroring fundAPI's Contribution-style action set (getDetail/update/updateStatus/getMine). delete is now usable by the comment's own author too (backend widened CommentDeleteView's permission to IsAuthenticated + ownership/admin check), not just admins."}
       - {name: fundAPI, kind: object, methods: [getBalance, getContributions, getExpenses, "(7B) updateContributionStatus(completed|failed)", "(7B) deleteContribution(superuser)", "(7B) createExpense(multipart)", "(7B) deleteExpense", "(Phase 13) getExpenseDetail(id) → GET /api/fund/expenses/{id}/", "(Phase 13) getExpenseComments(id) → GET /api/fund/expenses/{id}/comments/", "(Phase 13) createExpenseComment(id, {text, rating?, guest_name?}) → POST /api/fund/expenses/{id}/comments/create/", "(Phase 14) createManualContribution({guest_name, amount, currency?, payment_method?, status?, notes?}) → POST /api/fund/contributions/create-manual/", "(Phase 15, item X) getExpenses(page, filters) gained filters.search → ?search=", "(Phase 15, item E) getContributionsPublic(page) → GET /api/fund/contributions/public/ (AllowAny, paginated ContributionPublic[])", "(Phase 15, item F) getContributionDetail(id) → GET /api/fund/contributions/{id}/ (can_manage_permissions, returns full Contribution incl. receipt_image)", "(Phase 15, item F/O/Z) updateContribution(id, data: Partial<{amount, currency, guest_name, payment_method, status, notes, rejection_reason, show_in_public_list, display_name_choice, public_display_name, message}>) → PATCH /api/fund/contributions/{id}/edit/", "(Phase 15, item Z) getMyContributions(page) → GET /api/fund/contributions/mine/ (IsAuthenticated, paginated MyContribution[] + total_approved)"]}
       - {name: paymentsAPI, kind: object, methods: [getMethods, "initiate(data: {amount, payment_method, guest_name?, notes?, show_in_public_list?, display_name_choice?, public_display_name?, message?}) — Phase 15 (item E): the 4 trailing fields are new, passed straight through to POST /api/payments/initiate/", uploadReceipt(field=receipt_image), getStatus]}
       - {name: membersAPI, kind: object, methods: [getProfile, updateProfile, changePassword, "(7B) getList(paginated+filters)", "(7B) changeGroup", "(7B) toggleActive(id, reason?) — Phase 17 (item g): optional `reason`, sent as {reason} only when provided", "(7B) delete", "(Phase 14) create({full_name, display_name?, phone?, email?, password, password_confirm, group_id?}) → POST /api/members/create/"]}
@@ -2039,15 +2124,21 @@ files:
       - {name: logsAPI, kind: object, "phase": 7B, methods: [getActivity, getActivityDetail, getSystem(superuser), getSystemDetail(superuser)]}
       - {name: settingsAPI, kind: object, methods: [getPublicSettings, "(7B) getAll(superuser)", "(7B) update(key,value)(superuser)"], note: "raw axios.get bypassing shared interceptor — avoids 403→/forbidden redirect for guests on public /contact page"}
       - {name: systemAPI, kind: object, "phase": 13, methods: ["getStatus(superuser) → GET /api/settings/system-status/"]}
-      - {name: types, kind: type, items: [ApiResponse, PostAuthor, PostImage, PostSummary, PostDetail, Comment, Paginated<T>, FundBalance, "(7B) MemberMinimal, Contribution, Expense, MemberListItem, MemberDetail, GroupPermission, AccessGroup, DashboardData, ActivityLogEntry, SystemLogEntry, DefaultSettingItem", "(Phase 13) SystemStatus {database: {engine, connected}, debug, environment: 'railway'|'local', media_storage: 's3'|'local', django_version, counts: {members_total, members_active, posts, contributions, expenses, pending_comments}}", "(Phase 15) ContributionDisplayNameChoice = 'hidden'|'display_name'|'full_name'|'custom'", "(Phase 15) Contribution gained: receipt_image?, show_in_public_list?, display_name_choice?, public_display_name?, message?, rejection_reason?, updated_at? (all optional — only populated on admin detail/edit responses)", "(Phase 15, item E) ContributionPublic {id, display_name: string|null, amount, currency, message, created_at}", "(Phase 15, item Z) MyContribution {id, amount, currency, payment_method, status, rejection_reason, message, created_at}", "(Phase 15, item L) DashboardData gained pending_contributions_count?: number", "(Phase 17, item g) MemberDetail gained deactivation_reason?: string, deactivated_by_name?: string | null"]}
+      - {name: contactAPI, kind: object, "phase": 20, methods: ["submit({name, contact_info, message}) → POST /api/contact/submit/ (AllowAny — real submission, replaces the old client-only mailto: link)", "getList(page, {is_handled?, search?}) → GET /api/contact/ (admin, paginated ContactMessage[])", "toggleHandled(id) → PATCH /api/contact/{id}/toggle-handled/ (admin)"], note: "NEW (Phase 20, part C)"}
+      - {name: types, kind: type, items: [ApiResponse, PostAuthor, PostImage, PostSummary, PostDetail, "CommentAuthor, CommentStatus = 'pending'|'approved'|'rejected', Comment {..., status: CommentStatus} (REPLACES is_approved), CommentDetail extends Comment {rejection_reason, target_type: 'post'|'expense', target_label, updated_at}, MyComment extends Comment {rejection_reason, target_type, target_label}", Paginated<T>, FundBalance, "(7B) MemberMinimal, Contribution, Expense, MemberListItem {..., member_number: number | null (Phase 20, part B)}, MemberDetail, GroupPermission, AccessGroup, DashboardData, ActivityLogEntry, SystemLogEntry, DefaultSettingItem", "(Phase 13) SystemStatus {database: {engine, connected}, debug, environment: 'railway'|'local', media_storage: 's3'|'local', django_version, counts: {members_total, members_active, posts, contributions, expenses, pending_comments}}", "(Phase 15) ContributionDisplayNameChoice = 'hidden'|'display_name'|'full_name'|'custom'", "(Phase 15) Contribution gained: receipt_image?, show_in_public_list?, display_name_choice?, public_display_name?, message?, rejection_reason?, updated_at? (all optional — only populated on admin detail/edit responses)", "(Phase 15, item E) ContributionPublic {id, display_name: string|null, amount, currency, message, created_at}", "(Phase 15, item Z) MyContribution {id, amount, currency, payment_method, status, rejection_reason, message, created_at}", "(Phase 15, item L) DashboardData gained pending_contributions_count?: number", "(Phase 17, item g) MemberDetail gained deactivation_reason?: string, deactivated_by_name?: string | null", "(Phase 20, part C) DashboardData gained pending_contact_messages_count?: number; ContactMessage {id, name, contact_info, message, sender_label, is_handled, handled_by_label, handled_at, created_at}"]}
     needed_by:
       - {file: "frontend/app/[locale]/**/page.tsx", items: [authAPI, postsAPI, fundAPI, paymentsAPI, membersAPI, settingsAPI], status: available}
-      - {file: "frontend/app/[locale]/admin/**/page.tsx", items: [commentsAPI, groupsAPI, dashboardAPI, logsAPI, systemAPI, "extended fundAPI/membersAPI/postsAPI/settingsAPI"], status: available}
+      - {file: "frontend/app/[locale]/admin/**/page.tsx", items: [commentsAPI, groupsAPI, dashboardAPI, logsAPI, systemAPI, "extended fundAPI/membersAPI/postsAPI/settingsAPI", "(Phase 20) contactAPI"], status: available}
       - {file: "frontend/app/[locale]/admin/contributions/page.tsx", items: [fundAPI.createManualContribution, "(Phase 15) fundAPI.getContributionDetail, fundAPI.updateContribution"], status: available, note: "Phase 14 — 'Add Contribution' modal. Phase 15 (items F/O/Z) — 'Details' and 'Edit' modals."}
       - {file: "frontend/app/[locale]/admin/members/page.tsx", items: [membersAPI.create], status: available, note: "NEW (Phase 14) — 'Add Member' modal"}
+      - {file: "frontend/app/[locale]/admin/comments/page.tsx", items: [commentsAPI], status: available, note: "Phase 20 — full rewrite using the new Contribution-style action set"}
+      - {file: "frontend/app/[locale]/admin/contact-messages/page.tsx", items: [contactAPI], status: available, note: "NEW (Phase 20, part C)"}
       - {file: "frontend/app/[locale]/contributions/page.tsx", items: [fundAPI.getContributionsPublic, "types: ContributionPublic, Paginated"], status: available, note: "NEW (Phase 15, item E)"}
       - {file: "frontend/app/[locale]/contribute/page.tsx", items: [paymentsAPI.initiate, "types: ContributionDisplayNameChoice"], status: available, note: "Phase 15 (item E) — new form fields"}
-      - {file: "frontend/app/[locale]/profile/page.tsx", items: [fundAPI.getMyContributions, "types: MyContribution, Paginated"], status: available, note: "NEW (Phase 15, item Z) — 'My Contributions' tab"}
+      - {file: "frontend/app/[locale]/profile/page.tsx", items: [fundAPI.getMyContributions, "types: MyContribution, Paginated"], status: available, note: "Phase 15, item Z. Phase 20: the 'My Contributions' block itself was extracted out to frontend/app/[locale]/profile/contributions/page.tsx — profile/page.tsx now only links to it."}
+      - {file: "frontend/app/[locale]/profile/comments/page.tsx", items: [commentsAPI.getMine, commentsAPI.updateMine, commentsAPI.delete], status: available, note: "NEW (Phase 20, part A) — 'My Comments' page"}
+      - {file: "frontend/app/[locale]/profile/contributions/page.tsx", items: [fundAPI.getMyContributions], status: available, note: "NEW (Phase 20) — 'My Contributions' page, extracted verbatim out of profile/page.tsx"}
+      - {file: "frontend/app/[locale]/contact/page.tsx", items: [contactAPI.submit], status: available, note: "Phase 20 (part C) — REPLACES the old client-only mailto: window.open with a real async submit + pending/error state"}
 
   "frontend/lib/settingsMeta.ts":
     status: done
@@ -2066,7 +2157,7 @@ files:
   "frontend/lib/permissionsMeta.ts":
     status: done
     kind: module
-    note: "NEW (Phase 14) — PERMISSION_META: Record<string, PermissionMeta> bilingual {label,description} metadata for Permission codenames seeded by backend/core/management/commands/seed_initial_data.py (can_contribute, can_comment, can_post, can_expense, can_view_balance, can_view_posts, can_view_dashboard, can_approve_comments, can_delete_member, can_change_any_password, can_manage_permissions). Same pattern as SETTINGS_META (frontend/lib/settingsMeta.ts) — translates DB-sourced English Permission.label/description for display in the admin UI. Any codename NOT present falls back to the raw perm.label from the backend (safe for future permissions added without an i18n update). Phase 15 (item A) added a 12th entry, can_manage_env_vars; Phase 17 (item a) REMOVED it again — back to 11 entries matching the 11 seeded permissions."
+    note: "NEW (Phase 14) — PERMISSION_META: Record<string, PermissionMeta> bilingual {label,description} metadata for Permission codenames seeded by backend/core/management/commands/seed_initial_data.py (can_contribute, can_comment, can_post, can_expense, can_view_balance, can_view_posts, can_view_dashboard, can_approve_comments, can_delete_member, can_change_any_password, can_manage_permissions). Same pattern as SETTINGS_META (frontend/lib/settingsMeta.ts) — translates DB-sourced English Permission.label/description for display in the admin UI. Any codename NOT present falls back to the raw perm.label from the backend (safe for future permissions added without an i18n update). Phase 15 (item A) added a 12th entry, can_manage_env_vars; Phase 17 (item a) REMOVED it again — back to 11 entries matching the 11 seeded permissions. Phase 20 (part C) added a 12th entry, can_manage_contact_messages, matching the new seeded permission."
     exports:
       - {name: PERMISSION_META, kind: const, type: "Record<string, PermissionMeta>"}
       - {name: PermissionMeta, kind: "interface ({label: {en,fa}, description: {en,fa}})"}
@@ -2077,13 +2168,13 @@ files:
   "frontend/lib/adminNav.ts":
     status: done
     kind: module
-    note: "NEW (Phase 15, items B/C/L) — single source of truth for the admin sidebar (see shared_components.adminNav for full design rationale); extracted from AdminSidebar.tsx's previously-hardcoded nav array. Phase 17 (item a) removed the env-vars nav item + Server icon import (back to 12 items); Phase 17 (items c/e/f) replaced the ADMIN_PERMISSIONS export with BASELINE_PERMISSIONS + hasAdminAccess()."
+    note: "NEW (Phase 15, items B/C/L) — single source of truth for the admin sidebar (see shared_components.adminNav for full design rationale); extracted from AdminSidebar.tsx's previously-hardcoded nav array. Phase 17 (item a) removed the env-vars nav item + Server icon import (back to 12 items); Phase 17 (items c/e/f) replaced the ADMIN_PERMISSIONS export with BASELINE_PERMISSIONS + hasAdminAccess(). Phase 20 (part C) added a 13th nav item, 'contact-messages' (icon: Mail, permission: can_manage_contact_messages, badgeKey: pendingContactMessageCount)."
     imports:
       external:
-        - {from: lucide-react, items: [LayoutDashboard, Users, ShieldCheck, HandCoins, Receipt, Newspaper, MessageSquare, Wallet, Settings, Database, ScrollText, Terminal]}
+        - {from: lucide-react, items: [LayoutDashboard, Users, ShieldCheck, HandCoins, Receipt, Newspaper, MessageSquare, Wallet, Settings, Database, ScrollText, Terminal, Mail]}
     exports:
-      - {name: AdminNavItem, kind: "interface ({key, href, icon: React.ElementType, label: {en,fa}, permission?: string|string[], superuserOnly?, divider?, badgeKey?: 'pendingCommentCount'|'pendingContributionCount'})"}
-      - {name: ADMIN_NAV_ITEMS, kind: const, type: "AdminNavItem[]", note: "12 items (Phase 15 added a 13th, 'env-vars'; Phase 17 item a removed it again): dashboard, members, groups, contributions (badgeKey: pendingContributionCount), expenses (permission: ['can_view_balance','can_expense'] — fixes item C), posts, comments (badgeKey: pendingCommentCount), payments, settings, system-status (superuserOnly), activity-log (divider: true), system-log (superuserOnly)"}
+      - {name: AdminNavItem, kind: "interface ({key, href, icon: React.ElementType, label: {en,fa}, permission?: string|string[], superuserOnly?, divider?, badgeKey?: 'pendingCommentCount'|'pendingContributionCount'|'pendingContactMessageCount'})"}
+      - {name: ADMIN_NAV_ITEMS, kind: const, type: "AdminNavItem[]", note: "13 items (Phase 15 added a 14th, 'env-vars'; Phase 17 item a removed it again; Phase 20 part C added 'contact-messages' back to 13): dashboard, members, groups, contributions (badgeKey: pendingContributionCount), expenses (permission: ['can_view_balance','can_expense'] — fixes item C), posts, comments (badgeKey: pendingCommentCount), payments, settings, system-status (superuserOnly), activity-log (divider: true), contact-messages (permission: can_manage_contact_messages, badgeKey: pendingContactMessageCount — Phase 20, part C), system-log (superuserOnly)"}
       - {name: isNavItemVisible, kind: function, signature: "(item: AdminNavItem, {isSuperuser, hasPermission}: {isSuperuser: boolean, hasPermission: (codename: string) => boolean}) => boolean"}
       - {name: BASELINE_PERMISSIONS, kind: const, type: "string[]", note: "NEW (Phase 17, items c/e/f) — REPLACES the old ADMIN_PERMISSIONS export (which was the deduplicated union of ADMIN_NAV_ITEMS[].permission). Hardcoded list of the 4 'default plan' codenames: ['can_comment','can_contribute','can_view_balance','can_view_posts'] — mirrors backend/accounts/models.py's BASELINE_GROUP_PERMISSIONS (same 4 codenames, different order). admin/groups/page.tsx's create-group modal seeds its checkbox selection from this array (was hardcoded ['can_contribute','can_comment'])."}
       - {name: hasAdminAccess, kind: function, signature: "(opts: {isSuperuser: boolean; groupPermissions?: string[] | null}) => boolean", note: "NEW (Phase 17, items c/e/f) — REPLACES the old `member.is_superuser || ADMIN_PERMISSIONS.some(hasPermission)` check used by admin/layout.tsx's route guard and Navbar.tsx's 'Admin Panel' entry button. Returns true if isSuperuser, OR if groupPermissions contains at least one codename NOT in BASELINE_PERMISSIONS. A member whose group grants ONLY some/all of the 4 baseline ('default plan') permissions has NO admin-panel access — implements the 'default plan users can never reach /admin' rule."}
@@ -2222,7 +2313,7 @@ files:
     status: done
     kind: page
     route: "/{locale}/posts/{id}"
-    note: "postsAPI.getDetail → {post, comments}; postsAPI.getComments → Comment[] (filters is_approved); postsAPI.createComment for guest/member comment submission. Phase 13 — removed local `Lightbox` component, now uses shared ImageLightbox (Escape/backdrop/X close) with hintText=tc('lightbox_hint'); fixed hardcoded English 'Your name' placeholder → t('comment_name_placeholder') and 'Submitting…' → tc('submitting'). Phase 14 — added `|| post.author?.full_name` before the final '—' fallback for the post-author byline (display_name is optional; full_name is always present). Phase 15 (item J) — StarRating/StarDisplay reduced from a 1-10 to a 1-5 scale: `Array.from({length: 10}, ...)` → `{length: 5}`, gap-0.5→gap-2, icon size 16→22 (StarRating) / 12→18 (StarDisplay), '/10'/'out of 10' labels → '/5'/'out of 5'; StarDisplay clamps `Math.min(rating, 5)` so any pre-Phase-15 ratings of 6-10 still render as exactly 5 filled stars. Backend posts.PostComment.rating's MaxValueValidator(10)→MaxValueValidator(5) (matching serializer validation) — existing 6-10 values are NOT data-migrated, only display-clamped."
+    note: "postsAPI.getDetail → {post, comments}; postsAPI.getComments → Comment[] (filters status==='approved' — Phase 20, was is_approved); postsAPI.createComment for guest/member comment submission. Phase 13 — removed local `Lightbox` component, now uses shared ImageLightbox (Escape/backdrop/X close) with hintText=tc('lightbox_hint'); fixed hardcoded English 'Your name' placeholder → t('comment_name_placeholder') and 'Submitting…' → tc('submitting'). Phase 14 — added `|| post.author?.full_name` before the final '—' fallback for the post-author byline (display_name is optional; full_name is always present). Phase 15 (item J) — StarRating/StarDisplay reduced from a 1-10 to a 1-5 scale: `Array.from({length: 10}, ...)` → `{length: 5}`, gap-0.5→gap-2, icon size 16→22 (StarRating) / 12→18 (StarDisplay), '/10'/'out of 10' labels → '/5'/'out of 5'; StarDisplay clamps `Math.min(rating, 5)` so any pre-Phase-15 ratings of 6-10 still render as exactly 5 filled stars. Backend posts.PostComment.rating's MaxValueValidator(10)→MaxValueValidator(5) (matching serializer validation) — existing 6-10 values are NOT data-migrated, only display-clamped."
     imports:
       external:
         - {from: react, items: [useState, useEffect]}
@@ -2266,7 +2357,7 @@ files:
     status: done
     kind: page
     route: "/{locale}/expenses/{id}"
-    note: "NEW (Phase 13) — expense detail page, modeled on posts/[id]/page.tsx. fundAPI.getExpenseDetail(id) → Expense (full untruncated description, amount via formatAmount, expense_date, withdrawn_by.display_name or admin_label); fundAPI.getBalance → FundBalance (gated on can_view_balance, used only for the currency symbol); fundAPI.getExpenseComments(id) → Comment[] (filters is_approved) + fundAPI.createExpenseComment for guest/member comment submission (StarRating 1-10, optional). Receipt image (if present) opens shared ImageLightbox (hintText=tc('lightbox_hint')). Handles loading skeleton, 404 (not_found), 401 (login_required_detail + login_cta), 403 (router.push to /{locale}/forbidden) states. StarRating/StarDisplay/CommentItem are local duplicates of the equivalent components in posts/[id]/page.tsx (kept local, not extracted to a shared module). Phase 14 — added `|| expense.withdrawn_by?.full_name` before t('admin_label') in the withdrawn-by fallback chain (display_name is optional; full_name is always present)."
+    note: "NEW (Phase 13) — expense detail page, modeled on posts/[id]/page.tsx. fundAPI.getExpenseDetail(id) → Expense (full untruncated description, amount via formatAmount, expense_date, withdrawn_by.display_name or admin_label); fundAPI.getBalance → FundBalance (gated on can_view_balance, used only for the currency symbol); fundAPI.getExpenseComments(id) → Comment[] (filters status==='approved' — Phase 20, was is_approved) + fundAPI.createExpenseComment for guest/member comment submission (StarRating 1-10, optional). Receipt image (if present) opens shared ImageLightbox (hintText=tc('lightbox_hint')). Handles loading skeleton, 404 (not_found), 401 (login_required_detail + login_cta), 403 (router.push to /{locale}/forbidden) states. StarRating/StarDisplay/CommentItem are local duplicates of the equivalent components in posts/[id]/page.tsx (kept local, not extracted to a shared module). Phase 14 — added `|| expense.withdrawn_by?.full_name` before t('admin_label') in the withdrawn-by fallback chain (display_name is optional; full_name is always present)."
     imports:
       external:
         - {from: react, items: [useState, useEffect]}
@@ -2326,16 +2417,55 @@ files:
     status: done
     kind: page
     route: "/{locale}/profile"
-    note: "membersAPI.updateProfile → Member; membersAPI.changePassword. Phase 15 (items E/F) — NEW 'My Contributions' section (paginated, pageSize=5, via fundAPI.getMyContributions(page) → GET /api/fund/contributions/mine/): lists the current member's own contributions including rejected ones (status badge + rejection_reason shown for 'failed'), each row showing amount/currency/date/status; a summary line shows `total_approved` (sum of `amount` for status='completed', from the same response) with HeartHandshake icon; Prev/Next pagination mirrors the expenses/contributions list pattern (ChevronLeft/ChevronRight, contribTotalCount/contribHasNext/contribHasPrev state)."
+    note: "membersAPI.updateProfile → Member; membersAPI.changePassword. Phase 15 (items E/F) — NEW 'My Contributions' section (paginated, pageSize=5, via fundAPI.getMyContributions(page) → GET /api/fund/contributions/mine/): lists the current member's own contributions including rejected ones (status badge + rejection_reason shown for 'failed'), each row showing amount/currency/date/status; a summary line shows `total_approved` (sum of `amount` for status='completed', from the same response) with HeartHandshake icon; Prev/Next pagination mirrors the expenses/contributions list pattern (ChevronLeft/ChevronRight, contribTotalCount/contribHasNext/contribHasPrev state). Phase 20 — the entire 'My Contributions' section (state + fetch + JSX) described above was EXTRACTED out, unchanged, into the new frontend/app/[locale]/profile/contributions/page.tsx; this page now renders two small link cards instead ('My Contributions' → /{locale}/profile/contributions, HeartHandshake icon; 'My Comments' → /{locale}/profile/comments, MessageSquare icon, NEW page). Phase 20 (part B) — the profile header now shows `#{member.member_number}` (small gray/cyan text) next to the display name, when member.member_number != null."
+    imports:
+      external:
+        - {from: react, items: [useState, useEffect]}
+        - {from: next-intl, items: [useTranslations]}
+        - {from: next/navigation, items: [useParams, useRouter]}
+        - {from: next/link, items: [default (Link)]}
+        - {from: lucide-react, items: [User, Edit2, Save, X, Lock, Eye, EyeOff, CheckCircle, AlertTriangle, ChevronRight, HeartHandshake, MessageSquare]}
+      internal:
+        - {file: "frontend/lib/api.ts", items: [membersAPI], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore, "types: Member"], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    i18n_namespace: "profile"
+    needed_by: []
+
+  "frontend/app/[locale]/profile/contributions/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/profile/contributions"
+    note: "NEW (Phase 20) — 'My Contributions' page, containing the exact state/fetch/JSX previously inline in profile/page.tsx (paginated pageSize=5 via fundAPI.getMyContributions(page); summary `total_approved` line with HeartHandshake icon; status badge + rejection_reason for rejected rows; Prev/Next pagination). A 'back to profile' button calls router.push(`/{locale}/profile`)."
     imports:
       external:
         - {from: react, items: [useState, useEffect, useCallback]}
         - {from: next-intl, items: [useTranslations]}
         - {from: next/navigation, items: [useParams, useRouter]}
-        - {from: lucide-react, items: [User, Edit2, Save, X, Lock, Eye, EyeOff, CheckCircle, AlertTriangle, ChevronLeft, ChevronRight, HeartHandshake, MessageSquare]}
+        - {from: lucide-react, items: [ChevronLeft, ChevronRight, HeartHandshake, MessageSquare, AlertTriangle]}
       internal:
-        - {file: "frontend/lib/api.ts", items: [membersAPI, fundAPI, "types: MyContribution, Paginated"], status: available, note: "Phase 15 (items E/F) — fundAPI.getMyContributions + MyContribution type are NEW"}
-        - {file: "frontend/store/authStore.ts", items: [useAuthStore, "types: Member"], status: available}
+        - {file: "frontend/lib/api.ts", items: [fundAPI, "types: MyContribution, Paginated"], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    i18n_namespace: "profile"
+    needed_by: []
+
+  "frontend/app/[locale]/profile/comments/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/profile/comments"
+    note: "NEW (Phase 20, part A) — 'My Comments' page, mirroring the structure of profile/contributions/page.tsx. Lists the current member's own comments via commentsAPI.getMine(page) (paginated MyComment[]): each row shows the comment text, target_label/target_type, rating (Star icons), a local STATUS_STYLE color-coded badge (pending=amber/approved=green/rejected=red — same 3-color mapping as AdminBadge, but rendered locally rather than importing the admin component), and rejection_reason when rejected. Owner-only Edit (inline form → commentsAPI.updateMine(id, {text, rating}), which the backend always reverts the comment to status=pending) and Delete (→ commentsAPI.delete(id), now permitted for the comment's own author, not just admins) actions on each row. A 'back to profile' button calls router.push(`/{locale}/profile`)."
+    imports:
+      external:
+        - {from: react, items: [useState, useEffect, useCallback]}
+        - {from: next-intl, items: [useTranslations]}
+        - {from: next/navigation, items: [useParams, useRouter]}
+        - {from: lucide-react, items: [ChevronLeft, ChevronRight, MessageSquare, AlertTriangle, Star, Pencil, Trash2, Save, X]}
+      internal:
+        - {file: "frontend/lib/api.ts", items: [commentsAPI, "types: MyComment, Paginated"], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
     exports:
       - {name: default, kind: function, type: "React Server/Client Component (page)"}
     i18n_namespace: "profile"
@@ -2345,15 +2475,16 @@ files:
     status: done
     kind: page
     route: "/{locale}/contact"
-    note: "settingsAPI.getPublicSettings (graceful null on error/403) for contact_email/contact_phone; mailto: form fallback. Phase 15 (item V) — when mounted && member?.is_active===false, renders the same bilingual amber/red deactivation banner as the landing page (tCommon('deactivated_title'/'deactivated_message')) above the contact form — this page remains reachable for deactivated members per DeactivatedGuard's allowlist."
+    note: "settingsAPI.getPublicSettings (graceful null on error/403) for contact_email/contact_phone. Phase 15 (item V) — when mounted && member?.is_active===false, renders the same bilingual amber/red deactivation banner as the landing page (tCommon('deactivated_title'/'deactivated_message')) above the contact form — this page remains reachable for deactivated members per DeactivatedGuard's allowlist. Phase 20 (part C) — REPLACES the old mailto:-only `handleSubmit` (which just built a mailto: link and called window.open, persisting nothing) with a real `await contactAPI.submit({name, contact_info, message})`; added `submitting`/`submitError` state, an amber/red error box (AlertTriangle icon, t('submit_error')) on failure, and the submit button disables + shows tCommon('submitting') while in flight."
     imports:
       external:
         - {from: react, items: [useState, useEffect]}
         - {from: next-intl, items: [useTranslations]}
-        - {from: lucide-react, items: [Mail, Phone, Send, CheckCircle]}
+        - {from: lucide-react, items: [Mail, Phone, Send, CheckCircle, AlertTriangle]}
       internal:
-        - {file: "frontend/lib/api.ts", items: [settingsAPI], status: available}
+        - {file: "frontend/lib/api.ts", items: [settingsAPI, contactAPI], status: available, note: "Phase 20 (part C) — contactAPI is new"}
         - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
     exports:
       - {name: default, kind: function, type: "React Server/Client Component (page)"}
     i18n_namespace: "contact"
@@ -2363,7 +2494,7 @@ files:
     status: done
     kind: page
     route: "/{locale}/help"
-    note: "site guide using useTranslations('help') (new i18n namespace in messages/en.json + fa.json) + same glass-morphism theme as /contact (LionAndSun, cyan/gold accents). Sections grouped guest/member/admin and gated via useAuthStore (member, hasPermission, is_superuser) with the same permission→section mapping as AdminSidebar (can_view_dashboard, can_manage_permissions, can_view_balance, can_post, can_approve_comments, superuser-only system_log) — only sections relevant to the visitor's access level are rendered. Linked from Navbar + Footer (nav.help / messages help namespace)."
+    note: "site guide using useTranslations('help') (new i18n namespace in messages/en.json + fa.json) + same glass-morphism theme as /contact (LionAndSun, cyan/gold accents). Sections grouped guest/member/admin and gated via useAuthStore (member, hasPermission, is_superuser) with the same permission→section mapping as AdminSidebar (can_view_dashboard, can_manage_permissions, can_view_balance, can_post, can_approve_comments, superuser-only system_log) — only sections relevant to the visitor's access level are rendered. Linked from Navbar + Footer (nav.help / messages help namespace). Phase 20 added two SECTIONS entries: { key: 'my_comments', group: 'member' } (next to the existing my_contributions) and { key: 'contact_messages', group: 'admin', permission: 'can_manage_contact_messages' } (next to activity_log) — both with matching messages/en.json+fa.json help.sections.* keys."
     imports:
       external:
         - {from: react, items: [useState, useEffect]}
@@ -2479,7 +2610,7 @@ files:
     status: done
     kind: page
     route: "/{locale}/admin/members"
-    note: "membersAPI.getList(page,{search,group,is_active}) + groupsAPI.getList() for filter options; AdminTable w/ search+group+status filters, links to detail page. Gated on can_manage_permissions. Phase 13 — added totalCount state (from Paginated.count) and pageSize=5 (was 10); AdminTable's pagination prop now passes bilingual prevLabel ('قبلی'/'Prev'), nextLabel ('بعدی'/'Next'), and pageLabel ('صفحه X از Y'/'Page X of Y'). Phase 14 — extracted the inline useEffect fetch body into a `load()` function (same deps: canManage/page/search/groupFilter/activeFilter); added a '+ Add Member' button (gated canManage) opening an AdminModal create-member form (full_name required; display_name/phone/email optional; AdminSelect group from `groups` state, placeholder = Default; password + confirm password) with client-side validation (phone-or-email required, password match, min 8 chars) → membersAPI.create(...), bilingual toast on success/error, closes modal and calls load() to refresh the list."
+    note: "membersAPI.getList(page,{search,group,is_active}) + groupsAPI.getList() for filter options; AdminTable w/ search+group+status filters, links to detail page. Gated on can_manage_permissions. Phase 13 — added totalCount state (from Paginated.count) and pageSize=5 (was 10); AdminTable's pagination prop now passes bilingual prevLabel ('قبلی'/'Prev'), nextLabel ('بعدی'/'Next'), and pageLabel ('صفحه X از Y'/'Page X of Y'). Phase 14 — extracted the inline useEffect fetch body into a `load()` function (same deps: canManage/page/search/groupFilter/activeFilter); added a '+ Add Member' button (gated canManage) opening an AdminModal create-member form (full_name required; display_name/phone/email optional; AdminSelect group from `groups` state, placeholder = Default; password + confirm password) with client-side validation (phone-or-email required, password match, min 8 chars) → membersAPI.create(...), bilingual toast on success/error, closes modal and calls load() to refresh the list. Phase 20 (part B) — new small monospace `#{m.member_number}` column added between display_name and group; the search box's placeholder now mentions searching by ID too ('جستجو بر اساس نام یا شناسه...'/'Search by name or ID...'), since the backend's search now matches an all-digit query against member_number too."
     imports:
       external:
         - {from: react, items: [useEffect, useState]}
@@ -2504,7 +2635,7 @@ files:
     status: done
     kind: page
     route: "/{locale}/admin/members/{id}"
-    note: "membersAPI.getProfile/updateProfile/changeGroup/changePassword/toggleActive/delete — profile edit form, group-change form, password-change form (gated can_change_any_password), danger zone (deactivate via AdminConfirmDialog, delete gated can_delete_member). Phase 14 — saveGroup's catch block now narrows the axios error (unknown, manual 'response'/'status' checks) and shows a dedicated bilingual toast when the backend returns 403 (MemberChangeGroupView intentionally rejects changing a superuser's group: 'گروه کاربران سوپریوزر را نمی‌توان تغییر داد.'/'The group of a superuser account cannot be changed.'), falling back to the generic 'Failed to change group' toast for other errors; also fixed the back-button's hardcoded aria-label='Back' → bilingual ({isRTL ? 'بازگشت' : 'Back'}). Phase 17 (item g) — new state `deactivateReason` (string); toggleActive() now computes `wasActive = !!target?.is_active` and calls `membersAPI.toggleActive(id, wasActive ? deactivateReason.trim() : undefined)` (reason sent only when deactivating), then locally updates `target.deactivation_reason`/`deactivated_by_name` (the latter from `currentMember?.display_name || currentMember?.full_name`) and resets `deactivateReason` on success. The deactivate AdminConfirmDialog now passes `target.is_active && <AdminTextarea label='Deactivation reason (shown to the member)' value={deactivateReason} onChange=... rows={3} />` as `children` (only shown when about to deactivate, not reactivate); its `onClose` also resets `deactivateReason`. A new amber 'Danger Zone' info block renders `target.deactivation_reason`/`target.deactivated_by_name` (Reason/By) whenever `!target.is_active && (deactivation_reason || deactivated_by_name)`."
+    note: "membersAPI.getProfile/updateProfile/changeGroup/changePassword/toggleActive/delete — profile edit form, group-change form, password-change form (gated can_change_any_password), danger zone (deactivate via AdminConfirmDialog, delete gated can_delete_member). Phase 14 — saveGroup's catch block now narrows the axios error (unknown, manual 'response'/'status' checks) and shows a dedicated bilingual toast when the backend returns 403 (MemberChangeGroupView intentionally rejects changing a superuser's group: 'گروه کاربران سوپریوزر را نمی‌توان تغییر داد.'/'The group of a superuser account cannot be changed.'), falling back to the generic 'Failed to change group' toast for other errors; also fixed the back-button's hardcoded aria-label='Back' → bilingual ({isRTL ? 'بازگشت' : 'Back'}). Phase 17 (item g) — new state `deactivateReason` (string); toggleActive() now computes `wasActive = !!target?.is_active` and calls `membersAPI.toggleActive(id, wasActive ? deactivateReason.trim() : undefined)` (reason sent only when deactivating), then locally updates `target.deactivation_reason`/`deactivated_by_name` (the latter from `currentMember?.display_name || currentMember?.full_name`) and resets `deactivateReason` on success. The deactivate AdminConfirmDialog now passes `target.is_active && <AdminTextarea label='Deactivation reason (shown to the member)' value={deactivateReason} onChange=... rows={3} />` as `children` (only shown when about to deactivate, not reactivate); its `onClose` also resets `deactivateReason`. A new amber 'Danger Zone' info block renders `target.deactivation_reason`/`target.deactivated_by_name` (Reason/By) whenever `!target.is_active && (deactivation_reason || deactivated_by_name)`. Phase 20 (part B) — the page header subtitle now also shows the member's immutable numeric ID: `{target.display_name} · #{target.member_number} · {target.group_name || '—'}`."
     imports:
       external:
         - {from: react, items: [useEffect, useState]}
@@ -2640,24 +2771,51 @@ files:
     status: done
     kind: page
     route: "/{locale}/admin/comments"
-    note: "commentsAPI.getList(page,{search,is_approved,target_type}) — AdminTable w/ search+status+target_type filter form (Search/Status/Target Type AdminSelect+AdminInput), approve→commentsAPI.approve / delete→commentsAPI.delete via AdminConfirmDialog. Gated on can_approve_comments (delete additionally gated can_manage_permissions). Phase 13 — added totalCount state (from Paginated.count) and pageSize=10 (unchanged, now explicit); AdminTable's pagination prop now passes bilingual prevLabel ('قبلی'/'Prev'), nextLabel ('بعدی'/'Next'), and pageLabel ('صفحه X از Y'/'Page X of Y')."
+    note: "Phase 20 (part A) — FULL REWRITE mirroring admin/contributions/page.tsx's structure exactly (this entry SUPERSEDES every prior phase's description, incl. the Phase 7B 'DEGRADED dashboardAPI-sourced' note). commentsAPI.getList(page,{search,status,target_type}) — AdminTable w/ search+status+target_type filter form (status options pending/approved/rejected via plain AdminSelect, 'All' not disabled), each row showing author_label/guest_name, truncated text, Star rating, AdminBadge status={c.status}, created_at, and an actions column with: Eye→Details modal, Pencil→Edit modal, inline Approve/Reject buttons (only when status==='pending' and canManage), Trash2 delete (only when canDelete) — each backed by AdminConfirmDialog. Details modal (AdminModal, max-w-2xl): fetches CommentDetail via commentsAPI.getDetail(id) showing author/rating/target_type+target_label/status/created_at/updated_at/full text; shows rejection_reason box when status==='rejected'; when status==='pending' shows an inline AdminTextarea(rejectReason) + Approve (commentsAPI.updateStatus(id,'approved')) / Reject (requires non-empty rejectReason, calls commentsAPI.update(id,{status:'rejected', rejection_reason})) button pair. Edit modal (AdminModal, max-w-2xl): full form — AdminTextarea(text), AdminSelect(rating, RATING_OPTIONS 0-5), AdminSelect(status, STATUS_OPTIONS_BIDIRECTIONAL — freely re-editable in any direction like the contributions Edit modal), conditional AdminTextarea(rejection_reason) when status==='rejected' → commentsAPI.update(id, {text, rating, status, rejection_reason}). Page gated on can_approve_comments (canManage = isSuperuser || hasPermission('can_approve_comments'), used for the page-level guard AND the inline approve/reject/edit actions); delete additionally gated canDelete = isSuperuser || hasPermission('can_manage_permissions') (same two-tier gating as the old version, preserved). pageSize=10."
     imports:
       external:
         - {from: react, items: [useEffect, useState]}
         - {from: next/navigation, items: [useParams]}
-        - {from: lucide-react, items: [Check, Trash2, Star]}
+        - {from: lucide-react, items: [Check, X, Trash2, Eye, Pencil, Star]}
       internal:
         - {file: "frontend/components/admin/AdminTable.tsx", items: [default, AdminTableColumn], status: available}
-        - {file: "frontend/components/admin/AdminConfirmDialog.tsx", items: [default], status: available}
         - {file: "frontend/components/admin/AdminBadge.tsx", items: [default], status: available}
-        - {file: "frontend/components/admin/fields/AdminInput.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/AdminModal.tsx", items: [default], status: available, note: "Phase 20 — Details + Edit modals (2nd/3rd AdminModal instances on this page, same pattern as admin/contributions/page.tsx)"}
         - {file: "frontend/components/admin/fields/AdminSelect.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminInput.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminTextarea.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/AdminConfirmDialog.tsx", items: [default], status: available}
         - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
         - {file: "frontend/store/toastStore.ts", items: [useToastStore], status: available}
-        - {file: "frontend/lib/api.ts", items: [commentsAPI, "types: Comment, Paginated"], status: available}
+        - {file: "frontend/lib/api.ts", items: [commentsAPI, "types: Comment, CommentDetail, CommentStatus, Paginated"], status: available, note: "Phase 20 — CommentDetail/CommentStatus and the new commentsAPI methods are NEW"}
     exports:
       - {name: default, kind: function, type: "React Server/Client Component (page)"}
-    notes_extra: "useAuthStore usage: hasPermission('can_approve_comments'/'can_manage_permissions'), member.is_superuser bypass for canApprove (page-level gate) and canDelete (gates delete button + AdminConfirmDialog branch). useToastStore usage: show(...) on load failure and approve/delete success+error. NOTE: this entry SUPERSEDES the old all.yaml note describing a 'DEGRADED' dashboardAPI-sourced implementation — the current source uses the real commentsAPI.getList() with full pagination/filtering (Phase 7B gap #1 already resolved per the KNOWN BACKEND GAPS section at end of file)."
+    notes_extra: "useAuthStore usage: hasPermission('can_approve_comments'/'can_manage_permissions'), member.is_superuser bypass for canManage (page-level gate + approve/reject/edit) and canDelete (gates delete button + AdminConfirmDialog branch). useToastStore usage: show(...) on load failure and approve/reject/delete/edit success+error (incl. a 'warning' toast when rejecting without entering a reason)."
+    i18n_namespace: "none — admin panel uses inline bilingual strings (isRTL ternary), not messages/*.json"
+    needed_by: []
+
+  "frontend/app/[locale]/admin/contact-messages/page.tsx":
+    status: done
+    kind: page
+    route: "/{locale}/admin/contact-messages"
+    note: "NEW (Phase 20, part C). Simpler than comments/contributions — no approve/reject, just a binary is_handled toggle. contactAPI.getList(page,{search,is_handled}) — AdminTable w/ search + handled-status AdminSelect filter ('All'/'Unhandled'/'Handled', not disabled), rows show name/contact_info/truncated message/sender_label (or '—' for guest submissions)/AdminBadge (status={is_handled?'active':'pending'}, with an explicit bilingual `label` override so it reads 'Handled'/'Unhandled' rather than AdminBadge's default 'active'/'pending' text)/created_at, actions: Eye→Details modal, inline toggle button (CheckCircle2 'Mark Handled' when unhandled / RotateCcw 'Revert' when handled) → contactAPI.toggleHandled(id), optimistically patches detailItem.is_handled if the detail modal for that row is open. Details modal (AdminModal, max-w-2xl): name/contact_info/sender_label/status badge/created_at, handled_by_label+handled_at when handled, full message text, and the same toggle button at the bottom. Gated on can_manage_contact_messages (canManage = isSuperuser || hasPermission('can_manage_contact_messages')) — single permission level, no separate delete tier (messages are never deleted, only marked handled/unhandled). pageSize=10."
+    imports:
+      external:
+        - {from: react, items: [useEffect, useState]}
+        - {from: next/navigation, items: [useParams]}
+        - {from: lucide-react, items: [Eye, CheckCircle2, RotateCcw]}
+      internal:
+        - {file: "frontend/components/admin/AdminTable.tsx", items: [default, AdminTableColumn], status: available}
+        - {file: "frontend/components/admin/AdminBadge.tsx", items: [default], status: available, note: "uses the label override prop to show 'Handled'/'Unhandled' text over the active/pending color mapping"}
+        - {file: "frontend/components/admin/AdminModal.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminSelect.tsx", items: [default], status: available}
+        - {file: "frontend/components/admin/fields/AdminInput.tsx", items: [default], status: available}
+        - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
+        - {file: "frontend/store/toastStore.ts", items: [useToastStore], status: available}
+        - {file: "frontend/lib/api.ts", items: [contactAPI, "types: ContactMessage, Paginated"], status: available}
+    exports:
+      - {name: default, kind: function, type: "React Server/Client Component (page)"}
+    notes_extra: "useAuthStore usage: hasPermission('can_manage_contact_messages'), member.is_superuser bypass — single canManage gate for the whole page (no delete tier). useToastStore usage: show(...) on load failure and toggle-handled success+error."
     i18n_namespace: "none — admin panel uses inline bilingual strings (isRTL ternary), not messages/*.json"
     needed_by: []
 
@@ -2880,7 +3038,7 @@ files:
   "frontend/components/layout/AdminLayout.tsx":
     status: done
     kind: component
-    note: "composes AdminTopBar + AdminSidebar + scrollable main + AdminToastContainer; owns collapsed/mobileOpen state, fetches dashboardAPI.getStats() once on mount for the pending-comments badge count (passed down to both AdminTopBar and AdminSidebar). toggleSidebar() collapses the desktop sidebar (width var --admin-sidebar-collapsed) on screens >=768px, or opens the mobile drawer below that. <main> padding-inline-start is a CSS calc() driven by --admin-sidebar-width/--admin-sidebar-collapsed (defined in frontend/styles/admin.css) so content reflows when the sidebar collapses. Phase 15 (item L) — same dashboardAPI.getStats() call now also reads `data.pending_contributions_count`; new `pendingContributionCount` state is passed to <AdminSidebar> alongside pendingCommentCount (AdminTopBar is unchanged — the badge only applies to the sidebar's Contributions item)."
+    note: "composes AdminTopBar + AdminSidebar + scrollable main + AdminToastContainer; owns collapsed/mobileOpen state, fetches dashboardAPI.getStats() once on mount for the pending-comments badge count (passed down to both AdminTopBar and AdminSidebar). toggleSidebar() collapses the desktop sidebar (width var --admin-sidebar-collapsed) on screens >=768px, or opens the mobile drawer below that. <main> padding-inline-start is a CSS calc() driven by --admin-sidebar-width/--admin-sidebar-collapsed (defined in frontend/styles/admin.css) so content reflows when the sidebar collapses. Phase 15 (item L) — same dashboardAPI.getStats() call now also reads `data.pending_contributions_count`; new `pendingContributionCount` state is passed to <AdminSidebar> alongside pendingCommentCount (AdminTopBar is unchanged — the badge only applies to the sidebar's Contributions item). Phase 20 (part C) — same call also reads `data.pending_contact_messages_count` into a new `pendingContactMessageCount` state, passed to <AdminSidebar> alongside the other two badge counts."
     imports:
       external: [{from: react, items: [useEffect, useState]}, {from: next/navigation, items: [usePathname]}]
       internal:
@@ -2895,14 +3053,14 @@ files:
   "frontend/components/layout/AdminSidebar.tsx":
     status: done
     kind: component
-    note: "260px/64px collapsible (framer-motion width transition) + mobile drawer w/ overlay; visibility via authStore.hasPermission() + is_superuser bypass; active state via .admin-nav-item.active (defined in frontend/styles/admin.css). Phase 15 (item B refactor) — the nav item array is NO LONGER hardcoded here: `const items = ADMIN_NAV_ITEMS` (imported from frontend/lib/adminNav.ts), and `isVisible(item)` delegates to `isNavItemVisible(item, {isSuperuser, hasPermission})` (also from adminNav.ts, supports both a single permission string and an array meaning 'any of'). Adding a new admin section now only requires editing frontend/lib/adminNav.ts (plus creating the page) — see roadmap.add_admin_page_or_feature. Badge rendering is now generic: `badgeCounts = {pendingCommentCount, pendingContributionCount}`, and each item with a `badgeKey` ('pendingCommentCount' on Comments, 'pendingContributionCount' on Contributions — item L) reads `badgeCounts[item.badgeKey]` (99+ cap, same as before). The 12 ADMIN_NAV_ITEMS (dashboard/members/groups/contributions/expenses/posts/comments/payments/settings/system-status/activity-log-divider/system-log — Phase 15 added a 13th, env-vars[item A]; Phase 17 item a removed it again) are documented in shared_components.adminNav and frontend/lib/adminNav.ts's own entry."
+    note: "260px/64px collapsible (framer-motion width transition) + mobile drawer w/ overlay; visibility via authStore.hasPermission() + is_superuser bypass; active state via .admin-nav-item.active (defined in frontend/styles/admin.css). Phase 15 (item B refactor) — the nav item array is NO LONGER hardcoded here: `const items = ADMIN_NAV_ITEMS` (imported from frontend/lib/adminNav.ts), and `isVisible(item)` delegates to `isNavItemVisible(item, {isSuperuser, hasPermission})` (also from adminNav.ts, supports both a single permission string and an array meaning 'any of'). Adding a new admin section now only requires editing frontend/lib/adminNav.ts (plus creating the page) — see roadmap.add_admin_page_or_feature. Badge rendering is now generic: `badgeCounts = {pendingCommentCount, pendingContributionCount, pendingContactMessageCount}`, and each item with a `badgeKey` ('pendingCommentCount' on Comments, 'pendingContributionCount' on Contributions — item L, 'pendingContactMessageCount' on Contact Messages — Phase 20 part C) reads `badgeCounts[item.badgeKey]` (99+ cap, same as before). The 13 ADMIN_NAV_ITEMS (dashboard/members/groups/contributions/expenses/posts/comments/payments/settings/system-status/activity-log-divider/contact-messages/system-log — Phase 15 added a 14th, env-vars[item A]; Phase 17 item a removed it again; Phase 20 part C added contact-messages back to 13) are documented in shared_components.adminNav and frontend/lib/adminNav.ts's own entry."
     imports:
       external: [{from: next/link, items: [Link]}, {from: next/navigation, items: [usePathname]}, {from: framer-motion, items: [motion, AnimatePresence]}, {from: lucide-react, items: [X]}]
       internal:
         - {file: "frontend/components/animations/IranianSymbols.tsx", items: [LionAndSun], status: available}
         - {file: "frontend/store/authStore.ts", items: [useAuthStore], status: available}
         - {file: "frontend/lib/adminNav.ts", items: [ADMIN_NAV_ITEMS, isNavItemVisible], status: available, note: "NEW (Phase 15, item B) — replaces the old hardcoded `items: NavItem[]` array; lucide icons for each item now come from adminNav.ts itself"}
-    exports: [{name: default, kind: function, type: "React component", props: "AdminSidebarProps {locale: 'en'|'fa', collapsed, mobileOpen, onMobileClose, pendingCommentCount?, pendingContributionCount?}"}]
+    exports: [{name: default, kind: function, type: "React component", props: "AdminSidebarProps {locale: 'en'|'fa', collapsed, mobileOpen, onMobileClose, pendingCommentCount?, pendingContributionCount?, pendingContactMessageCount?}"}]
     needed_by:
       - {file: "frontend/components/layout/AdminLayout.tsx", status: available}
 
@@ -3091,7 +3249,7 @@ files:
     note: "zustand + persist; holds member, accessToken, refreshToken, isAuthenticated, hasPermission(codename); login/logout/setTokens"
     exports:
       - {name: "default (useAuthStore hook)", kind: function, type: "zustand store hook (persist middleware, localStorage key 'groupfund-auth')"}
-      - {name: Member, kind: type, type: "interface { id, full_name, display_name, email, phone, group_name, group_permissions[], is_active, is_superuser, created_at, deactivation_reason?, deactivated_by_name? }", note: "Phase 17 (item g): deactivation_reason?: string and deactivated_by_name?: string | null added after created_at, mirroring MemberProfileSerializer — shown on the home page banner for deactivated members."}
+      - {name: Member, kind: type, type: "interface { id, full_name, display_name, email, phone, group_name, group_permissions[], is_active, is_superuser, created_at, deactivation_reason?, deactivated_by_name?, member_number: number | null }", note: "Phase 17 (item g): deactivation_reason?: string and deactivated_by_name?: string | null added after created_at, mirroring MemberProfileSerializer — shown on the home page banner for deactivated members. Phase 20 (part B): member_number: number | null added, mirroring MemberProfileSerializer — shown in profile/page.tsx's header next to the display name."}
     needed_by: "see shared_components.useAuthStore"
 
   "frontend/store/langStore.ts":

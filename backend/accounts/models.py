@@ -1,4 +1,5 @@
 import logging
+import random
 import uuid
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 from django.core.exceptions import ValidationError
@@ -81,6 +82,9 @@ class Member(AbstractBaseUser):
     )
     phone = models.CharField(max_length=20, unique=True, null=True, blank=True, default=None)
     email = models.EmailField(unique=True, null=True, blank=True, default=None)
+    # 5-digit, never starts with 0, unique, immutable once assigned (see save()).
+    # Lets members/admins identify someone quickly without exposing the UUID pk.
+    member_number = models.PositiveIntegerField(unique=True, null=True, blank=True, editable=False)
     # password field provided by AbstractBaseUser (set via set_password())
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
@@ -106,6 +110,19 @@ class Member(AbstractBaseUser):
     def clean(self):
         if not self.phone and not self.email:
             raise ValidationError('At least one of phone or email must be provided.')
+
+    def save(self, *args, **kwargs):
+        if self.member_number is None:
+            self.member_number = self._generate_member_number()
+        super().save(*args, **kwargs)
+
+    @staticmethod
+    def _generate_member_number():
+        for _ in range(20):
+            candidate = random.randint(10000, 99999)
+            if not Member.objects.filter(member_number=candidate).exists():
+                return candidate
+        raise RuntimeError('Could not generate a unique member number.')
 
     def has_perm(self, perm, obj=None):
         return self.is_superuser

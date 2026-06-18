@@ -141,6 +141,7 @@ export default function AdminMembersPage() {
   const columns: AdminTableColumn<MemberListItem>[] = [
     { key: 'full_name', header: isRTL ? 'نام کامل' : 'Full Name', render: (m) => <span className="text-white/80">{m.full_name}</span> },
     { key: 'display_name', header: isRTL ? 'نام نمایشی' : 'Display Name', render: (m) => <span className="text-white/60">{m.display_name}</span> },
+    { key: 'member_number', header: isRTL ? 'شناسه' : 'ID', render: (m) => <span className="text-white/40 text-xs font-mono">#{m.member_number}</span> },
     { key: 'group', header: isRTL ? 'گروه' : 'Group', render: (m) => <span className="text-white/60">{m.group_name || '—'}</span> },
     { key: 'status', header: isRTL ? 'وضعیت' : 'Status', render: (m) => <AdminBadge status={m.is_active ? 'active' : 'inactive'} /> },
     {
@@ -185,7 +186,7 @@ export default function AdminMembersPage() {
         <form onSubmit={submitSearch} className="lg:col-span-2 flex gap-2">
           <div className="flex-1">
             <AdminInput
-              placeholder={isRTL ? 'جستجو بر اساس نام...' : 'Search by name...'}
+              placeholder={isRTL ? 'جستجو بر اساس نام یا شناسه...' : 'Search by name or ID...'}
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
             />
