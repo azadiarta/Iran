@@ -291,6 +291,10 @@ class CommentGlobalListView(APIView):
             model = Post if target_type == 'post' else Expense
             qs = qs.filter(content_type=ContentType.objects.get_for_model(model))
 
+        author_id = request.query_params.get('author')
+        if author_id:
+            qs = qs.filter(author_id=author_id)
+
         search = request.query_params.get('search')
         if search:
             qs = qs.filter(

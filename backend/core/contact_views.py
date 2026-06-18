@@ -61,6 +61,10 @@ class ContactMessageListView(APIView):
         if is_handled is not None:
             qs = qs.filter(is_handled=is_handled.lower() in ('true', '1'))
 
+        sender_id = request.query_params.get('sender')
+        if sender_id:
+            qs = qs.filter(sender_id=sender_id)
+
         search = request.query_params.get('search')
         if search:
             qs = qs.filter(

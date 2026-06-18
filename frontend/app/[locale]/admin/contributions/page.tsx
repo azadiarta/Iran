@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Check, X, Trash2, Plus, Eye, Pencil } from 'lucide-react';
 import AdminTable, { AdminTableColumn } from '@/components/admin/AdminTable';
 import AdminBadge from '@/components/admin/AdminBadge';
@@ -35,6 +35,8 @@ type ConfirmAction = { type: 'approve' | 'reject' | 'delete'; contribution: Cont
 
 export default function AdminContributionsPage() {
   const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const locale = (params?.locale as 'en' | 'fa') || 'en';
   const isRTL = locale === 'fa';
   const { hasPermission, member: currentMember } = useAuthStore();
@@ -52,6 +54,8 @@ export default function AdminContributionsPage() {
   const pageSize = 5;
   const [statusFilter, setStatusFilter] = useState('');
   const [methodFilter, setMethodFilter] = useState('');
+  const [memberFilterId, setMemberFilterId] = useState(searchParams.get('member') || '');
+  const [memberFilterName, setMemberFilterName] = useState(searchParams.get('name') || '');
 
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -92,9 +96,10 @@ export default function AdminContributionsPage() {
 
   function load() {
     setLoading(true);
-    const filters: { status?: string; payment_method?: string } = {};
+    const filters: { status?: string; payment_method?: string; contributor?: string } = {};
     if (statusFilter) filters.status = statusFilter;
     if (methodFilter) filters.payment_method = methodFilter;
+    if (memberFilterId) filters.contributor = memberFilterId;
     fundAPI
       .getContributions(page, filters)
       .then((res) => {
@@ -111,7 +116,14 @@ export default function AdminContributionsPage() {
     if (canView) load();
     else setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canView, page, statusFilter, methodFilter]);
+  }, [canView, page, statusFilter, methodFilter, memberFilterId]);
+
+  function clearMemberFilter() {
+    setMemberFilterId('');
+    setMemberFilterName('');
+    setPage(1);
+    router.replace(`/${locale}/admin/contributions`);
+  }
 
   async function runAction() {
     if (!confirmAction) return;
@@ -406,6 +418,17 @@ export default function AdminContributionsPage() {
           </button>
         )}
       </div>
+
+      {memberFilterId && (
+        <div className="admin-glass-card p-3 flex items-center justify-between gap-3" style={{ border: '1px solid rgba(0,255,255,0.25)' }}>
+          <span className="text-sm text-white/70">
+            {isRTL ? `نمایش مشارکت‌های عضو: ${memberFilterName || memberFilterId}` : `Showing contributions for member: ${memberFilterName || memberFilterId}`}
+          </span>
+          <button onClick={clearMemberFilter} className="text-xs font-medium underline" style={{ color: '#00ffff' }}>
+            {isRTL ? 'پاک‌کردن فیلتر' : 'Clear filter'}
+          </button>
+        </div>
+      )}
 
       <div className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <AdminSelect

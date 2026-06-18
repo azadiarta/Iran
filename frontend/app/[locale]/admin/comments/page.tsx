@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Check, X, Trash2, Eye, Pencil, Star } from 'lucide-react';
 import AdminTable, { AdminTableColumn } from '@/components/admin/AdminTable';
 import AdminBadge from '@/components/admin/AdminBadge';
@@ -33,6 +33,8 @@ type TargetFilter = '' | 'post' | 'expense';
 
 export default function AdminCommentsPage() {
   const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const locale = (params?.locale as 'en' | 'fa') || 'en';
   const isRTL = locale === 'fa';
   const { hasPermission, member: currentMember } = useAuthStore();
@@ -53,6 +55,8 @@ export default function AdminCommentsPage() {
   const [statusFilter, setStatusFilter] = useState<'' | CommentStatus>('');
   const [targetFilter, setTargetFilter] = useState<TargetFilter>('');
   const [appliedSearch, setAppliedSearch] = useState('');
+  const [memberFilterId, setMemberFilterId] = useState(searchParams.get('member') || '');
+  const [memberFilterName, setMemberFilterName] = useState(searchParams.get('name') || '');
 
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -81,6 +85,7 @@ export default function AdminCommentsPage() {
         search: appliedSearch || undefined,
         status: statusFilter || undefined,
         target_type: targetFilter || undefined,
+        author: memberFilterId || undefined,
       })
       .then((res) => {
         const data = res.data as unknown as Paginated<Comment>;
@@ -96,12 +101,19 @@ export default function AdminCommentsPage() {
     if (canManage) load();
     else setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canManage, page, appliedSearch, statusFilter, targetFilter]);
+  }, [canManage, page, appliedSearch, statusFilter, targetFilter, memberFilterId]);
 
   function applySearch(e: React.FormEvent) {
     e.preventDefault();
     setPage(1);
     setAppliedSearch(searchInput.trim());
+  }
+
+  function clearMemberFilter() {
+    setMemberFilterId('');
+    setMemberFilterName('');
+    setPage(1);
+    router.replace(`/${locale}/admin/comments`);
   }
 
   async function runAction() {
@@ -339,6 +351,17 @@ export default function AdminCommentsPage() {
         <h1 className="text-2xl font-bold text-white">{isRTL ? 'نظرات' : 'Comments'}</h1>
         <p className="text-sm text-white/40 mt-1">{isRTL ? 'بررسی، ویرایش و تأیید نظرات کاربران' : 'Review, edit, and moderate user comments'}</p>
       </div>
+
+      {memberFilterId && (
+        <div className="admin-glass-card p-3 flex items-center justify-between gap-3" style={{ border: '1px solid rgba(0,255,255,0.25)' }}>
+          <span className="text-sm text-white/70">
+            {isRTL ? `نمایش نظرات عضو: ${memberFilterName || memberFilterId}` : `Showing comments for member: ${memberFilterName || memberFilterId}`}
+          </span>
+          <button onClick={clearMemberFilter} className="text-xs font-medium underline" style={{ color: '#00ffff' }}>
+            {isRTL ? 'پاک‌کردن فیلتر' : 'Clear filter'}
+          </button>
+        </div>
+      )}
 
       <form onSubmit={applySearch} className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
         <AdminInput label={isRTL ? 'جست‌وجو' : 'Search'} value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
