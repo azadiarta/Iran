@@ -6,6 +6,7 @@ from django.db.models import Q
 from django.utils.html import mark_safe
 from django.utils.translation import gettext_lazy as _
 
+from core.log_utils import actor_display_for, target_display_for
 from core.models import ContactMessage, DefaultSetting, Permission
 from logs.models import ActivityLog
 
@@ -84,11 +85,11 @@ class DefaultSettingAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
         ActivityLog.objects.create(
             actor=request.user,
-            actor_display=str(request.user),
+            actor_display=actor_display_for(request.user),
             action='setting_updated_via_admin',
             target_type=ContentType.objects.get_for_model(obj),
             target_id=obj.pk,
-            target_display=str(obj),
+            target_display=target_display_for(obj),
             ip_address=_get_ip(request),
             extra_data={'key': obj.key, 'value': obj.value},
         )
@@ -96,13 +97,13 @@ class DefaultSettingAdmin(admin.ModelAdmin):
 
 @admin.register(ContactMessage)
 class ContactMessageAdmin(admin.ModelAdmin):
-    list_display = ['name', 'contact_info', 'is_handled', 'handled_by', 'created_at']
+    list_display = ['tracking_code', 'name', 'contact_info', 'is_handled', 'handled_by', 'created_at']
     list_filter = ['is_handled']
-    search_fields = ['name', 'contact_info', 'message']
-    readonly_fields = ['id', 'sender', 'handled_by', 'handled_at', 'created_at']
+    search_fields = ['name', 'contact_info', 'message', 'tracking_code']
+    readonly_fields = ['id', 'tracking_code', 'sender', 'handled_by', 'handled_at', 'created_at']
 
     fieldsets = [
         (None,      {'fields': ['name', 'contact_info', 'message', 'sender']}),
         (_('Status'), {'fields': ['is_handled', 'handled_by', 'handled_at']}),
-        (_('Meta'), {'fields': ['id', 'created_at'], 'classes': ['collapse']}),
+        (_('Meta'), {'fields': ['id', 'tracking_code', 'created_at'], 'classes': ['collapse']}),
     ]

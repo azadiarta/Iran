@@ -42,10 +42,11 @@ def on_expense_delete(sender, instance, **kwargs):
 
 @receiver(pre_delete, sender='accounts.Member')
 def on_member_delete(sender, instance, **kwargs):
+    from core.log_utils import target_display_for
     from logs.models import ActivityLog
     ActivityLog.objects.create(
         actor=None,
         actor_display='system',
         action='deleted_member',
-        target_display=str(instance),
+        target_display=target_display_for(instance),
     )

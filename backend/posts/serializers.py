@@ -121,7 +121,7 @@ class CommentAdminDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = [
-            'id', 'author', 'author_label', 'guest_name', 'text', 'rating',
+            'id', 'tracking_code', 'author', 'author_label', 'guest_name', 'text', 'rating',
             'status', 'rejection_reason', 'target_type', 'target_label',
             'created_at', 'updated_at',
         ]

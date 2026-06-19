@@ -7,6 +7,7 @@ from django.db.models import Sum
 from django.utils.html import mark_safe
 from django.utils.translation import gettext_lazy as _
 
+from core.log_utils import actor_display_for, target_display_for
 from core.models import DefaultSetting
 from fund.models import Contribution, Expense
 from logs.models import ActivityLog
@@ -33,10 +34,10 @@ def _fund_balance_str():
 
 @admin.register(Contribution)
 class ContributionAdmin(admin.ModelAdmin):
-    list_display = ['contributor_display', 'amount', 'currency', 'payment_method', 'status', 'created_at']
+    list_display = ['tracking_code', 'contributor_display', 'amount', 'currency', 'payment_method', 'status', 'created_at']
     list_filter = ['status', 'payment_method', 'created_at']
-    search_fields = ['guest_name', 'notes']
-    readonly_fields = ['id', 'created_at', 'updated_at', 'receipt_preview']
+    search_fields = ['guest_name', 'notes', 'tracking_code']
+    readonly_fields = ['id', 'tracking_code', 'created_at', 'updated_at', 'receipt_preview']
     date_hierarchy = 'created_at'
     actions = ['approve_contributions', 'reject_contributions']
     change_list_template = 'admin/fund/contribution/change_list.html'
@@ -45,7 +46,7 @@ class ContributionAdmin(admin.ModelAdmin):
         (_('Contributor'),   {'fields': ['contributor', 'guest_name']}),
         (_('Payment'),       {'fields': ['amount', 'currency', 'payment_method', 'status', 'notes']}),
         (_('Receipt'),       {'fields': ['receipt_image', 'receipt_preview']}),
-        (_('Meta'),          {'fields': ['id', 'created_at', 'updated_at'], 'classes': ['collapse']}),
+        (_('Meta'),          {'fields': ['id', 'tracking_code', 'created_at', 'updated_at'], 'classes': ['collapse']}),
     ]
 
     def contributor_display(self, obj):
@@ -69,11 +70,11 @@ class ContributionAdmin(admin.ModelAdmin):
         for obj in queryset:
             ActivityLog.objects.create(
                 actor=request.user,
-                actor_display=str(request.user),
+                actor_display=actor_display_for(request.user),
                 action='contribution_approved_via_admin',
                 target_type=ContentType.objects.get_for_model(obj),
                 target_id=obj.pk,
-                target_display=str(obj),
+                target_display=target_display_for(obj),
                 ip_address=_get_ip(request),
             )
         self.message_user(request, f'{updated} contribution(s) approved.')
@@ -84,11 +85,11 @@ class ContributionAdmin(admin.ModelAdmin):
         for obj in queryset:
             ActivityLog.objects.create(
                 actor=request.user,
-                actor_display=str(request.user),
+                actor_display=actor_display_for(request.user),
                 action='contribution_rejected_via_admin',
                 target_type=ContentType.objects.get_for_model(obj),
                 target_id=obj.pk,
-                target_display=str(obj),
+                target_display=target_display_for(obj),
                 ip_address=_get_ip(request),
             )
         self.message_user(request, f'{updated} contribution(s) rejected.')

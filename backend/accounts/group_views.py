@@ -9,6 +9,7 @@ from accounts.serializers import (
     AccessGroupSerializer,
     AccessGroupUpdateSerializer,
 )
+from core.log_utils import actor_display_for, target_display_for
 from core.models import DefaultSetting
 from core.utils import api_error, api_success
 from logs.models import ActivityLog
@@ -17,18 +18,16 @@ from logs.models import ActivityLog
 def _log(actor, action, target=None, extra_data=None, ip=None):
     target_type = None
     target_id = None
-    target_display = ''
     if target:
         target_type = ContentType.objects.get_for_model(target)
         target_id = target.pk
-        target_display = str(target)
     ActivityLog.objects.create(
         actor=actor,
-        actor_display=str(actor),
+        actor_display=actor_display_for(actor),
         action=action,
         target_type=target_type,
         target_id=target_id,
-        target_display=target_display,
+        target_display=target_display_for(target),
         ip_address=ip,
         extra_data=extra_data,
     )

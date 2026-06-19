@@ -1,6 +1,8 @@
 import uuid
 from django.db import models
 
+from core.tracking_codes import generate_tracking_code
+
 
 # Default seed codenames: can_contribute (ON), can_comment (ON), can_post,
 # can_expense, can_manage_permissions, can_approve_comments,
@@ -69,6 +71,10 @@ class DefaultSetting(models.Model):
 
 class ContactMessage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    # System-assigned lookup code (never user-supplied), admin-panel-only —
+    # see save()/core/tracking_codes.py. Format matches Comment and
+    # Contribution's tracking_code (letter 'M' for Message).
+    tracking_code = models.CharField(max_length=20, unique=True, editable=False, blank=True)
     name = models.CharField(max_length=100)
     contact_info = models.CharField(max_length=150)
     message = models.TextField()
@@ -86,6 +92,12 @@ class ContactMessage(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        if not self.tracking_code:
+            member_number = self.sender.member_number if self.sender_id else None
+            self.tracking_code = generate_tracking_code(ContactMessage, 'M', member_number)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f'{self.name} — {self.created_at:%Y-%m-%d}'

@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 
 from accounts.models import AccessGroup, Member
 from accounts.permissions import IsSuperuser
+from core.log_utils import actor_display_for
 from core.models import DefaultSetting
 from core.serializers import DefaultSettingSerializer
 from core.utils import api_error, api_success
@@ -97,7 +98,7 @@ class DefaultSettingUpdateView(APIView):
 
         ActivityLog.objects.create(
             actor=request.user,
-            actor_display=str(request.user),
+            actor_display=actor_display_for(request.user),
             action='setting_updated',
             ip_address=_get_ip(request),
             extra_data={'key': key, 'old_value': old_value, 'new_value': new_value},
