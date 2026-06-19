@@ -168,6 +168,7 @@ export default function MyCommentsPage() {
                       <div className="flex flex-col gap-1">
                         <span className="text-xs text-white/40">{targetLabel(c)}</span>
                         <span className="text-xs text-white/40">{formatDate(c.created_at)}</span>
+                        <span className="text-xs text-white/30 font-mono">{t('tracking_code_label')}: {c.tracking_code}</span>
                       </div>
                       <span
                         className="px-2.5 py-1 rounded-full text-xs font-semibold border flex-shrink-0"

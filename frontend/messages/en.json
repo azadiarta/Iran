@@ -228,6 +228,7 @@
     "status_approved": "Approved",
     "status_rejected": "Rejected",
     "back_to_profile": "Back to profile",
+    "tracking_code_label": "Tracking code",
     "my_comments_title": "My Comments",
     "my_comments_empty": "You haven't posted any comments yet.",
     "my_comments_rejection_reason": "Reason",

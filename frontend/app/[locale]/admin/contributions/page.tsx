@@ -648,8 +648,9 @@ export default function AdminContributionsPage() {
               </div>
             )}
 
-            {/* Approve / Reject actions */}
-            {canManage && (detailItem.status === 'pending' || detailItem.status === 'pending_review') && (
+            {/* Status can always be changed here, even after a prior approve/reject —
+                an admin may have clicked the wrong action and needs to correct it. */}
+            {canManage && (
               <div className="flex flex-col gap-3 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                 {rejecting ? (
                   <>
@@ -684,7 +685,7 @@ export default function AdminContributionsPage() {
                     <button
                       type="button"
                       onClick={approve}
-                      disabled={statusActionLoading}
+                      disabled={statusActionLoading || detailItem.status === 'completed'}
                       className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
                       style={{ border: '1px solid rgba(16,185,129,0.35)', color: '#10b981', backgroundColor: 'rgba(16,185,129,0.06)' }}
                     >
@@ -694,7 +695,7 @@ export default function AdminContributionsPage() {
                     <button
                       type="button"
                       onClick={() => setRejecting(true)}
-                      disabled={statusActionLoading}
+                      disabled={statusActionLoading || detailItem.status === 'failed'}
                       className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
                       style={{ border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.06)' }}
                     >
