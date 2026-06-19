@@ -228,6 +228,7 @@
     "status_approved": "تأیید شده",
     "status_rejected": "رد شده",
     "back_to_profile": "بازگشت به پروفایل",
+    "tracking_code_label": "کد پیگیری",
     "my_comments_title": "نظرات من",
     "my_comments_empty": "هنوز هیچ نظری ثبت نکرده‌اید.",
     "my_comments_rejection_reason": "دلیل",

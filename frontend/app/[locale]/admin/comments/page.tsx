@@ -359,62 +359,62 @@ export default function AdminCommentsPage() {
               </div>
             )}
 
-            {detailItem.status === 'pending' && (
-              <div className="flex flex-col gap-3 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                {rejecting ? (
-                  <>
-                    <AdminTextarea
-                      label={isRTL ? 'دلیل رد (اختیاری)' : 'Rejection reason (optional)'}
-                      value={rejectReason}
-                      onChange={(e) => setRejectReason(e.target.value)}
-                      rows={2}
-                    />
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={confirmReject}
-                        disabled={statusActionLoading}
-                        className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
-                        style={{ border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.06)' }}
-                      >
-                        <X className="w-4 h-4" />
-                        {isRTL ? 'تأیید رد' : 'Confirm Reject'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setRejecting(false); setRejectReason(''); }}
-                        className="rounded-xl px-5 py-2.5 text-sm font-medium text-white/60 hover:text-white/90 transition-colors"
-                      >
-                        {isRTL ? 'انصراف' : 'Cancel'}
-                      </button>
-                    </div>
-                  </>
-                ) : (
+            {/* Status can always be changed here, even after a prior approve/reject —
+                an admin may have clicked the wrong action and needs to correct it. */}
+            <div className="flex flex-col gap-3 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              {rejecting ? (
+                <>
+                  <AdminTextarea
+                    label={isRTL ? 'دلیل رد (اختیاری)' : 'Rejection reason (optional)'}
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    rows={2}
+                  />
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
-                      onClick={approve}
-                      disabled={statusActionLoading}
-                      className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
-                      style={{ border: '1px solid rgba(16,185,129,0.35)', color: '#10b981', backgroundColor: 'rgba(16,185,129,0.06)' }}
-                    >
-                      <Check className="w-4 h-4" />
-                      {isRTL ? 'تأیید' : 'Approve'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRejecting(true)}
+                      onClick={confirmReject}
                       disabled={statusActionLoading}
                       className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
                       style={{ border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.06)' }}
                     >
                       <X className="w-4 h-4" />
-                      {isRTL ? 'رد' : 'Reject'}
+                      {isRTL ? 'تأیید رد' : 'Confirm Reject'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setRejecting(false); setRejectReason(''); }}
+                      className="rounded-xl px-5 py-2.5 text-sm font-medium text-white/60 hover:text-white/90 transition-colors"
+                    >
+                      {isRTL ? 'انصراف' : 'Cancel'}
                     </button>
                   </div>
-                )}
-              </div>
-            )}
+                </>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={approve}
+                    disabled={statusActionLoading || detailItem.status === 'approved'}
+                    className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
+                    style={{ border: '1px solid rgba(16,185,129,0.35)', color: '#10b981', backgroundColor: 'rgba(16,185,129,0.06)' }}
+                  >
+                    <Check className="w-4 h-4" />
+                    {isRTL ? 'تأیید' : 'Approve'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRejecting(true)}
+                    disabled={statusActionLoading || detailItem.status === 'rejected'}
+                    className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
+                    style={{ border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.06)' }}
+                  >
+                    <X className="w-4 h-4" />
+                    {isRTL ? 'رد' : 'Reject'}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </AdminModal>

@@ -280,6 +280,7 @@ export interface CommentDetail extends Comment {
 
 export interface MyComment {
   id: string;
+  tracking_code: string;
   text: string;
   rating: number | null;
   status: CommentStatus;

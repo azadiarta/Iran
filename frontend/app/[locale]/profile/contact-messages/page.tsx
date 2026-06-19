@@ -118,6 +118,7 @@ export default function MyContactMessagesPage() {
                       <div className="flex flex-col gap-1">
                         <span className="text-xs text-white/40">{m.contact_info}</span>
                         <span className="text-xs text-white/40">{formatDate(m.created_at)}</span>
+                        <span className="text-xs text-white/30 font-mono">{t('tracking_code_label')}: {m.tracking_code}</span>
                       </div>
                       <span
                         className="px-2.5 py-1 rounded-full text-xs font-semibold border flex-shrink-0"

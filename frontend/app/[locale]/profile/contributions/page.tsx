@@ -152,6 +152,7 @@ export default function MyContributionsPage() {
                           {formatContribAmount(c.amount, c.currency)}
                         </span>
                         <span className="text-xs text-white/40">{formatContribDate(c.created_at)}</span>
+                        <span className="text-xs text-white/30 font-mono">{t('tracking_code_label')}: {c.tracking_code}</span>
                       </div>
                       <span
                         className="px-2.5 py-1 rounded-full text-xs font-semibold border flex-shrink-0"
