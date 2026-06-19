@@ -184,6 +184,7 @@ export default function MyCommentsPage() {
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
                           rows={3}
+                          maxLength={250}
                           className={inputClass}
                         />
                         <div>

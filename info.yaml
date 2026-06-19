@@ -73,7 +73,7 @@ forms:
             - frontend/lib/api.ts
             - backend/accounts/views.py
             - backend/accounts/serializers.py
-          notes: "Fields: full_name, display_name, phone, email, password, confirm_password. Calls authAPI.register -> POST /api/auth/register/ (RegisterView + RegisterSerializer). Client: full_name required, phone-or-email required, password min 6 chars, password===confirm_password. Server re-validates phone-or-email in RegisterSerializer.validate()."
+          notes: "Fields: full_name, display_name, phone, email, password, confirm_password. Calls authAPI.register -> POST /api/auth/register/ (RegisterView + RegisterSerializer). Client: full_name required (max 35), display_name optional (max 20), phone-or-email required (phone must match strict '00<countrycode><number>' format via frontend/lib/validation.ts isValidPhoneStrict; email format-checked), password min 8 chars, password===confirm_password. Server re-validates via backend/core/validators.py (validate_phone_format, validate_email_format, sanitize_and_limit) in RegisterSerializer.validate_full_name/validate_display_name/validate_phone and validate()."
         - id: form_profile_edit
           label: Own profile edit form
           scope: frontend
@@ -265,7 +265,7 @@ forms:
             - backend/core/settings_views.py
             - backend/core/models.py
           notes: "Same per-field Save pattern as admin/payments. Includes the contact_phone DefaultSetting (org's public phone number — NOT the Member.phone field; see contact_data_fields category for the distinction)."
-  notes_general: "Quality-test relevant: every form's submit handler is in the listed frontend page.tsx file; every corresponding backend handler is the View class + Serializer class listed in location. There is no shared/reusable form-validation utility file in the frontend — each form implements its own manual checks inline (see validation_logic category)."
+  notes_general: "Quality-test relevant: every form's submit handler is in the listed frontend page.tsx file; every corresponding backend handler is the View class + Serializer class listed in location. frontend/lib/validation.ts provides shared client-side validation/format helpers (phone, email, length limits) used by these forms — see validation_logic category."
 
 action_buttons:
   scope: frontend
@@ -1706,9 +1706,33 @@ auth_permission_checks:
 
 validation_logic:
   scope: both
-  total_count: 6
-  description: Client-side and server-side validation, documented separately since no shared validation utility exists between the two stacks.
+  total_count: 7
+  description: >
+    Client-side and server-side validation. Both stacks now have a shared, canonical
+    validation/sanitization module (added during the input-validation-security hardening
+    pass): backend/core/validators.py (server) and frontend/lib/validation.ts (client),
+    mirroring the same rules — phone must be strict "00<countrycode><number>" format
+    (PHONE_REGEX = ^00\d{6,15}$), email format check, combined phone-or-email check,
+    SHORT_TEXT_MAX_LENGTH=150 (single-line inputs), LONG_TEXT_PUBLIC_MAX_LENGTH=250
+    (public-site textareas), LONG_TEXT_ADMIN_MAX_LENGTH=550 (admin-panel textareas/long
+    fields). Every user-submitted text field across both the public site and the admin
+    panel is now capped and sanitized (HTML-stripped) on the backend via
+    sanitize_and_limit()/validate_max_length(), in addition to a matching maxLength prop
+    and pre-submit check on the frontend — so no input can rely on only one layer.
   subcategories:
+    shared_validation_modules:
+      count: 2
+      items:
+        - id: validate_shared_backend
+          label: "backend/core/validators.py — canonical server-side validation module"
+          scope: backend
+          location: [backend/core/validators.py]
+          notes: "Exports PHONE_REGEX, LENIENT_PHONE_REGEX, SHORT_TEXT_MAX_LENGTH, LONG_TEXT_PUBLIC_MAX_LENGTH, LONG_TEXT_ADMIN_MAX_LENGTH, ALLOWED_IMAGE_FORMATS, and functions validate_phone_format, validate_phone_lenient, validate_email_format, validate_phone_or_email, sanitize_text (strip_tags+strip), validate_max_length, sanitize_and_limit (combo), validate_image_content (Pillow-based real content/format verification, rejects SVG and mislabeled files), validate_pdf_content (magic-byte check), validate_image_file, validate_receipt_file. Used by accounts/core/posts/fund/payments serializers and views instead of ad-hoc inline strip_tags()/length checks."
+        - id: validate_shared_frontend
+          label: "frontend/lib/validation.ts — canonical client-side validation module"
+          scope: frontend
+          location: ["frontend/lib/validation.ts"]
+          notes: "Exports SHORT_TEXT_MAX_LENGTH=150, LONG_TEXT_PUBLIC_MAX_LENGTH=250, LONG_TEXT_ADMIN_MAX_LENGTH=550, PHONE_PLACEHOLDER='00447700900000', isValidPhoneStrict, isValidPhoneLenient, isValidEmail, isValidPhoneOrEmail, phoneHint/phoneFormatError/phoneOrEmailFormatError/maxLengthError (bilingual message helpers). Used by register, login, profile, contact, contribute pages and all admin/* pages (which use the bilingual helpers directly since admin pages use the inline isRTL pattern rather than next-intl)."
     backend_serializer_validators:
       count: 5
       items:
@@ -1716,35 +1740,35 @@ validation_logic:
           label: accounts/serializers.py validators
           scope: backend
           location: [backend/accounts/serializers.py]
-          notes: "validate_email, validate_phone, validate() in RegisterSerializer and MemberUpdateSerializer (phone-or-email + uniqueness); validate() in ChangePasswordSerializer (new/confirm match)."
+          notes: "RegisterSerializer: validate_full_name (sanitize_and_limit 35), validate_display_name (sanitize_and_limit 20), validate_phone (validate_phone_format — strict '00' prefix), validate() for phone-or-email + uniqueness. MemberUpdateSerializer: same full_name/display_name checks, validate_phone only enforces strict format when the new value differs from the existing instance value (changed-value-only). LoginSerializer.credential now has max_length=254 and validate_credential calls validate_phone_or_email. ChangePasswordSerializer.validate() (new/confirm match, min_length=8). AccessGroupCreateSerializer/AccessGroupUpdateSerializer: validate_name (20), validate_description (350)."
         - id: validate_core
           label: core/serializers.py validators
           scope: backend
           location: [backend/core/serializers.py]
-          notes: "validate_name, validate_contact_info, validate_message in ContactMessageCreateSerializer."
+          notes: "ContactMessageCreateSerializer.validate_name/validate_contact_info/validate_message use sanitize_and_limit (100/150/250). DefaultSettingSerializer.validate_value uses sanitize_and_limit(value, LONG_TEXT_ADMIN_MAX_LENGTH=550)."
         - id: validate_fund
           label: fund/serializers.py validators
           scope: backend
           location: [backend/fund/serializers.py]
-          notes: "validate_amount (multiple serializers, always amount>0), validate_message, validate_public_display_name, validate_guest_name, validate_status, validate_receipt_image, plus object-level validate() in ContributionCreateSerializer."
+          notes: "validate_amount (multiple serializers, always amount>0); validate_message/validate_public_display_name/validate_guest_name/validate_notes all use sanitize_and_limit with form-appropriate caps (e.g. guest_name 50, public notes 250, admin notes 550); validate_status; validate_receipt_image delegates to core.validators.validate_image_file (content-verified, not extension-only); validate_short_reason/validate_description on ExpenseCreateSerializer; plus object-level validate() in ContributionCreateSerializer."
         - id: validate_posts
           label: posts/serializers.py validators
           scope: backend
           location: [backend/posts/serializers.py]
-          notes: "validate() + validate_rating in CommentCreateSerializer (rating must be 1-5 or null, guest_name required if unauthenticated); validate_rating repeated in CommentAdminEditSerializer/CommentOwnerEditSerializer; validate_status in CommentStatusSerializer."
+          notes: "validate() + validate_rating in CommentCreateSerializer (rating must be 1-5 or null, guest_name required if unauthenticated, validate_guest_name 50, validate_text 250); validate_rating repeated in CommentAdminEditSerializer (validate_text/validate_rejection_reason 550)/CommentOwnerEditSerializer (validate_text 250); validate_status in CommentStatusSerializer; PostCreateSerializer/PostUpdateSerializer validate_title (150)/validate_body (550)."
         - id: validate_payments
           label: payments/serializers.py validators
           scope: backend
           location: [backend/payments/serializers.py]
-          notes: "validate_amount, validate_message, validate_public_display_name, validate() in PaymentInitiateSerializer (mirrors fund's ContributionCreateSerializer checks); validate_receipt_image in ReceiptUploadSerializer (file type/size)."
+          notes: "validate_amount, validate_message/validate_public_display_name (sanitize_and_limit 150/100), validate_guest_name (50), notes field capped at LONG_TEXT_PUBLIC_MAX_LENGTH with validate_notes (250), validate() in PaymentInitiateSerializer (mirrors fund's ContributionCreateSerializer checks); validate_receipt_image in ReceiptUploadSerializer delegates to core.validators.validate_receipt_file (content-verified file type, not extension-only)."
     frontend_manual_validation:
       count: 1
       items:
         - id: validate_frontend_pattern
-          label: Per-component manual validation (no shared utility)
+          label: Per-component validation, built on the shared frontend/lib/validation.ts helpers
           scope: frontend
-          location: ["UNKNOWN — pervasive, see notes"]
-          notes: "Every form in the forms category implements its own validation inline in its page.tsx/component file (presence checks, regex for amounts, password-match checks, toast-based error display via toastStore). There is no shared validators.ts, no Yup/Zod schema, no React Hook Form resolver anywhere in the frontend. To add a new validation rule consistently, each relevant form file must be edited individually."
+          location: ["frontend/lib/validation.ts", "UNKNOWN — consumers pervasive, see notes"]
+          notes: "Every form in the forms category still calls its own validation from its page.tsx/component file (presence checks, regex for amounts, password-match checks, toast-based error display via toastStore), but phone/email/length checks now route through the shared frontend/lib/validation.ts helpers rather than ad-hoc per-file regexes. All single-line text inputs carry maxLength={150} (or a tighter field-specific cap, e.g. full_name 35, display_name 20), public-site textareas maxLength={250}, admin-panel textareas maxLength={550} — enforced via the native HTML maxLength attribute AND re-checked by the backend serializer, so neither layer can be bypassed alone. There is still no Yup/Zod schema or React Hook Form resolver anywhere in the frontend — validation.ts is a plain function-based utility, not a schema library."
 
 file_upload_handlers:
   scope: both
@@ -1757,18 +1781,18 @@ file_upload_handlers:
         - id: upload_post_images_backend
           label: "Backend: PostImageUploadView / PostImageDeleteView"
           scope: backend
-          location: [backend/posts/views.py, backend/posts/serializers.py, backend/posts/models.py]
-          notes: "Multipart upload to PostImage.image (upload_to='posts/'). MultiPartParser globally enabled via REST_FRAMEWORK DEFAULT_PARSER_CLASSES."
+          location: [backend/posts/views.py, backend/posts/serializers.py, backend/posts/models.py, backend/core/validators.py]
+          notes: "Multipart upload to PostImage.image (upload_to='posts/'). MultiPartParser globally enabled via REST_FRAMEWORK DEFAULT_PARSER_CLASSES. PostCreateView and PostImageUploadView both validate uploaded images via core.validators.validate_image_file, which opens the file with Pillow and calls img.verify() against an allowlist of real image formats (JPEG/PNG) — rejects SVG and any file whose actual content doesn't match an allowed image format, regardless of extension or declared content-type, in addition to the existing size cap."
         - id: upload_receipt_self_service_backend
           label: "Backend: ReceiptUploadView (self-service contribution receipt)"
           scope: backend
-          location: [backend/payments/views.py, backend/payments/serializers.py, backend/fund/models.py]
-          notes: "Uploads to Contribution.receipt_image (upload_to='contribution_receipts/'). validate_receipt_image in ReceiptUploadSerializer checks file type/size."
+          location: [backend/payments/views.py, backend/payments/serializers.py, backend/fund/models.py, backend/core/validators.py]
+          notes: "Uploads to Contribution.receipt_image (upload_to='contribution_receipts/'). validate_receipt_image in ReceiptUploadSerializer delegates to core.validators.validate_receipt_file, which content-verifies the upload as either a real image (Pillow-verified) or a real PDF (checked via the %PDF- magic-byte signature, not just the .pdf extension) before accepting it, plus the size cap."
         - id: upload_expense_receipt_backend
           label: "Backend: ExpenseCreateView receipt field"
           scope: backend
-          location: [backend/fund/views.py, backend/fund/serializers.py, backend/fund/models.py]
-          notes: "Uploads to Expense.receipt_image (upload_to='receipts/'), optional field on ExpenseCreateSerializer."
+          location: [backend/fund/views.py, backend/fund/serializers.py, backend/fund/models.py, backend/core/validators.py]
+          notes: "Uploads to Expense.receipt_image (upload_to='receipts/'), optional field on ExpenseCreateSerializer; validate_receipt_image delegates to core.validators.validate_image_file (same content-based image verification as post images)."
         - id: upload_media_storage_config
           label: "Backend: media storage configuration (S3 vs local/ephemeral)"
           scope: backend

@@ -314,6 +314,7 @@ export default function ContributePage() {
             value={guestName}
             onChange={(e) => setGuestName(e.target.value)}
             placeholder={t('contribute.guest_name_placeholder')}
+            maxLength={50}
             className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-white/20 outline-none focus:border-[#00ffff] focus:ring-1 focus:ring-[#00ffff]/30 transition-all"
           />
         </div>

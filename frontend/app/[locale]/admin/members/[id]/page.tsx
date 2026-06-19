@@ -21,6 +21,7 @@ import {
   ContactMessage,
   ActivityLogEntry,
 } from '@/lib/api';
+import { isValidPhoneStrict, isValidEmail, phoneFormatError, PHONE_PLACEHOLDER, LONG_TEXT_ADMIN_MAX_LENGTH } from '@/lib/validation';
 
 export default function AdminMemberDetailPage() {
   const params = useParams();
@@ -49,6 +50,7 @@ export default function AdminMemberDetailPage() {
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [originalPhone, setOriginalPhone] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
 
   // Group change
@@ -83,6 +85,7 @@ export default function AdminMemberDetailPage() {
         setDisplayName(m.display_name);
         setEmail(m.email || '');
         setPhone(m.phone || '');
+        setOriginalPhone(m.phone || '');
         setComments(profile.comments);
         setContributions(profile.contributions);
         setContactMessages(profile.contact_messages);
@@ -114,10 +117,29 @@ export default function AdminMemberDetailPage() {
 
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
+    if (fullName.trim().length > 35) {
+      showToast('warning', isRTL ? 'نام کامل باید حداکثر ۳۵ نویسه باشد' : 'Full name must be 35 characters or fewer');
+      return;
+    }
+    if (displayName.trim().length > 20) {
+      showToast('warning', isRTL ? 'نام نمایشی باید حداکثر ۲۰ نویسه باشد' : 'Display name must be 20 characters or fewer');
+      return;
+    }
+    if (email.trim() && !isValidEmail(email)) {
+      showToast('warning', isRTL ? 'ایمیل وارد شده معتبر نیست' : 'Enter a valid email address');
+      return;
+    }
+    // Only enforce strict "00"-prefixed format if the phone is being changed,
+    // mirroring the backend (legacy numbers must not block unrelated edits).
+    if (phone.trim() && phone.trim() !== originalPhone && !isValidPhoneStrict(phone)) {
+      showToast('warning', phoneFormatError(isRTL));
+      return;
+    }
     setSavingProfile(true);
     try {
       const res = await membersAPI.updateProfile(id, { full_name: fullName, display_name: displayName, email, phone });
       setTarget(res.data as unknown as MemberDetail);
+      setOriginalPhone(phone.trim());
       showToast('success', isRTL ? 'پروفایل با موفقیت به‌روزرسانی شد' : 'Profile updated successfully');
     } catch {
       showToast('error', isRTL ? 'به‌روزرسانی پروفایل ناموفق بود' : 'Failed to update profile');
@@ -272,10 +294,16 @@ export default function AdminMemberDetailPage() {
         {/* Profile form */}
         <form onSubmit={saveProfile} className="admin-glass-card p-5 flex flex-col gap-4">
           <h2 className="text-sm font-semibold text-white/80">{isRTL ? 'ویرایش پروفایل' : 'Edit Profile'}</h2>
-          <AdminInput label={isRTL ? 'نام کامل' : 'Full Name'} value={fullName} onChange={(e) => setFullName(e.target.value)} />
-          <AdminInput label={isRTL ? 'نام نمایشی' : 'Display Name'} value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
-          <AdminInput label={isRTL ? 'ایمیل' : 'Email'} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <AdminInput label={isRTL ? 'تلفن' : 'Phone'} value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <AdminInput label={isRTL ? 'نام کامل' : 'Full Name'} value={fullName} onChange={(e) => setFullName(e.target.value)} maxLength={35} />
+          <AdminInput label={isRTL ? 'نام نمایشی' : 'Display Name'} value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={20} />
+          <AdminInput label={isRTL ? 'ایمیل' : 'Email'} type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} />
+          <AdminInput
+            label={isRTL ? 'تلفن' : 'Phone'}
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder={PHONE_PLACEHOLDER}
+            maxLength={17}
+          />
           <button
             type="submit"
             disabled={savingProfile}
@@ -565,6 +593,7 @@ export default function AdminMemberDetailPage() {
             value={deactivateReason}
             onChange={(e) => setDeactivateReason(e.target.value)}
             rows={3}
+            maxLength={LONG_TEXT_ADMIN_MAX_LENGTH}
           />
         )}
       </AdminConfirmDialog>

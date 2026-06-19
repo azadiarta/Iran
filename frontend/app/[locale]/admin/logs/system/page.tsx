@@ -127,7 +127,7 @@ export default function AdminSystemLogPage() {
             { value: 'critical', label: isRTL ? 'بحرانی' : 'Critical' },
           ]}
         />
-        <AdminInput label={isRTL ? 'منبع' : 'Source'} value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} />
+        <AdminInput label={isRTL ? 'منبع' : 'Source'} value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} maxLength={150} />
         <AdminInput label={isRTL ? 'از تاریخ' : 'Date From'} type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
         <AdminInput label={isRTL ? 'تا تاریخ' : 'Date To'} type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
         <button

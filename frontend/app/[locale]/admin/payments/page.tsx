@@ -10,6 +10,7 @@ import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
 import { settingsAPI, DefaultSettingItem } from '@/lib/api';
 import { PAYMENT_SETTINGS_META } from '@/lib/settingsMeta';
+import { isValidEmail } from '@/lib/validation';
 
 const MANUAL_FIELDS = [
   'payment_manual_bank_name',
@@ -56,9 +57,14 @@ export default function AdminPaymentsPage() {
   }
 
   async function save(key: string) {
+    const value = values[key] ?? '';
+    if (key === 'payment_paypal_email' && value && !isValidEmail(value)) {
+      showToast('warning', isRTL ? 'ایمیل وارد شده معتبر نیست' : 'Enter a valid email address');
+      return;
+    }
     setSavingKey(key);
     try {
-      await settingsAPI.update(key, values[key] ?? '');
+      await settingsAPI.update(key, value);
       showToast('success', isRTL ? 'تنظیمات ذخیره شد' : 'Setting saved');
     } catch {
       showToast('error', isRTL ? 'ذخیره تنظیمات ناموفق بود' : 'Failed to save setting');
@@ -92,9 +98,9 @@ export default function AdminPaymentsPage() {
         <div className="flex items-end gap-2">
           <div className="flex-1">
             {multiline ? (
-              <AdminTextarea label={label} value={value} onChange={(e) => set(key, e.target.value)} rows={2} />
+              <AdminTextarea label={label} value={value} onChange={(e) => set(key, e.target.value)} rows={2} maxLength={550} />
             ) : (
-              <AdminInput label={label} value={value} onChange={(e) => set(key, e.target.value)} />
+              <AdminInput label={label} value={value} onChange={(e) => set(key, e.target.value)} maxLength={550} />
             )}
           </div>
           <button

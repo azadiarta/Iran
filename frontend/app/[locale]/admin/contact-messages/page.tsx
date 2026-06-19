@@ -197,7 +197,7 @@ export default function AdminContactMessagesPage() {
       )}
 
       <form onSubmit={applySearch} className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-        <AdminInput label={isRTL ? 'جست‌وجو' : 'Search'} value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
+        <AdminInput label={isRTL ? 'جست‌وجو' : 'Search'} value={searchInput} onChange={(e) => setSearchInput(e.target.value)} maxLength={150} />
         <AdminSelect
           label={isRTL ? 'وضعیت' : 'Status'}
           value={handledFilter}

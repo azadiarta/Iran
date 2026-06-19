@@ -1,6 +1,11 @@
 from rest_framework import serializers
 
 from core.serializers import RelativeImageField
+from core.validators import (
+    LONG_TEXT_ADMIN_MAX_LENGTH,
+    LONG_TEXT_PUBLIC_MAX_LENGTH,
+    sanitize_and_limit,
+)
 from posts.models import Comment, Post, PostImage
 
 
@@ -34,6 +39,12 @@ class PostCreateSerializer(serializers.ModelSerializer):
         model = Post
         fields = ['title', 'body']
 
+    def validate_title(self, value):
+        return sanitize_and_limit(value, 150)
+
+    def validate_body(self, value):
+        return sanitize_and_limit(value, LONG_TEXT_ADMIN_MAX_LENGTH)
+
     def create(self, validated_data):
         validated_data['author'] = self.context['request'].user
         return super().create(validated_data)
@@ -47,6 +58,12 @@ class PostUpdateSerializer(serializers.ModelSerializer):
             'title': {'required': False},
             'body':  {'required': False},
         }
+
+    def validate_title(self, value):
+        return sanitize_and_limit(value, 150)
+
+    def validate_body(self, value):
+        return sanitize_and_limit(value, LONG_TEXT_ADMIN_MAX_LENGTH)
 
 
 # Admin-only — includes the raw id and member_number, which must never be
@@ -77,6 +94,12 @@ class CommentCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ['guest_name', 'text', 'rating']
+
+    def validate_guest_name(self, value):
+        return sanitize_and_limit(value, 50)
+
+    def validate_text(self, value):
+        return sanitize_and_limit(value, LONG_TEXT_PUBLIC_MAX_LENGTH)
 
     def validate(self, data):
         request = self.context.get('request')
@@ -148,6 +171,12 @@ class CommentAdminEditSerializer(serializers.ModelSerializer):
         model = Comment
         fields = ['text', 'rating', 'status', 'rejection_reason']
 
+    def validate_text(self, value):
+        return sanitize_and_limit(value, LONG_TEXT_ADMIN_MAX_LENGTH)
+
+    def validate_rejection_reason(self, value):
+        return sanitize_and_limit(value, LONG_TEXT_ADMIN_MAX_LENGTH) if value else value
+
     def validate_rating(self, value):
         if value is not None and not (1 <= value <= 5):
             raise serializers.ValidationError('Rating must be between 1 and 5.')
@@ -158,6 +187,9 @@ class CommentOwnerEditSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ['text', 'rating']
+
+    def validate_text(self, value):
+        return sanitize_and_limit(value, LONG_TEXT_PUBLIC_MAX_LENGTH)
 
     def validate_rating(self, value):
         if value is None or not (1 <= value <= 5):

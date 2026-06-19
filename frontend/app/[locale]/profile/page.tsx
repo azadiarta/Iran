@@ -7,6 +7,7 @@ import { User, Edit2, Save, X, Lock, Eye, EyeOff, CheckCircle, AlertTriangle, Ch
 import { membersAPI } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 import type { Member } from '@/store/authStore';
+import { isValidPhoneStrict, isValidEmail, phoneFormatError, maxLengthError, PHONE_PLACEHOLDER } from '@/lib/validation';
 
 function getInitials(fullName: string): string {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
@@ -105,6 +106,31 @@ export default function ProfilePage() {
 
   const handleEditSave = async () => {
     if (!member) return;
+    const isRTL = locale === 'fa';
+    const errs: Record<string, string> = {};
+    if (editData.full_name.trim().length > 35) {
+      errs.full_name = maxLengthError(isRTL, 35);
+    }
+    if (editData.display_name.trim().length > 20) {
+      errs.display_name = maxLengthError(isRTL, 20);
+    }
+    if (editData.email.trim() && !isValidEmail(editData.email)) {
+      errs.email = isRTL ? 'ایمیل وارد شده معتبر نیست.' : 'Enter a valid email address.';
+    }
+    // Only enforce the strict "00"-prefixed format if the phone is actually
+    // changing — existing members may have a legacy format on file.
+    if (
+      editData.phone.trim() &&
+      editData.phone.trim() !== (member.phone || '') &&
+      !isValidPhoneStrict(editData.phone)
+    ) {
+      errs.phone = phoneFormatError(isRTL);
+    }
+    if (Object.keys(errs).length > 0) {
+      setEditFieldErrors(errs);
+      return;
+    }
+
     setEditSaving(true);
     setEditError(null);
     setEditFieldErrors({});
@@ -153,6 +179,15 @@ export default function ProfilePage() {
 
   const handlePasswordSave = async () => {
     if (!member) return;
+    const isRTL = locale === 'fa';
+    if (passwordData.new_password.length < 8) {
+      setPasswordError(isRTL ? 'رمز عبور جدید باید حداقل ۸ نویسه باشد.' : 'New password must be at least 8 characters.');
+      return;
+    }
+    if (passwordData.new_password !== passwordData.confirm_new_password) {
+      setPasswordError(isRTL ? 'رمزهای عبور مطابقت ندارند.' : 'Passwords do not match.');
+      return;
+    }
     setPasswordSaving(true);
     setPasswordError(null);
     setPasswordSuccess(false);
@@ -278,6 +313,7 @@ export default function ProfilePage() {
                   value={editData.full_name}
                   onChange={(e) => setEditData((d) => ({ ...d, full_name: e.target.value }))}
                   className={inputClass}
+                  maxLength={35}
                 />
                 {editFieldErrors.full_name && (
                   <p className="text-xs text-[#ef4444] mt-1">{editFieldErrors.full_name}</p>
@@ -292,6 +328,7 @@ export default function ProfilePage() {
                   value={editData.display_name}
                   onChange={(e) => setEditData((d) => ({ ...d, display_name: e.target.value }))}
                   className={inputClass}
+                  maxLength={20}
                 />
                 {editFieldErrors.display_name && (
                   <p className="text-xs text-[#ef4444] mt-1">{editFieldErrors.display_name}</p>
@@ -306,6 +343,7 @@ export default function ProfilePage() {
                   value={editData.email}
                   onChange={(e) => setEditData((d) => ({ ...d, email: e.target.value }))}
                   className={inputClass}
+                  maxLength={254}
                 />
                 {editFieldErrors.email && (
                   <p className="text-xs text-[#ef4444] mt-1">{editFieldErrors.email}</p>
@@ -320,6 +358,8 @@ export default function ProfilePage() {
                   value={editData.phone}
                   onChange={(e) => setEditData((d) => ({ ...d, phone: e.target.value }))}
                   className={inputClass}
+                  placeholder={PHONE_PLACEHOLDER}
+                  maxLength={17}
                 />
                 {editFieldErrors.phone && (
                   <p className="text-xs text-[#ef4444] mt-1">{editFieldErrors.phone}</p>

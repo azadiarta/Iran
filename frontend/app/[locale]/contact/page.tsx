@@ -195,6 +195,7 @@ export default function ContactPage() {
                   onChange={(e) => setFormData((d) => ({ ...d, name: e.target.value }))}
                   placeholder={t('name_placeholder')}
                   disabled={mounted && !!member}
+                  maxLength={100}
                   className={inputClass + (mounted && member ? ' opacity-60 cursor-not-allowed' : '')}
                 />
               </div>
@@ -223,6 +224,7 @@ export default function ContactPage() {
                   value={formData.contact}
                   onChange={(e) => setFormData((d) => ({ ...d, contact: e.target.value }))}
                   placeholder={t('contact_placeholder')}
+                  maxLength={150}
                   className={inputClass}
                 />
               </div>
@@ -238,6 +240,7 @@ export default function ContactPage() {
                   value={formData.message}
                   onChange={(e) => setFormData((d) => ({ ...d, message: e.target.value }))}
                   placeholder={t('message_placeholder')}
+                  maxLength={250}
                   className={inputClass + ' resize-none'}
                 />
               </div>

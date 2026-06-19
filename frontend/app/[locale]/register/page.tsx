@@ -7,6 +7,7 @@ import { Eye, EyeOff, UserPlus } from 'lucide-react';
 import { authAPI } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
+import { isValidPhoneStrict, isValidEmail, maxLengthError, PHONE_PLACEHOLDER } from '@/lib/validation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,6 +45,7 @@ function Field({
   hint,
   error,
   rightElement,
+  maxLength,
 }: {
   id: string;
   label: string;
@@ -56,6 +58,7 @@ function Field({
   hint?: string;
   error?: string;
   rightElement?: React.ReactNode;
+  maxLength?: number;
 }) {
   return (
     <div className="space-y-1.5">
@@ -71,6 +74,7 @@ function Field({
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
           placeholder={placeholder}
+          maxLength={maxLength}
           className="w-full rounded-xl px-4 py-3 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50"
           style={{
             background: 'rgba(255,255,255,0.05)',
@@ -150,8 +154,16 @@ export default function RegisterPage() {
   function validate(): boolean {
     const errors: FieldErrors = {};
 
+    const isRTL = locale === 'fa';
+
     if (!form.full_name.trim()) {
       errors.full_name = 'Full name is required.';
+    } else if (form.full_name.trim().length > 35) {
+      errors.full_name = maxLengthError(isRTL, 35);
+    }
+
+    if (form.display_name.trim().length > 20) {
+      errors.display_name = maxLengthError(isRTL, 20);
     }
 
     if (!form.phone.trim() && !form.email.trim()) {
@@ -159,10 +171,18 @@ export default function RegisterPage() {
       errors.email = 'At least phone or email is required.';
     }
 
+    if (form.phone.trim() && !isValidPhoneStrict(form.phone)) {
+      errors.phone = t('phone_format_error');
+    }
+
+    if (form.email.trim() && !isValidEmail(form.email)) {
+      errors.email = 'Enter a valid email address.';
+    }
+
     if (!form.password) {
       errors.password = 'Password is required.';
-    } else if (form.password.length < 6) {
-      errors.password = 'Password must be at least 6 characters.';
+    } else if (form.password.length < 8) {
+      errors.password = 'Password must be at least 8 characters.';
     }
 
     if (form.password !== form.confirm_password) {
@@ -293,6 +313,7 @@ export default function RegisterPage() {
             placeholder="Ali Hosseini"
             required
             error={fieldErrors.full_name}
+            maxLength={35}
           />
 
           <Field
@@ -303,6 +324,7 @@ export default function RegisterPage() {
             disabled={loading}
             placeholder="Ali"
             error={fieldErrors.display_name}
+            maxLength={20}
           />
 
           <Field
@@ -312,9 +334,10 @@ export default function RegisterPage() {
             value={form.phone}
             onChange={setField('phone')}
             disabled={loading}
-            placeholder="+44 7700 900000"
-            hint={!form.phone && !form.email ? phoneOrEmailHint : undefined}
+            placeholder={PHONE_PLACEHOLDER}
+            hint={!form.phone && !form.email ? phoneOrEmailHint : t('phone_format_hint')}
             error={fieldErrors.phone}
+            maxLength={17}
           />
 
           <Field
@@ -327,6 +350,7 @@ export default function RegisterPage() {
             placeholder="you@example.com"
             hint={!form.phone && !form.email ? phoneOrEmailHint : undefined}
             error={fieldErrors.email}
+            maxLength={254}
           />
 
           {/* Password */}

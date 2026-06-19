@@ -522,6 +522,7 @@ export default function ExpenseDetailPage() {
                     readOnly={isAuthenticated}
                     disabled={commentSubmitting}
                     placeholder={isAuthenticated ? (member?.display_name || member?.full_name || '') : t('comment_name_placeholder')}
+                    maxLength={50}
                     className="w-full rounded-xl px-4 py-3 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50"
                     style={{
                       background: isAuthenticated
@@ -558,6 +559,7 @@ export default function ExpenseDetailPage() {
                     disabled={commentSubmitting}
                     placeholder={t('comment_text')}
                     rows={4}
+                    maxLength={250}
                     className="w-full rounded-xl px-4 py-3 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50 resize-y"
                     style={{
                       background: 'rgba(255,255,255,0.05)',
