@@ -12,16 +12,26 @@ class MemberMinimalSerializer(serializers.Serializer):
     full_name = serializers.CharField(read_only=True)
 
 
+# Admin-only variant — includes member_number, which must never be exposed
+# outside the admin panel. Only used by ContributionAdminDetailSerializer
+# (gated by can_manage_permissions), never by the general ContributionSerializer.
+class MemberAdminMinimalSerializer(serializers.Serializer):
+    id = serializers.UUIDField(read_only=True)
+    display_name = serializers.CharField(read_only=True)
+    full_name = serializers.CharField(read_only=True)
+    member_number = serializers.IntegerField(read_only=True)
+
+
 class ContributionSerializer(serializers.ModelSerializer):
     contributor = MemberMinimalSerializer(read_only=True)
 
     class Meta:
         model = Contribution
         fields = [
-            'id', 'contributor', 'guest_name', 'amount', 'currency',
+            'id', 'tracking_code', 'contributor', 'guest_name', 'amount', 'currency',
             'payment_method', 'status', 'notes', 'created_at',
         ]
-        read_only_fields = ['id', 'created_at']
+        read_only_fields = ['id', 'tracking_code', 'created_at']
 
 
 class ContributionCreateSerializer(serializers.ModelSerializer):
@@ -137,13 +147,13 @@ class ContributionPublicListSerializer(serializers.ModelSerializer):
 
 
 class ContributionAdminDetailSerializer(serializers.ModelSerializer):
-    contributor = MemberMinimalSerializer(read_only=True)
+    contributor = MemberAdminMinimalSerializer(read_only=True)
     receipt_image = RelativeImageField()
 
     class Meta:
         model = Contribution
         fields = [
-            'id', 'contributor', 'guest_name', 'amount', 'currency',
+            'id', 'tracking_code', 'contributor', 'guest_name', 'amount', 'currency',
             'payment_method', 'status', 'notes', 'receipt_image',
             'show_in_public_list', 'display_name_choice', 'public_display_name',
             'message', 'rejection_reason', 'created_at', 'updated_at',
@@ -175,7 +185,7 @@ class MyContributionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Contribution
         fields = [
-            'id', 'amount', 'currency', 'payment_method', 'status',
+            'id', 'tracking_code', 'amount', 'currency', 'payment_method', 'status',
             'rejection_reason', 'message', 'created_at',
         ]
 

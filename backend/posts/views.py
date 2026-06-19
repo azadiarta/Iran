@@ -85,16 +85,6 @@ def _can_modify_post(request, post):
     return False
 
 
-def _can_modify_comment(request, comment):
-    if request.user.is_superuser:
-        return True
-    if comment.author and comment.author == request.user:
-        return True
-    if request.user.group and request.user.group.permissions.filter(codename='can_manage_permissions').exists():
-        return True
-    return False
-
-
 # ─── Post ─────────────────────────────────────────────────────────────────────
 
 class PostListView(APIView):
@@ -420,29 +410,6 @@ class CommentUpdateView(APIView):
 
         _log(request.user, 'comment_edited_by_owner', target=comment, ip=_get_ip(request))
         return api_success(CommentSerializer(comment).data, message='Comment updated and resubmitted for approval.')
-
-
-class CommentDeleteView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def delete(self, request, pk):
-        try:
-            comment = Comment.objects.get(pk=pk)
-        except Comment.DoesNotExist:
-            return api_error('Comment not found.', status_code=404)
-
-        if not _can_modify_comment(request, comment):
-            return api_error('Permission denied.', status_code=403)
-
-        _log(request.user, 'comment_deleted', target=comment, ip=_get_ip(request), extra_data={
-            'text': comment.text,
-            'rating': comment.rating,
-            'author': str(comment.author) if comment.author else (comment.guest_name or None),
-            'target_type': comment.content_type.model,
-            'target_id': str(comment.object_id),
-        })
-        comment.delete()
-        return api_success(message='Comment deleted.')
 
 
 class MyCommentsView(APIView):

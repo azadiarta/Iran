@@ -13,7 +13,7 @@
     "admin_panel": "پنل مدیریت"
   },
   "landing": {
-    "headline": "صندوق گروهی",
+    "headline": "انجمن سیاسی ایرانیان بیرمنگام",
     "tagline": "جمع‌آوری کمک مالی شفاف برای جامعه ما",
     "cta_join": "عضو شوید",
     "cta_profile": "پروفایل من",
@@ -64,11 +64,12 @@
     "comment_name": "نام شما",
     "comment_name_placeholder": "نام شما",
     "comment_text": "نظر خود را بنویسید...",
-    "comment_rating": "امتیاز (اختیاری)",
+    "comment_rating": "امتیاز",
     "comment_submit": "ارسال نظر",
     "comment_pending": "نظر شما ثبت شد و در انتظار تأیید است.",
     "anonymous": "ناشناس",
     "comment_text_required": "متن نظر الزامی است.",
+    "comment_rating_required": "امتیاز دادن الزامی است.",
     "name_required": "نام شما الزامی است.",
     "comment_submit_error": "ارسال نظر ناموفق بود. لطفاً دوباره تلاش کنید.",
     "back_to_posts": "بازگشت به اخبار",
@@ -111,10 +112,11 @@
     "comment_name": "نام شما",
     "comment_name_placeholder": "نام شما",
     "comment_text": "نظر خود را بنویسید...",
-    "comment_rating": "امتیاز (اختیاری)",
+    "comment_rating": "امتیاز",
     "comment_submit": "ارسال نظر",
     "comment_pending": "نظر شما ثبت شد و در انتظار تأیید است.",
     "comment_text_required": "متن نظر الزامی است.",
+    "comment_rating_required": "امتیاز دادن الزامی است.",
     "name_required": "نام شما الزامی است.",
     "comment_submit_error": "ارسال نظر ناموفق بود. لطفاً دوباره تلاش کنید.",
     "no_comments": "هنوز نظری ثبت نشده. شما اولین نفر باشید!",
@@ -223,9 +225,6 @@
     "my_contributions_empty": "هنوز هیچ مشارکتی ثبت نکرده‌اید.",
     "my_contributions_rejection_reason": "دلیل",
     "status_pending": "در انتظار",
-    "status_pending_review": "در انتظار بررسی",
-    "status_completed": "تکمیل شده",
-    "status_failed": "رد شده",
     "status_approved": "تأیید شده",
     "status_rejected": "رد شده",
     "back_to_profile": "بازگشت به پروفایل",
@@ -235,12 +234,9 @@
     "my_comments_target_post": "نظر روی پست",
     "my_comments_target_expense": "نظر روی هزینه",
     "my_comments_rating_label": "امتیاز",
-    "my_comments_no_rating": "بدون امتیاز",
     "my_comments_edit_notice": "ویرایش این نظر آن را دوباره برای تأیید ارسال می‌کند.",
     "my_comments_text_required": "متن نظر را وارد کنید.",
     "my_comments_save_error": "ذخیره نظر ناموفق بود. لطفاً دوباره تلاش کنید.",
-    "my_comments_delete_error": "حذف نظر ناموفق بود. لطفاً دوباره تلاش کنید.",
-    "my_comments_delete_confirm": "آیا از حذف این نظر مطمئن هستید؟",
     "my_messages_title": "پیام‌های من",
     "my_messages_empty": "هنوز هیچ پیامی ارسال نکرده‌اید.",
     "my_messages_status_pending": "در انتظار",
@@ -268,7 +264,7 @@
   },
   "help": {
     "title": "راهنمای سایت",
-    "subtitle": "توضیح کامل تمام بخش‌های صندوق گروهی — فقط بخش‌هایی که به حساب کاربری شما مرتبط هستند در ادامه نمایش داده می‌شوند.",
+    "subtitle": "توضیح کامل تمام بخش‌های سایت انجمن سیاسی ایرانیان بیرمنگام — فقط بخش‌هایی که به حساب کاربری شما مرتبط هستند در ادامه نمایش داده می‌شوند.",
     "guest_heading": "شروع کار",
     "member_heading": "امکانات اعضا",
     "admin_heading": "پنل مدیریت",
@@ -278,7 +274,7 @@
     "sections": {
       "home": {
         "title": "صفحه اصلی",
-        "desc": "صفحه نخست سایت، صندوق گروهی را معرفی می‌کند، آمار زنده (تعداد اعضا، مجموع کمک‌های مالی، موجودی فعلی) را نشان می‌دهد و آخرین پست‌ها را برجسته می‌کند."
+        "desc": "صفحه نخست سایت، انجمن سیاسی ایرانیان بیرمنگام را معرفی می‌کند، آمار زنده (تعداد اعضا، مجموع کمک‌های مالی، موجودی فعلی) را نشان می‌دهد و آخرین پست‌ها را برجسته می‌کند."
       },
       "posts": {
         "title": "اخبار و پست‌ها",
@@ -385,7 +381,7 @@
   },
   "footer": {
     "slogan": "پاینده ایران",
-    "copyright": "صندوق گروهی. تمام حقوق محفوظ است.",
+    "copyright": "انجمن سیاسی ایرانیان بیرمنگام. تمام حقوق محفوظ است.",
     "dedication": "این سایت ساخته شده به یاد جاویدنامان ایران، توسط arta"
   },
   "common": {

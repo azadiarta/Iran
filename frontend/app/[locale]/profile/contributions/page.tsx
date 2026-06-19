@@ -12,6 +12,7 @@ export default function MyContributionsPage() {
   const params = useParams();
   const router = useRouter();
   const locale = (params?.locale as string) || 'en';
+  const isRTL = locale === 'fa';
   const { member, isAuthenticated, hasHydrated } = useAuthStore();
 
   const [contributions, setContributions] = useState<MyContribution[]>([]);
@@ -91,6 +92,16 @@ export default function MyContributionsPage() {
     failed: { color: '#ef4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.3)' },
   };
 
+  // pending = contribution created, awaiting payment; pending_review = a
+  // receipt has been uploaded and is awaiting admin verification — distinct
+  // stages of the same flow, spelled out so they don't read as duplicates.
+  const contribStatusLabel: Record<MyContribution['status'], string> = {
+    pending: isRTL ? 'در انتظار پرداخت' : 'Awaiting Payment',
+    pending_review: isRTL ? 'در انتظار بررسی رسید' : 'Awaiting Receipt Review',
+    completed: isRTL ? 'تکمیل شده' : 'Completed',
+    failed: isRTL ? 'رد شده' : 'Rejected',
+  };
+
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white">
       <div className="max-w-2xl mx-auto px-4 py-10">
@@ -146,7 +157,7 @@ export default function MyContributionsPage() {
                         className="px-2.5 py-1 rounded-full text-xs font-semibold border flex-shrink-0"
                         style={{ borderColor: style.border, backgroundColor: style.bg, color: style.color }}
                       >
-                        {t(`status_${c.status}`)}
+                        {contribStatusLabel[c.status]}
                       </span>
                     </div>
                     {c.status === 'failed' && c.rejection_reason && (

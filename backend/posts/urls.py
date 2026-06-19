@@ -4,7 +4,6 @@ from posts.views import (
     CommentAdminDetailView,
     CommentAdminEditView,
     CommentCreateView,
-    CommentDeleteView,
     CommentGlobalListView,
     CommentListView,
     CommentStatusUpdateView,
@@ -43,6 +42,5 @@ urlpatterns = [
     path('comments/<uuid:pk>/status/',      CommentStatusUpdateView.as_view(), name='comment-status'),
     path('comments/<uuid:pk>/edit/',        CommentAdminEditView.as_view(),    name='comment-admin-edit'),
     path('comments/<uuid:pk>/update/',      CommentUpdateView.as_view(),       name='comment-update'),
-    path('comments/<uuid:pk>/delete/',      CommentDeleteView.as_view(),       name='comment-delete'),
     path('comments/<uuid:pk>/',             CommentAdminDetailView.as_view(),  name='comment-admin-detail'),
 ]

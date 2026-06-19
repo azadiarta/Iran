@@ -221,13 +221,17 @@ export default function ExpenseDetailPage() {
       setCommentError(t('name_required'));
       return;
     }
+    if (commentRating === 0) {
+      setCommentError(t('comment_rating_required'));
+      return;
+    }
 
     setCommentSubmitting(true);
     try {
-      const payload: { text: string; rating?: number; guest_name?: string } = {
+      const payload: { text: string; rating: number; guest_name?: string } = {
         text: commentText.trim(),
+        rating: commentRating,
       };
-      if (commentRating > 0) payload.rating = commentRating;
       if (!isAuthenticated && commentName.trim()) {
         payload.guest_name = commentName.trim();
       }
@@ -574,7 +578,7 @@ export default function ExpenseDetailPage() {
                 {/* Rating */}
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-white/70">
-                    {t('comment_rating')}
+                    {t('comment_rating')} <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <StarRating
                     value={commentRating}

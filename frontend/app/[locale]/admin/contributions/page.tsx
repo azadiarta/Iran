@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { Check, X, Trash2, Plus, Eye, Pencil } from 'lucide-react';
+import { Check, X, Plus, Eye } from 'lucide-react';
 import AdminTable, { AdminTableColumn } from '@/components/admin/AdminTable';
 import AdminBadge from '@/components/admin/AdminBadge';
 import AdminModal from '@/components/admin/AdminModal';
@@ -9,7 +9,6 @@ import AdminSelect from '@/components/admin/fields/AdminSelect';
 import AdminInput from '@/components/admin/fields/AdminInput';
 import AdminTextarea from '@/components/admin/fields/AdminTextarea';
 import AdminToggle from '@/components/admin/fields/AdminToggle';
-import AdminConfirmDialog from '@/components/admin/AdminConfirmDialog';
 import ImageLightbox from '@/components/common/ImageLightbox';
 import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
@@ -17,12 +16,16 @@ import { fundAPI, Contribution, ContributionDisplayNameChoice, Paginated } from 
 import { SETTINGS_META } from '@/lib/settingsMeta';
 import { PAYMENT_METHOD_LABELS, getPaymentMethodLabel } from '@/lib/paymentMethodsMeta';
 
-const STATUS_OPTIONS_BIDIRECTIONAL = (isRTL: boolean) => [
-  { value: 'pending', label: isRTL ? 'در انتظار' : 'Pending' },
-  { value: 'pending_review', label: isRTL ? 'در انتظار بررسی' : 'Pending Review' },
-  { value: 'completed', label: isRTL ? 'تکمیل شده' : 'Completed' },
-  { value: 'failed', label: isRTL ? 'رد شده' : 'Rejected' },
-];
+// pending = contribution created, awaiting payment/receipt; pending_review = a
+// receipt has been uploaded and is awaiting admin verification. Both are real,
+// distinct stages of the same flow — labels spell this out so it reads clearly
+// in the admin panel instead of looking like a duplicate status.
+const STATUS_LABELS = (isRTL: boolean): Record<string, string> => ({
+  pending: isRTL ? 'در انتظار پرداخت' : 'Awaiting Payment',
+  pending_review: isRTL ? 'در انتظار بررسی رسید' : 'Awaiting Receipt Review',
+  completed: isRTL ? 'تکمیل شده' : 'Completed',
+  failed: isRTL ? 'رد شده' : 'Rejected',
+});
 
 const DISPLAY_NAME_CHOICE_OPTIONS = (isRTL: boolean) => [
   { value: 'hidden', label: isRTL ? 'پنهان' : 'Hidden' },
@@ -30,8 +33,6 @@ const DISPLAY_NAME_CHOICE_OPTIONS = (isRTL: boolean) => [
   { value: 'full_name', label: isRTL ? 'نام کامل' : 'Full Name' },
   { value: 'custom', label: isRTL ? 'نام دلخواه' : 'Custom' },
 ];
-
-type ConfirmAction = { type: 'approve' | 'reject' | 'delete'; contribution: Contribution } | null;
 
 export default function AdminContributionsPage() {
   const params = useParams();
@@ -44,7 +45,6 @@ export default function AdminContributionsPage() {
 
   const canView = !!currentMember?.is_superuser || hasPermission('can_view_balance');
   const canManage = !!currentMember?.is_superuser || hasPermission('can_manage_permissions');
-  const isSuperuser = !!currentMember?.is_superuser;
 
   const [items, setItems] = useState<Contribution[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,13 +52,15 @@ export default function AdminContributionsPage() {
   const [hasNext, setHasNext] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const pageSize = 5;
+
+  const [searchInput, setSearchInput] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [methodFilter, setMethodFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [memberFilterId, setMemberFilterId] = useState(searchParams.get('member') || '');
   const [memberFilterName, setMemberFilterName] = useState(searchParams.get('name') || '');
-
-  const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
-  const [actionLoading, setActionLoading] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [guestName, setGuestName] = useState('');
@@ -69,37 +71,36 @@ export default function AdminContributionsPage() {
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Details modal
+  // Unified detail modal — viewing, editing, approving and rejecting all happen here.
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [detailItem, setDetailItem] = useState<Contribution | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [detailActionLoading, setDetailActionLoading] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
-  // Edit modal
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editLoading, setEditLoading] = useState(false);
-  const [editSaving, setEditSaving] = useState(false);
   const [editAmount, setEditAmount] = useState('');
   const [editCurrency, setEditCurrency] = useState('GBP');
   const [editGuestName, setEditGuestName] = useState('');
   const [editPaymentMethod, setEditPaymentMethod] = useState('manual');
-  const [editStatus, setEditStatus] = useState('pending');
   const [editNotes, setEditNotes] = useState('');
-  const [editRejectionReason, setEditRejectionReason] = useState('');
   const [editShowInPublicList, setEditShowInPublicList] = useState(false);
   const [editDisplayNameChoice, setEditDisplayNameChoice] = useState<ContributionDisplayNameChoice>('display_name');
   const [editPublicDisplayName, setEditPublicDisplayName] = useState('');
   const [editMessage, setEditMessage] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const [statusActionLoading, setStatusActionLoading] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
 
   function load() {
     setLoading(true);
-    const filters: { status?: string; payment_method?: string; contributor?: string } = {};
+    const filters: { status?: string; payment_method?: string; date_from?: string; date_to?: string; contributor?: string; search?: string } = {};
     if (statusFilter) filters.status = statusFilter;
     if (methodFilter) filters.payment_method = methodFilter;
+    if (dateFrom) filters.date_from = dateFrom;
+    if (dateTo) filters.date_to = dateTo;
     if (memberFilterId) filters.contributor = memberFilterId;
+    if (appliedSearch) filters.search = appliedSearch;
     fundAPI
       .getContributions(page, filters)
       .then((res) => {
@@ -116,36 +117,19 @@ export default function AdminContributionsPage() {
     if (canView) load();
     else setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canView, page, statusFilter, methodFilter, memberFilterId]);
+  }, [canView, page, statusFilter, methodFilter, dateFrom, dateTo, memberFilterId, appliedSearch]);
+
+  function applySearch(e: React.FormEvent) {
+    e.preventDefault();
+    setPage(1);
+    setAppliedSearch(searchInput.trim());
+  }
 
   function clearMemberFilter() {
     setMemberFilterId('');
     setMemberFilterName('');
     setPage(1);
     router.replace(`/${locale}/admin/contributions`);
-  }
-
-  async function runAction() {
-    if (!confirmAction) return;
-    setActionLoading(true);
-    try {
-      if (confirmAction.type === 'approve') {
-        await fundAPI.updateContributionStatus(confirmAction.contribution.id, 'completed');
-        showToast('success', isRTL ? 'مشارکت تأیید شد' : 'Contribution approved');
-      } else if (confirmAction.type === 'reject') {
-        await fundAPI.updateContributionStatus(confirmAction.contribution.id, 'failed');
-        showToast('success', isRTL ? 'مشارکت رد شد' : 'Contribution rejected');
-      } else {
-        await fundAPI.deleteContribution(confirmAction.contribution.id);
-        showToast('success', isRTL ? 'مشارکت حذف شد' : 'Contribution deleted');
-      }
-      setConfirmAction(null);
-      load();
-    } catch {
-      showToast('error', isRTL ? 'انجام عملیات ناموفق بود' : 'Action failed');
-    } finally {
-      setActionLoading(false);
-    }
   }
 
   function openCreate() {
@@ -193,10 +177,21 @@ export default function AdminContributionsPage() {
     setDetailModalOpen(true);
     setDetailLoading(true);
     setDetailItem(null);
+    setRejecting(false);
     setRejectReason('');
     try {
       const res = await fundAPI.getContributionDetail(c.id);
-      setDetailItem(res.data as unknown as Contribution);
+      const d = res.data as unknown as Contribution;
+      setDetailItem(d);
+      setEditAmount(String(d.amount));
+      setEditCurrency(d.currency);
+      setEditGuestName(d.guest_name || '');
+      setEditPaymentMethod(d.payment_method);
+      setEditNotes(d.notes || '');
+      setEditShowInPublicList(!!d.show_in_public_list);
+      setEditDisplayNameChoice(d.display_name_choice || 'display_name');
+      setEditPublicDisplayName(d.public_display_name || '');
+      setEditMessage(d.message || '');
     } catch {
       showToast('error', isRTL ? 'بارگذاری جزئیات ناموفق بود' : 'Failed to load details');
       setDetailModalOpen(false);
@@ -205,96 +200,68 @@ export default function AdminContributionsPage() {
     }
   }
 
-  async function approveFromDetail() {
+  async function saveEdit() {
     if (!detailItem) return;
-    setDetailActionLoading(true);
-    try {
-      await fundAPI.updateContributionStatus(detailItem.id, 'completed');
-      showToast('success', isRTL ? 'مشارکت تأیید شد' : 'Contribution approved');
-      setDetailModalOpen(false);
-      load();
-    } catch {
-      showToast('error', isRTL ? 'انجام عملیات ناموفق بود' : 'Action failed');
-    } finally {
-      setDetailActionLoading(false);
-    }
-  }
-
-  async function rejectFromDetail() {
-    if (!detailItem) return;
-    if (!rejectReason.trim()) {
-      showToast('warning', isRTL ? 'دلیل رد را وارد کنید' : 'Enter a reason for rejection');
-      return;
-    }
-    setDetailActionLoading(true);
-    try {
-      await fundAPI.updateContribution(detailItem.id, { status: 'failed', rejection_reason: rejectReason.trim() });
-      showToast('success', isRTL ? 'مشارکت رد شد' : 'Contribution rejected');
-      setDetailModalOpen(false);
-      load();
-    } catch {
-      showToast('error', isRTL ? 'انجام عملیات ناموفق بود' : 'Action failed');
-    } finally {
-      setDetailActionLoading(false);
-    }
-  }
-
-  async function openEdit(c: Contribution) {
-    setEditModalOpen(true);
-    setEditLoading(true);
-    setEditId(c.id);
-    try {
-      const res = await fundAPI.getContributionDetail(c.id);
-      const d = res.data as unknown as Contribution;
-      setEditAmount(String(d.amount));
-      setEditCurrency(d.currency);
-      setEditGuestName(d.guest_name || '');
-      setEditPaymentMethod(d.payment_method);
-      setEditStatus(d.status);
-      setEditNotes(d.notes || '');
-      setEditRejectionReason(d.rejection_reason || '');
-      setEditShowInPublicList(!!d.show_in_public_list);
-      setEditDisplayNameChoice(d.display_name_choice || 'display_name');
-      setEditPublicDisplayName(d.public_display_name || '');
-      setEditMessage(d.message || '');
-    } catch {
-      showToast('error', isRTL ? 'بارگذاری جزئیات ناموفق بود' : 'Failed to load details');
-      setEditModalOpen(false);
-    } finally {
-      setEditLoading(false);
-    }
-  }
-
-  async function submitEdit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!editId) return;
     const amountNum = parseFloat(editAmount);
     if (!amountNum || amountNum <= 0) {
       showToast('warning', isRTL ? 'مبلغ معتبر وارد کنید' : 'Enter a valid amount');
       return;
     }
-    setEditSaving(true);
+    setSavingEdit(true);
     try {
-      await fundAPI.updateContribution(editId, {
+      const res = await fundAPI.updateContribution(detailItem.id, {
         amount: amountNum,
         currency: editCurrency,
         guest_name: editGuestName,
         payment_method: editPaymentMethod,
-        status: editStatus,
         notes: editNotes,
-        rejection_reason: editRejectionReason,
         show_in_public_list: editShowInPublicList,
         display_name_choice: editDisplayNameChoice,
         public_display_name: editPublicDisplayName,
         message: editMessage,
       });
-      showToast('success', isRTL ? 'مشارکت با موفقیت ویرایش شد' : 'Contribution updated successfully');
-      setEditModalOpen(false);
+      setDetailItem(res.data as unknown as Contribution);
+      showToast('success', isRTL ? 'تغییرات ذخیره شد' : 'Changes saved');
       load();
     } catch {
-      showToast('error', isRTL ? 'ویرایش مشارکت ناموفق بود' : 'Failed to update contribution');
+      showToast('error', isRTL ? 'ذخیره تغییرات ناموفق بود' : 'Failed to save changes');
     } finally {
-      setEditSaving(false);
+      setSavingEdit(false);
+    }
+  }
+
+  async function approve() {
+    if (!detailItem) return;
+    setStatusActionLoading(true);
+    try {
+      const res = await fundAPI.updateContribution(detailItem.id, { status: 'completed' });
+      setDetailItem(res.data as unknown as Contribution);
+      showToast('success', isRTL ? 'مشارکت تأیید شد' : 'Contribution approved');
+      load();
+    } catch {
+      showToast('error', isRTL ? 'انجام عملیات ناموفق بود' : 'Action failed');
+    } finally {
+      setStatusActionLoading(false);
+    }
+  }
+
+  async function confirmReject() {
+    if (!detailItem) return;
+    setStatusActionLoading(true);
+    try {
+      const res = await fundAPI.updateContribution(detailItem.id, {
+        status: 'failed',
+        rejection_reason: rejectReason.trim(),
+      });
+      setDetailItem(res.data as unknown as Contribution);
+      showToast('success', isRTL ? 'مشارکت رد شد' : 'Contribution rejected');
+      setRejecting(false);
+      setRejectReason('');
+      load();
+    } catch {
+      showToast('error', isRTL ? 'انجام عملیات ناموفق بود' : 'Action failed');
+    } finally {
+      setStatusActionLoading(false);
     }
   }
 
@@ -316,9 +283,14 @@ export default function AdminContributionsPage() {
       header: isRTL ? 'مشارکت‌کننده' : 'Contributor',
       render: (c) => <span className="text-white/80">{c.contributor?.display_name || c.contributor?.full_name || c.guest_name || (isRTL ? 'مهمان' : 'Guest')}</span>,
     },
+    {
+      key: 'tracking_code',
+      header: isRTL ? 'کد پیگیری' : 'Tracking Code',
+      render: (c) => <span className="text-white/50 text-xs font-mono">{c.tracking_code}</span>,
+    },
     { key: 'amount', header: isRTL ? 'مبلغ' : 'Amount', render: (c) => <span className="text-white/70">{fmt(c.amount)} {c.currency}</span> },
     { key: 'method', header: isRTL ? 'روش پرداخت' : 'Method', render: (c) => <span className="text-white/50 text-xs">{getPaymentMethodLabel(c.payment_method, c.payment_method, isRTL)}</span> },
-    { key: 'status', header: isRTL ? 'وضعیت' : 'Status', render: (c) => <AdminBadge status={c.status} /> },
+    { key: 'status', header: isRTL ? 'وضعیت' : 'Status', render: (c) => <AdminBadge status={c.status} label={STATUS_LABELS(isRTL)[c.status]} /> },
     {
       key: 'created_at',
       header: isRTL ? 'تاریخ' : 'Date',
@@ -328,77 +300,17 @@ export default function AdminContributionsPage() {
       key: 'actions',
       header: '',
       render: (c) => (
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => openDetail(c)}
-            className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
-            style={{ border: '1px solid rgba(0,255,255,0.25)', color: '#00ffff', backgroundColor: 'rgba(0,255,255,0.06)' }}
-            aria-label={isRTL ? 'جزئیات' : 'Details'}
-          >
-            <Eye className="w-3.5 h-3.5" />
-          </button>
-          {canManage && (
-            <button
-              onClick={() => openEdit(c)}
-              className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
-              style={{ border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)', backgroundColor: 'rgba(255,255,255,0.04)' }}
-              aria-label={isRTL ? 'ویرایش' : 'Edit'}
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
-          )}
-          {canManage && (c.status === 'pending' || c.status === 'pending_review') ? (
-            <>
-              <button
-                onClick={() => setConfirmAction({ type: 'approve', contribution: c })}
-                className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
-                style={{ border: '1px solid rgba(16,185,129,0.35)', color: '#10b981', backgroundColor: 'rgba(16,185,129,0.06)' }}
-              >
-                <Check className="w-3.5 h-3.5" />
-                {isRTL ? 'تأیید' : 'Approve'}
-              </button>
-              <button
-                onClick={() => setConfirmAction({ type: 'reject', contribution: c })}
-                className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
-                style={{ border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.06)' }}
-              >
-                <X className="w-3.5 h-3.5" />
-                {isRTL ? 'رد' : 'Reject'}
-              </button>
-            </>
-          ) : null}
-          {isSuperuser && (
-            <button
-              onClick={() => setConfirmAction({ type: 'delete', contribution: c })}
-              className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
-              style={{ border: '1px solid rgba(239,68,68,0.25)', color: 'rgba(239,68,68,0.8)', backgroundColor: 'transparent' }}
-              aria-label={isRTL ? 'حذف' : 'Delete'}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
+        <button
+          onClick={() => openDetail(c)}
+          className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
+          style={{ border: '1px solid rgba(0,255,255,0.25)', color: '#00ffff', backgroundColor: 'rgba(0,255,255,0.06)' }}
+          aria-label={isRTL ? 'جزئیات' : 'Details'}
+        >
+          <Eye className="w-3.5 h-3.5" />
+        </button>
       ),
     },
   ];
-
-  const confirmCopy = {
-    approve: {
-      title: isRTL ? 'تأیید مشارکت' : 'Approve Contribution',
-      message: isRTL ? 'آیا از تأیید این مشارکت مطمئن هستید؟' : 'Are you sure you want to approve this contribution?',
-      label: isRTL ? 'تأیید' : 'Approve',
-    },
-    reject: {
-      title: isRTL ? 'رد مشارکت' : 'Reject Contribution',
-      message: isRTL ? 'آیا از رد این مشارکت مطمئن هستید؟' : 'Are you sure you want to reject this contribution?',
-      label: isRTL ? 'رد کن' : 'Reject',
-    },
-    delete: {
-      title: isRTL ? 'حذف مشارکت' : 'Delete Contribution',
-      message: isRTL ? 'این عمل غیرقابل بازگشت است. آیا از حذف این مشارکت مطمئن هستید؟' : 'This action is irreversible. Are you sure you want to delete this contribution?',
-      label: isRTL ? 'حذف کن' : 'Delete',
-    },
-  };
 
   return (
     <div className="flex flex-col gap-6" dir={isRTL ? 'rtl' : 'ltr'}>
@@ -430,19 +342,26 @@ export default function AdminContributionsPage() {
         </div>
       )}
 
-      <div className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <form onSubmit={applySearch} className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 items-end">
+        <AdminInput
+          label={isRTL ? 'جست‌وجو (نام یا کد پیگیری)' : 'Search (name or tracking code)'}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+        />
         <AdminSelect
+          label={isRTL ? 'وضعیت' : 'Status'}
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
           options={[
             { value: '', label: isRTL ? 'همه وضعیت‌ها' : 'All statuses' },
-            { value: 'pending', label: isRTL ? 'در انتظار' : 'Pending' },
-            { value: 'pending_review', label: isRTL ? 'در انتظار بررسی' : 'Pending Review' },
-            { value: 'completed', label: isRTL ? 'تکمیل شده' : 'Completed' },
-            { value: 'failed', label: isRTL ? 'ناموفق' : 'Failed' },
+            { value: 'pending', label: STATUS_LABELS(isRTL).pending },
+            { value: 'pending_review', label: STATUS_LABELS(isRTL).pending_review },
+            { value: 'completed', label: STATUS_LABELS(isRTL).completed },
+            { value: 'failed', label: STATUS_LABELS(isRTL).failed },
           ]}
         />
         <AdminSelect
+          label={isRTL ? 'روش پرداخت' : 'Method'}
           value={methodFilter}
           onChange={(e) => { setMethodFilter(e.target.value); setPage(1); }}
           options={[
@@ -451,7 +370,26 @@ export default function AdminContributionsPage() {
             { value: 'paypal', label: 'PayPal' },
           ]}
         />
-      </div>
+        <AdminInput
+          label={isRTL ? 'از تاریخ' : 'From date'}
+          type="date"
+          value={dateFrom}
+          onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+        />
+        <AdminInput
+          label={isRTL ? 'تا تاریخ' : 'To date'}
+          type="date"
+          value={dateTo}
+          onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+        />
+        <button
+          type="submit"
+          className="rounded-xl px-5 py-2.5 text-sm font-bold transition-all"
+          style={{ backgroundColor: '#00ffff', color: '#0a0a0f', boxShadow: '0 0 16px rgba(0,255,255,0.3)' }}
+        >
+          {isRTL ? 'جست‌وجو' : 'Search'}
+        </button>
+      </form>
 
       <AdminTable
         columns={columns}
@@ -470,17 +408,6 @@ export default function AdminContributionsPage() {
             ? `صفحه ${page} از ${Math.max(1, Math.ceil(totalCount / pageSize))}`
             : `Page ${page} of ${Math.max(1, Math.ceil(totalCount / pageSize))}`,
         }}
-      />
-
-      <AdminConfirmDialog
-        isOpen={!!confirmAction}
-        onClose={() => setConfirmAction(null)}
-        onConfirm={runAction}
-        loading={actionLoading}
-        title={confirmAction ? confirmCopy[confirmAction.type].title : ''}
-        message={confirmAction ? confirmCopy[confirmAction.type].message : ''}
-        confirmLabel={confirmAction ? confirmCopy[confirmAction.type].label : ''}
-        cancelLabel={isRTL ? 'انصراف' : 'Cancel'}
       />
 
       <AdminModal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={isRTL ? 'افزودن مشارکت' : 'Add Contribution'}>
@@ -511,10 +438,10 @@ export default function AdminContributionsPage() {
             value={status}
             onChange={(e) => setStatus(e.target.value)}
             options={[
-              { value: 'pending', label: isRTL ? 'در انتظار' : 'Pending' },
-              { value: 'pending_review', label: isRTL ? 'در انتظار بررسی' : 'Pending Review' },
-              { value: 'completed', label: isRTL ? 'تکمیل شده' : 'Completed' },
-              { value: 'failed', label: isRTL ? 'ناموفق' : 'Failed' },
+              { value: 'pending', label: STATUS_LABELS(isRTL).pending },
+              { value: 'pending_review', label: STATUS_LABELS(isRTL).pending_review },
+              { value: 'completed', label: STATUS_LABELS(isRTL).completed },
+              { value: 'failed', label: STATUS_LABELS(isRTL).failed },
             ]}
           />
           <AdminTextarea label={isRTL ? 'یادداشت (اختیاری)' : 'Notes (optional)'} value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
@@ -534,7 +461,7 @@ export default function AdminContributionsPage() {
         </form>
       </AdminModal>
 
-      {/* Details modal */}
+      {/* Unified detail modal — view, edit (if permitted), approve and reject all happen here */}
       <AdminModal isOpen={detailModalOpen} onClose={() => setDetailModalOpen(false)} title={isRTL ? 'جزئیات مشارکت' : 'Contribution Details'} maxWidth="max-w-2xl">
         {detailLoading || !detailItem ? (
           <div className="py-8 text-center text-white/40 text-sm">{isRTL ? 'در حال بارگذاری...' : 'Loading...'}</div>
@@ -548,19 +475,18 @@ export default function AdminContributionsPage() {
                   {detailItem.contributor?.display_name && detailItem.contributor.display_name !== detailItem.contributor.full_name && (
                     <span className="text-white/40 text-xs"> ({detailItem.contributor.display_name})</span>
                   )}
+                  {detailItem.contributor?.member_number && (
+                    <span className="text-white/40 text-xs"> (#{detailItem.contributor.member_number})</span>
+                  )}
                 </span>
               </div>
               <div>
-                <span className="block text-xs text-white/40 mb-1">{isRTL ? 'مبلغ' : 'Amount'}</span>
-                <span className="text-white/80 text-sm">{fmt(detailItem.amount)} {detailItem.currency}</span>
-              </div>
-              <div>
-                <span className="block text-xs text-white/40 mb-1">{isRTL ? 'روش پرداخت' : 'Payment Method'}</span>
-                <span className="text-white/80 text-sm">{getPaymentMethodLabel(detailItem.payment_method, detailItem.payment_method, isRTL)}</span>
+                <span className="block text-xs text-white/40 mb-1">{isRTL ? 'کد پیگیری' : 'Tracking Code'}</span>
+                <span className="text-white/80 text-sm font-mono">{detailItem.tracking_code}</span>
               </div>
               <div>
                 <span className="block text-xs text-white/40 mb-1">{isRTL ? 'وضعیت' : 'Status'}</span>
-                <AdminBadge status={detailItem.status} />
+                <AdminBadge status={detailItem.status} label={STATUS_LABELS(isRTL)[detailItem.status]} />
               </div>
               <div>
                 <span className="block text-xs text-white/40 mb-1">{isRTL ? 'تاریخ ایجاد' : 'Created'}</span>
@@ -574,43 +500,129 @@ export default function AdminContributionsPage() {
               )}
             </div>
 
-            {detailItem.notes && (
-              <div>
-                <span className="block text-xs text-white/40 mb-1">{isRTL ? 'یادداشت' : 'Notes'}</span>
-                <p className="text-white/70 text-sm whitespace-pre-wrap">{detailItem.notes}</p>
-              </div>
-            )}
+            {canManage ? (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <AdminInput label={isRTL ? 'نام مشارکت‌کننده' : 'Contributor Name'} value={editGuestName} onChange={(e) => setEditGuestName(e.target.value)} />
+                  <AdminInput label={isRTL ? 'مبلغ' : 'Amount'} type="number" min="0" step="0.01" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} required />
+                  <AdminSelect
+                    label={isRTL ? 'واحد پول' : 'Currency'}
+                    value={editCurrency}
+                    onChange={(e) => setEditCurrency(e.target.value)}
+                    options={(SETTINGS_META.default_currency.options || []).map((o) => ({
+                      value: o.value,
+                      label: isRTL ? o.label.fa : o.label.en,
+                    }))}
+                  />
+                  <AdminSelect
+                    label={isRTL ? 'روش پرداخت' : 'Payment Method'}
+                    value={editPaymentMethod}
+                    onChange={(e) => setEditPaymentMethod(e.target.value)}
+                    options={Object.entries(PAYMENT_METHOD_LABELS).map(([value, meta]) => ({
+                      value,
+                      label: isRTL ? meta.fa : meta.en,
+                    }))}
+                  />
+                </div>
 
-            {/* Public listing info */}
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex flex-col gap-2">
-              <span className="text-xs font-medium text-white/60">{isRTL ? 'نمایش عمومی' : 'Public Listing'}</span>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-white/50">{isRTL ? 'نمایش در فهرست عمومی' : 'Show in public list'}</span>
-                <span className="text-white/80">{detailItem.show_in_public_list ? (isRTL ? 'بله' : 'Yes') : (isRTL ? 'خیر' : 'No')}</span>
-              </div>
-              {detailItem.show_in_public_list && (
-                <>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/50">{isRTL ? 'نوع نام نمایشی' : 'Display name type'}</span>
-                    <span className="text-white/80">
-                      {DISPLAY_NAME_CHOICE_OPTIONS(isRTL).find((o) => o.value === detailItem.display_name_choice)?.label}
-                    </span>
+                <AdminTextarea label={isRTL ? 'یادداشت' : 'Notes'} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={2} />
+
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex flex-col gap-3">
+                  <AdminToggle
+                    checked={editShowInPublicList}
+                    onChange={setEditShowInPublicList}
+                    label={isRTL ? 'نمایش در فهرست عمومی مشارکت‌کنندگان' : 'Show in public contributors list'}
+                  />
+                  {editShowInPublicList && (
+                    <>
+                      <AdminSelect
+                        label={isRTL ? 'نوع نام نمایشی' : 'Display name type'}
+                        value={editDisplayNameChoice}
+                        onChange={(e) => setEditDisplayNameChoice(e.target.value as ContributionDisplayNameChoice)}
+                        options={DISPLAY_NAME_CHOICE_OPTIONS(isRTL)}
+                      />
+                      {editDisplayNameChoice === 'custom' && (
+                        <AdminInput
+                          label={isRTL ? 'نام دلخواه' : 'Custom name'}
+                          value={editPublicDisplayName}
+                          onChange={(e) => setEditPublicDisplayName(e.target.value)}
+                          maxLength={100}
+                        />
+                      )}
+                    </>
+                  )}
+                  <AdminTextarea
+                    label={isRTL ? `پیام (${editMessage.length}/150)` : `Message (${editMessage.length}/150)`}
+                    value={editMessage}
+                    onChange={(e) => setEditMessage(e.target.value.slice(0, 150))}
+                    rows={2}
+                    maxLength={150}
+                  />
+                </div>
+
+                <div>
+                  <button
+                    type="button"
+                    onClick={saveEdit}
+                    disabled={savingEdit}
+                    className="rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
+                    style={{ backgroundColor: '#00ffff', color: '#0a0a0f', boxShadow: '0 0 16px rgba(0,255,255,0.3)' }}
+                  >
+                    {savingEdit ? (isRTL ? 'در حال ذخیره...' : 'Saving...') : (isRTL ? 'ذخیره تغییرات' : 'Save changes')}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <span className="block text-xs text-white/40 mb-1">{isRTL ? 'مبلغ' : 'Amount'}</span>
+                    <span className="text-white/80 text-sm">{fmt(detailItem.amount)} {detailItem.currency}</span>
                   </div>
-                  {detailItem.display_name_choice === 'custom' && detailItem.public_display_name && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-white/50">{isRTL ? 'نام دلخواه' : 'Custom name'}</span>
-                      <span className="text-white/80">{detailItem.public_display_name}</span>
+                  <div>
+                    <span className="block text-xs text-white/40 mb-1">{isRTL ? 'روش پرداخت' : 'Payment Method'}</span>
+                    <span className="text-white/80 text-sm">{getPaymentMethodLabel(detailItem.payment_method, detailItem.payment_method, isRTL)}</span>
+                  </div>
+                </div>
+
+                {detailItem.notes && (
+                  <div>
+                    <span className="block text-xs text-white/40 mb-1">{isRTL ? 'یادداشت' : 'Notes'}</span>
+                    <p className="text-white/70 text-sm whitespace-pre-wrap">{detailItem.notes}</p>
+                  </div>
+                )}
+
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex flex-col gap-2">
+                  <span className="text-xs font-medium text-white/60">{isRTL ? 'نمایش عمومی' : 'Public Listing'}</span>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-white/50">{isRTL ? 'نمایش در فهرست عمومی' : 'Show in public list'}</span>
+                    <span className="text-white/80">{detailItem.show_in_public_list ? (isRTL ? 'بله' : 'Yes') : (isRTL ? 'خیر' : 'No')}</span>
+                  </div>
+                  {detailItem.show_in_public_list && (
+                    <>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-white/50">{isRTL ? 'نوع نام نمایشی' : 'Display name type'}</span>
+                        <span className="text-white/80">
+                          {DISPLAY_NAME_CHOICE_OPTIONS(isRTL).find((o) => o.value === detailItem.display_name_choice)?.label}
+                        </span>
+                      </div>
+                      {detailItem.display_name_choice === 'custom' && detailItem.public_display_name && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-white/50">{isRTL ? 'نام دلخواه' : 'Custom name'}</span>
+                          <span className="text-white/80">{detailItem.public_display_name}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {detailItem.message && (
+                    <div>
+                      <span className="block text-white/50 text-sm mb-1">{isRTL ? 'پیام' : 'Message'}</span>
+                      <p className="text-white/80 text-sm whitespace-pre-wrap">{detailItem.message}</p>
                     </div>
                   )}
-                </>
-              )}
-              {detailItem.message && (
-                <div>
-                  <span className="block text-white/50 text-sm mb-1">{isRTL ? 'پیام' : 'Message'}</span>
-                  <p className="text-white/80 text-sm whitespace-pre-wrap">{detailItem.message}</p>
                 </div>
-              )}
-            </div>
+              </>
+            )}
 
             {/* Receipt image */}
             {detailItem.receipt_image && (
@@ -639,34 +651,58 @@ export default function AdminContributionsPage() {
             {/* Approve / Reject actions */}
             {canManage && (detailItem.status === 'pending' || detailItem.status === 'pending_review') && (
               <div className="flex flex-col gap-3 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                <AdminTextarea
-                  label={isRTL ? 'دلیل رد (در صورت رد کردن)' : 'Rejection reason (if rejecting)'}
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  rows={2}
-                />
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={approveFromDetail}
-                    disabled={detailActionLoading}
-                    className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
-                    style={{ border: '1px solid rgba(16,185,129,0.35)', color: '#10b981', backgroundColor: 'rgba(16,185,129,0.06)' }}
-                  >
-                    <Check className="w-4 h-4" />
-                    {isRTL ? 'تأیید' : 'Approve'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={rejectFromDetail}
-                    disabled={detailActionLoading}
-                    className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
-                    style={{ border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.06)' }}
-                  >
-                    <X className="w-4 h-4" />
-                    {isRTL ? 'رد' : 'Reject'}
-                  </button>
-                </div>
+                {rejecting ? (
+                  <>
+                    <AdminTextarea
+                      label={isRTL ? 'دلیل رد (اختیاری)' : 'Rejection reason (optional)'}
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      rows={2}
+                    />
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={confirmReject}
+                        disabled={statusActionLoading}
+                        className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
+                        style={{ border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.06)' }}
+                      >
+                        <X className="w-4 h-4" />
+                        {isRTL ? 'تأیید رد' : 'Confirm Reject'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setRejecting(false); setRejectReason(''); }}
+                        className="rounded-xl px-5 py-2.5 text-sm font-medium text-white/60 hover:text-white/90 transition-colors"
+                      >
+                        {isRTL ? 'انصراف' : 'Cancel'}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={approve}
+                      disabled={statusActionLoading}
+                      className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
+                      style={{ border: '1px solid rgba(16,185,129,0.35)', color: '#10b981', backgroundColor: 'rgba(16,185,129,0.06)' }}
+                    >
+                      <Check className="w-4 h-4" />
+                      {isRTL ? 'تأیید' : 'Approve'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRejecting(true)}
+                      disabled={statusActionLoading}
+                      className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
+                      style={{ border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.06)' }}
+                    >
+                      <X className="w-4 h-4" />
+                      {isRTL ? 'رد' : 'Reject'}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -680,97 +716,6 @@ export default function AdminContributionsPage() {
           onClose={() => setLightboxSrc(null)}
         />
       )}
-
-      {/* Edit modal */}
-      <AdminModal isOpen={editModalOpen} onClose={() => setEditModalOpen(false)} title={isRTL ? 'ویرایش مشارکت' : 'Edit Contribution'} maxWidth="max-w-2xl">
-        {editLoading ? (
-          <div className="py-8 text-center text-white/40 text-sm">{isRTL ? 'در حال بارگذاری...' : 'Loading...'}</div>
-        ) : (
-          <form onSubmit={submitEdit} className="flex flex-col gap-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <AdminInput label={isRTL ? 'نام مشارکت‌کننده' : 'Contributor Name'} value={editGuestName} onChange={(e) => setEditGuestName(e.target.value)} />
-              <AdminInput label={isRTL ? 'مبلغ' : 'Amount'} type="number" min="0" step="0.01" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} required />
-              <AdminSelect
-                label={isRTL ? 'واحد پول' : 'Currency'}
-                value={editCurrency}
-                onChange={(e) => setEditCurrency(e.target.value)}
-                options={(SETTINGS_META.default_currency.options || []).map((o) => ({
-                  value: o.value,
-                  label: isRTL ? o.label.fa : o.label.en,
-                }))}
-              />
-              <AdminSelect
-                label={isRTL ? 'روش پرداخت' : 'Payment Method'}
-                value={editPaymentMethod}
-                onChange={(e) => setEditPaymentMethod(e.target.value)}
-                options={Object.entries(PAYMENT_METHOD_LABELS).map(([value, meta]) => ({
-                  value,
-                  label: isRTL ? meta.fa : meta.en,
-                }))}
-              />
-              <AdminSelect
-                label={isRTL ? 'وضعیت' : 'Status'}
-                value={editStatus}
-                onChange={(e) => setEditStatus(e.target.value)}
-                options={STATUS_OPTIONS_BIDIRECTIONAL(isRTL)}
-              />
-            </div>
-
-            <AdminTextarea label={isRTL ? 'یادداشت' : 'Notes'} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={2} />
-
-            {editStatus === 'failed' && (
-              <AdminTextarea label={isRTL ? 'دلیل رد' : 'Rejection reason'} value={editRejectionReason} onChange={(e) => setEditRejectionReason(e.target.value)} rows={2} />
-            )}
-
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex flex-col gap-3">
-              <AdminToggle
-                checked={editShowInPublicList}
-                onChange={setEditShowInPublicList}
-                label={isRTL ? 'نمایش در فهرست عمومی مشارکت‌کنندگان' : 'Show in public contributors list'}
-              />
-              {editShowInPublicList && (
-                <>
-                  <AdminSelect
-                    label={isRTL ? 'نوع نام نمایشی' : 'Display name type'}
-                    value={editDisplayNameChoice}
-                    onChange={(e) => setEditDisplayNameChoice(e.target.value as ContributionDisplayNameChoice)}
-                    options={DISPLAY_NAME_CHOICE_OPTIONS(isRTL)}
-                  />
-                  {editDisplayNameChoice === 'custom' && (
-                    <AdminInput
-                      label={isRTL ? 'نام دلخواه' : 'Custom name'}
-                      value={editPublicDisplayName}
-                      onChange={(e) => setEditPublicDisplayName(e.target.value)}
-                      maxLength={100}
-                    />
-                  )}
-                </>
-              )}
-              <AdminTextarea
-                label={isRTL ? `پیام (${editMessage.length}/150)` : `Message (${editMessage.length}/150)`}
-                value={editMessage}
-                onChange={(e) => setEditMessage(e.target.value.slice(0, 150))}
-                rows={2}
-                maxLength={150}
-              />
-            </div>
-
-            <div className="flex items-center gap-3 mt-1">
-              <button
-                type="submit"
-                disabled={editSaving}
-                className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
-                style={{ backgroundColor: '#00ffff', color: '#0a0a0f', boxShadow: '0 0 16px rgba(0,255,255,0.3)' }}
-              >
-                {editSaving ? (isRTL ? 'در حال ذخیره...' : 'Saving...') : (isRTL ? 'ذخیره' : 'Save')}
-              </button>
-              <button type="button" onClick={() => setEditModalOpen(false)} className="rounded-xl px-5 py-2.5 text-sm font-medium text-white/60 hover:text-white/90 transition-colors">
-                {isRTL ? 'انصراف' : 'Cancel'}
-              </button>
-            </div>
-          </form>
-        )}
-      </AdminModal>
     </div>
   );
 }

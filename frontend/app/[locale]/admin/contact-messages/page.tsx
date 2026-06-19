@@ -118,7 +118,12 @@ export default function AdminContactMessagesPage() {
     {
       key: 'sender',
       header: isRTL ? 'فرستنده' : 'Sender',
-      render: (m) => <span className="text-white/40 text-xs">{m.sender_label || (isRTL ? '—' : '—')}</span>,
+      render: (m) => (
+        <span className="text-white/40 text-xs">
+          {m.sender_label || '—'}
+          {m.sender_member_number && <span> (#{m.sender_member_number})</span>}
+        </span>
+      ),
     },
     {
       key: 'status',
@@ -240,7 +245,12 @@ export default function AdminContactMessagesPage() {
               </div>
               <div>
                 <span className="block text-xs text-white/40 mb-1">{isRTL ? 'فرستنده' : 'Sender'}</span>
-                <span className="text-white/60 text-sm">{detailItem.sender_label || '—'}</span>
+                <span className="text-white/60 text-sm">
+                  {detailItem.sender_label || '—'}
+                  {detailItem.sender_member_number && (
+                    <span className="text-white/40 text-xs"> (#{detailItem.sender_member_number})</span>
+                  )}
+                </span>
               </div>
               <div>
                 <span className="block text-xs text-white/40 mb-1">{isRTL ? 'وضعیت' : 'Status'}</span>

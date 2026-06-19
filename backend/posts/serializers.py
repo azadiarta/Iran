@@ -49,19 +49,22 @@ class PostUpdateSerializer(serializers.ModelSerializer):
         }
 
 
+# Admin-only — includes the raw id and member_number, which must never be
+# exposed publicly. Only used by CommentAdminDetailSerializer (gated by
+# can_approve_comments), never by the public CommentSerializer below.
 class CommentAuthorSerializer(serializers.Serializer):
     id = serializers.UUIDField(read_only=True)
     display_name = serializers.CharField(read_only=True)
     full_name = serializers.CharField(read_only=True)
+    member_number = serializers.IntegerField(read_only=True)
 
 
 class CommentSerializer(serializers.ModelSerializer):
-    author = CommentAuthorSerializer(read_only=True)
     author_label = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
-        fields = ['id', 'author', 'author_label', 'guest_name', 'text', 'rating', 'status', 'created_at']
+        fields = ['id', 'author_label', 'guest_name', 'text', 'rating', 'status', 'created_at']
         read_only_fields = ['id', 'status', 'created_at']
 
     def get_author_label(self, obj):
@@ -83,8 +86,8 @@ class CommentCreateSerializer(serializers.ModelSerializer):
         return data
 
     def validate_rating(self, value):
-        if value is not None and not (1 <= value <= 5):
-            raise serializers.ValidationError('Rating must be between 1 and 5.')
+        if value is None or not (1 <= value <= 5):
+            raise serializers.ValidationError('A rating between 1 and 5 is required.')
         return value
 
     def create(self, validated_data):
@@ -157,8 +160,8 @@ class CommentOwnerEditSerializer(serializers.ModelSerializer):
         fields = ['text', 'rating']
 
     def validate_rating(self, value):
-        if value is not None and not (1 <= value <= 5):
-            raise serializers.ValidationError('Rating must be between 1 and 5.')
+        if value is None or not (1 <= value <= 5):
+            raise serializers.ValidationError('A rating between 1 and 5 is required.')
         return value
 
     def update(self, instance, validated_data):

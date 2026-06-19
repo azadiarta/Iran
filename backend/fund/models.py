@@ -1,3 +1,4 @@
+import random
 import uuid
 from django.db import models
 
@@ -17,6 +18,10 @@ class Contribution(models.Model):
         FAILED         = 'failed',         'Failed'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    # System-assigned lookup code (never user-supplied), used by admins to find
+    # a contribution quickly (e.g. when a contributor quotes it in a support
+    # request). Immutable once assigned — see save()/_generate_tracking_code().
+    tracking_code = models.CharField(max_length=20, unique=True, editable=False, blank=True)
     contributor = models.ForeignKey(
         'accounts.Member', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='contributions',
@@ -48,6 +53,19 @@ class Contribution(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        if not self.tracking_code:
+            self.tracking_code = self._generate_tracking_code()
+        super().save(*args, **kwargs)
+
+    @staticmethod
+    def _generate_tracking_code():
+        for _ in range(20):
+            candidate = f'FUND-{random.randint(100000, 999999)}'
+            if not Contribution.objects.filter(tracking_code=candidate).exists():
+                return candidate
+        raise RuntimeError('Could not generate a unique tracking code.')
 
     def __str__(self):
         name = (

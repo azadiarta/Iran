@@ -5,7 +5,7 @@ from django.db.models import Q, Sum
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
-from accounts.permissions import HasGroupPermission, IsSuperuser
+from accounts.permissions import HasGroupPermission
 from core.models import DefaultSetting
 from core.pagination import paginate
 from core.utils import api_error, api_success
@@ -78,6 +78,15 @@ class ContributionListView(APIView):
         if contributor_id:
             qs = qs.filter(contributor__id=contributor_id)
 
+        search = request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                Q(guest_name__icontains=search)
+                | Q(contributor__full_name__icontains=search)
+                | Q(contributor__display_name__icontains=search)
+                | Q(tracking_code__icontains=search)
+            )
+
         return paginate(qs, request, ContributionSerializer)
 
 
@@ -134,29 +143,6 @@ class ContributionStatusUpdateView(APIView):
             ip=_get_ip(request),
         )
         return api_success(ContributionSerializer(contribution).data, message='Status updated.')
-
-
-class ContributionDeleteView(APIView):
-    permission_classes = [IsAuthenticated, IsSuperuser]
-
-    def delete(self, request, pk):
-        try:
-            contribution = Contribution.objects.get(pk=pk)
-        except Contribution.DoesNotExist:
-            return api_error('Contribution not found.', status_code=404)
-
-        _log(
-            request.user, 'contribution_deleted', target=contribution,
-            extra_data={
-                'amount': str(contribution.amount),
-                'currency': contribution.currency,
-                'contributor': str(contribution.contributor) if contribution.contributor else (contribution.guest_name or 'Guest'),
-                'status': contribution.status,
-            },
-            ip=_get_ip(request),
-        )
-        contribution.delete()
-        return api_success(message='Contribution deleted.')
 
 
 class ContributionPublicListView(APIView):

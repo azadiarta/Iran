@@ -1,24 +1,19 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { Check, X, Trash2, Eye, Pencil, Star } from 'lucide-react';
+import { Check, X, Eye, Star } from 'lucide-react';
 import AdminTable, { AdminTableColumn } from '@/components/admin/AdminTable';
 import AdminBadge from '@/components/admin/AdminBadge';
 import AdminModal from '@/components/admin/AdminModal';
 import AdminSelect from '@/components/admin/fields/AdminSelect';
 import AdminInput from '@/components/admin/fields/AdminInput';
 import AdminTextarea from '@/components/admin/fields/AdminTextarea';
-import AdminConfirmDialog from '@/components/admin/AdminConfirmDialog';
 import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
 import { commentsAPI, Comment, CommentDetail, CommentStatus, Paginated } from '@/lib/api';
 
-const STATUS_OPTIONS_BIDIRECTIONAL = (isRTL: boolean) => [
-  { value: 'pending', label: isRTL ? 'در انتظار' : 'Pending' },
-  { value: 'approved', label: isRTL ? 'تأیید شده' : 'Approved' },
-  { value: 'rejected', label: isRTL ? 'رد شده' : 'Rejected' },
-];
-
+// "No rating" stays selectable here (unlike the public submission form) so
+// admins can still view/edit legacy comments that predate mandatory ratings.
 const RATING_OPTIONS = (isRTL: boolean) => [
   { value: '0', label: isRTL ? 'بدون امتیاز' : 'No rating' },
   { value: '1', label: '1' },
@@ -28,7 +23,6 @@ const RATING_OPTIONS = (isRTL: boolean) => [
   { value: '5', label: '5' },
 ];
 
-type ConfirmAction = { type: 'approve' | 'reject' | 'delete'; comment: Comment } | null;
 type TargetFilter = '' | 'post' | 'expense';
 
 export default function AdminCommentsPage() {
@@ -42,7 +36,6 @@ export default function AdminCommentsPage() {
 
   const isSuperuser = !!currentMember?.is_superuser;
   const canManage = isSuperuser || hasPermission('can_approve_comments');
-  const canDelete = isSuperuser || hasPermission('can_manage_permissions');
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,25 +51,16 @@ export default function AdminCommentsPage() {
   const [memberFilterId, setMemberFilterId] = useState(searchParams.get('member') || '');
   const [memberFilterName, setMemberFilterName] = useState(searchParams.get('name') || '');
 
-  const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
-  const [actionLoading, setActionLoading] = useState(false);
-
-  // Details modal
+  // Unified detail modal — viewing, editing, approving and rejecting all happen here.
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [detailItem, setDetailItem] = useState<CommentDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [detailActionLoading, setDetailActionLoading] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
-
-  // Edit modal
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editLoading, setEditLoading] = useState(false);
-  const [editSaving, setEditSaving] = useState(false);
   const [editText, setEditText] = useState('');
   const [editRating, setEditRating] = useState('0');
-  const [editStatus, setEditStatus] = useState<CommentStatus>('pending');
-  const [editRejectionReason, setEditRejectionReason] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [statusActionLoading, setStatusActionLoading] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
 
   function load() {
     setLoading(true);
@@ -116,37 +100,18 @@ export default function AdminCommentsPage() {
     router.replace(`/${locale}/admin/comments`);
   }
 
-  async function runAction() {
-    if (!confirmAction) return;
-    setActionLoading(true);
-    try {
-      if (confirmAction.type === 'approve') {
-        await commentsAPI.updateStatus(confirmAction.comment.id, 'approved');
-        showToast('success', isRTL ? 'نظر تأیید شد' : 'Comment approved');
-      } else if (confirmAction.type === 'reject') {
-        await commentsAPI.updateStatus(confirmAction.comment.id, 'rejected');
-        showToast('success', isRTL ? 'نظر رد شد' : 'Comment rejected');
-      } else {
-        await commentsAPI.delete(confirmAction.comment.id);
-        showToast('success', isRTL ? 'نظر حذف شد' : 'Comment deleted');
-      }
-      setConfirmAction(null);
-      load();
-    } catch {
-      showToast('error', isRTL ? 'انجام عملیات ناموفق بود' : 'Action failed');
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
   async function openDetail(c: Comment) {
     setDetailModalOpen(true);
     setDetailLoading(true);
     setDetailItem(null);
+    setRejecting(false);
     setRejectReason('');
     try {
       const res = await commentsAPI.getDetail(c.id);
-      setDetailItem(res.data as unknown as CommentDetail);
+      const d = res.data as unknown as CommentDetail;
+      setDetailItem(d);
+      setEditText(d.text);
+      setEditRating(String(d.rating || 0));
     } catch {
       showToast('error', isRTL ? 'بارگذاری جزئیات ناموفق بود' : 'Failed to load details');
       setDetailModalOpen(false);
@@ -155,81 +120,60 @@ export default function AdminCommentsPage() {
     }
   }
 
-  async function approveFromDetail() {
+  async function saveEdit() {
     if (!detailItem) return;
-    setDetailActionLoading(true);
-    try {
-      await commentsAPI.updateStatus(detailItem.id, 'approved');
-      showToast('success', isRTL ? 'نظر تأیید شد' : 'Comment approved');
-      setDetailModalOpen(false);
-      load();
-    } catch {
-      showToast('error', isRTL ? 'انجام عملیات ناموفق بود' : 'Action failed');
-    } finally {
-      setDetailActionLoading(false);
-    }
-  }
-
-  async function rejectFromDetail() {
-    if (!detailItem) return;
-    if (!rejectReason.trim()) {
-      showToast('warning', isRTL ? 'دلیل رد را وارد کنید' : 'Enter a reason for rejection');
-      return;
-    }
-    setDetailActionLoading(true);
-    try {
-      await commentsAPI.update(detailItem.id, { status: 'rejected', rejection_reason: rejectReason.trim() });
-      showToast('success', isRTL ? 'نظر رد شد' : 'Comment rejected');
-      setDetailModalOpen(false);
-      load();
-    } catch {
-      showToast('error', isRTL ? 'انجام عملیات ناموفق بود' : 'Action failed');
-    } finally {
-      setDetailActionLoading(false);
-    }
-  }
-
-  async function openEdit(c: Comment) {
-    setEditModalOpen(true);
-    setEditLoading(true);
-    setEditId(c.id);
-    try {
-      const res = await commentsAPI.getDetail(c.id);
-      const d = res.data as unknown as CommentDetail;
-      setEditText(d.text);
-      setEditRating(String(d.rating || 0));
-      setEditStatus(d.status);
-      setEditRejectionReason(d.rejection_reason || '');
-    } catch {
-      showToast('error', isRTL ? 'بارگذاری جزئیات ناموفق بود' : 'Failed to load details');
-      setEditModalOpen(false);
-    } finally {
-      setEditLoading(false);
-    }
-  }
-
-  async function submitEdit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!editId) return;
     if (!editText.trim()) {
       showToast('warning', isRTL ? 'متن نظر را وارد کنید' : 'Enter the comment text');
       return;
     }
-    setEditSaving(true);
+    setSavingEdit(true);
     try {
-      await commentsAPI.update(editId, {
-        text: editText,
+      const res = await commentsAPI.update(detailItem.id, {
+        text: editText.trim(),
         rating: parseInt(editRating, 10) || null,
-        status: editStatus,
-        rejection_reason: editRejectionReason,
       });
-      showToast('success', isRTL ? 'نظر با موفقیت ویرایش شد' : 'Comment updated successfully');
-      setEditModalOpen(false);
+      setDetailItem(res.data as unknown as CommentDetail);
+      showToast('success', isRTL ? 'تغییرات ذخیره شد' : 'Changes saved');
       load();
     } catch {
-      showToast('error', isRTL ? 'ویرایش نظر ناموفق بود' : 'Failed to update comment');
+      showToast('error', isRTL ? 'ذخیره تغییرات ناموفق بود' : 'Failed to save changes');
     } finally {
-      setEditSaving(false);
+      setSavingEdit(false);
+    }
+  }
+
+  async function approve() {
+    if (!detailItem) return;
+    setStatusActionLoading(true);
+    try {
+      const res = await commentsAPI.updateStatus(detailItem.id, 'approved');
+      setDetailItem(res.data as unknown as CommentDetail);
+      showToast('success', isRTL ? 'نظر تأیید شد' : 'Comment approved');
+      load();
+    } catch {
+      showToast('error', isRTL ? 'انجام عملیات ناموفق بود' : 'Action failed');
+    } finally {
+      setStatusActionLoading(false);
+    }
+  }
+
+  async function confirmReject() {
+    if (!detailItem) return;
+    setStatusActionLoading(true);
+    try {
+      const res = await commentsAPI.update(detailItem.id, {
+        status: 'rejected',
+        rejection_reason: rejectReason.trim(),
+      });
+      setDetailItem(res.data as unknown as CommentDetail);
+      showToast('success', isRTL ? 'نظر رد شد' : 'Comment rejected');
+      setRejecting(false);
+      setRejectReason('');
+      load();
+    } catch {
+      showToast('error', isRTL ? 'انجام عملیات ناموفق بود' : 'Action failed');
+    } finally {
+      setStatusActionLoading(false);
     }
   }
 
@@ -240,24 +184,6 @@ export default function AdminCommentsPage() {
       </div>
     );
   }
-
-  const confirmCopy = {
-    approve: {
-      title: isRTL ? 'تأیید نظر' : 'Approve Comment',
-      message: isRTL ? 'آیا از تأیید این نظر مطمئن هستید؟' : 'Are you sure you want to approve this comment?',
-      label: isRTL ? 'تأیید' : 'Approve',
-    },
-    reject: {
-      title: isRTL ? 'رد نظر' : 'Reject Comment',
-      message: isRTL ? 'آیا از رد این نظر مطمئن هستید؟' : 'Are you sure you want to reject this comment?',
-      label: isRTL ? 'رد کن' : 'Reject',
-    },
-    delete: {
-      title: isRTL ? 'حذف نظر' : 'Delete Comment',
-      message: isRTL ? 'این عمل غیرقابل بازگشت است. آیا از حذف این نظر مطمئن هستید؟' : 'This action is irreversible. Are you sure you want to delete this comment?',
-      label: isRTL ? 'حذف کن' : 'Delete',
-    },
-  };
 
   const columns: AdminTableColumn<Comment>[] = [
     {
@@ -293,54 +219,14 @@ export default function AdminCommentsPage() {
       key: 'actions',
       header: '',
       render: (c) => (
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => openDetail(c)}
-            className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
-            style={{ border: '1px solid rgba(0,255,255,0.25)', color: '#00ffff', backgroundColor: 'rgba(0,255,255,0.06)' }}
-            aria-label={isRTL ? 'جزئیات' : 'Details'}
-          >
-            <Eye className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => openEdit(c)}
-            className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
-            style={{ border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)', backgroundColor: 'rgba(255,255,255,0.04)' }}
-            aria-label={isRTL ? 'ویرایش' : 'Edit'}
-          >
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-          {c.status === 'pending' && (
-            <>
-              <button
-                onClick={() => setConfirmAction({ type: 'approve', comment: c })}
-                className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
-                style={{ border: '1px solid rgba(16,185,129,0.35)', color: '#10b981', backgroundColor: 'rgba(16,185,129,0.06)' }}
-              >
-                <Check className="w-3.5 h-3.5" />
-                {isRTL ? 'تأیید' : 'Approve'}
-              </button>
-              <button
-                onClick={() => setConfirmAction({ type: 'reject', comment: c })}
-                className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
-                style={{ border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.06)' }}
-              >
-                <X className="w-3.5 h-3.5" />
-                {isRTL ? 'رد' : 'Reject'}
-              </button>
-            </>
-          )}
-          {canDelete && (
-            <button
-              onClick={() => setConfirmAction({ type: 'delete', comment: c })}
-              className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
-              style={{ border: '1px solid rgba(239,68,68,0.25)', color: 'rgba(239,68,68,0.8)', backgroundColor: 'transparent' }}
-              aria-label={isRTL ? 'حذف' : 'Delete'}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
+        <button
+          onClick={() => openDetail(c)}
+          className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
+          style={{ border: '1px solid rgba(0,255,255,0.25)', color: '#00ffff', backgroundColor: 'rgba(0,255,255,0.06)' }}
+          aria-label={isRTL ? 'جزئیات' : 'Details'}
+        >
+          <Eye className="w-3.5 h-3.5" />
+        </button>
       ),
     },
   ];
@@ -414,18 +300,7 @@ export default function AdminCommentsPage() {
         }}
       />
 
-      <AdminConfirmDialog
-        isOpen={!!confirmAction}
-        onClose={() => setConfirmAction(null)}
-        onConfirm={runAction}
-        loading={actionLoading}
-        title={confirmAction ? confirmCopy[confirmAction.type].title : ''}
-        message={confirmAction ? confirmCopy[confirmAction.type].message : ''}
-        confirmLabel={confirmAction ? confirmCopy[confirmAction.type].label : ''}
-        cancelLabel={isRTL ? 'انصراف' : 'Cancel'}
-      />
-
-      {/* Details modal */}
+      {/* Unified detail modal — view, edit, approve and reject all happen here */}
       <AdminModal isOpen={detailModalOpen} onClose={() => setDetailModalOpen(false)} title={isRTL ? 'جزئیات نظر' : 'Comment Details'} maxWidth="max-w-2xl">
         {detailLoading || !detailItem ? (
           <div className="py-8 text-center text-white/40 text-sm">{isRTL ? 'در حال بارگذاری...' : 'Loading...'}</div>
@@ -434,18 +309,12 @@ export default function AdminCommentsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <span className="block text-xs text-white/40 mb-1">{isRTL ? 'نویسنده' : 'Author'}</span>
-                <span className="text-white/80 text-sm">{detailItem.author_label || detailItem.guest_name || (isRTL ? 'مهمان' : 'Guest')}</span>
-              </div>
-              <div>
-                <span className="block text-xs text-white/40 mb-1">{isRTL ? 'امتیاز' : 'Rating'}</span>
-                {typeof detailItem.rating === 'number' && detailItem.rating > 0 ? (
-                  <span className="flex items-center gap-1 text-sm" style={{ color: '#fbbf24' }}>
-                    <Star className="w-4 h-4" fill="#fbbf24" />
-                    {detailItem.rating}
-                  </span>
-                ) : (
-                  <span className="text-white/30 text-sm">—</span>
-                )}
+                <span className="text-white/80 text-sm">
+                  {detailItem.author_label || detailItem.guest_name || (isRTL ? 'مهمان' : 'Guest')}
+                  {detailItem.author?.member_number && (
+                    <span className="text-white/40 text-xs"> (#{detailItem.author.member_number})</span>
+                  )}
+                </span>
               </div>
               <div>
                 <span className="block text-xs text-white/40 mb-1">{isRTL ? 'هدف نظر' : 'Target'}</span>
@@ -462,15 +331,21 @@ export default function AdminCommentsPage() {
                 <span className="block text-xs text-white/40 mb-1">{isRTL ? 'تاریخ ایجاد' : 'Created'}</span>
                 <span className="text-white/60 text-xs">{new Date(detailItem.created_at).toLocaleString(locale === 'fa' ? 'fa-IR' : 'en-US')}</span>
               </div>
-              <div>
-                <span className="block text-xs text-white/40 mb-1">{isRTL ? 'آخرین بروزرسانی' : 'Last Updated'}</span>
-                <span className="text-white/60 text-xs">{new Date(detailItem.updated_at).toLocaleString(locale === 'fa' ? 'fa-IR' : 'en-US')}</span>
-              </div>
             </div>
 
+            <AdminTextarea label={isRTL ? 'متن نظر' : 'Comment Text'} value={editText} onChange={(e) => setEditText(e.target.value)} rows={4} />
+            <AdminSelect label={isRTL ? 'امتیاز' : 'Rating'} value={editRating} onChange={(e) => setEditRating(e.target.value)} options={RATING_OPTIONS(isRTL)} />
+
             <div>
-              <span className="block text-xs text-white/40 mb-1">{isRTL ? 'متن نظر' : 'Comment Text'}</span>
-              <p className="text-white/70 text-sm whitespace-pre-wrap">{detailItem.text}</p>
+              <button
+                type="button"
+                onClick={saveEdit}
+                disabled={savingEdit}
+                className="rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
+                style={{ backgroundColor: '#00ffff', color: '#0a0a0f', boxShadow: '0 0 16px rgba(0,255,255,0.3)' }}
+              >
+                {savingEdit ? (isRTL ? 'در حال ذخیره...' : 'Saving...') : (isRTL ? 'ذخیره متن و امتیاز' : 'Save text & rating')}
+              </button>
             </div>
 
             {detailItem.status === 'rejected' && detailItem.rejection_reason && (
@@ -482,75 +357,61 @@ export default function AdminCommentsPage() {
 
             {detailItem.status === 'pending' && (
               <div className="flex flex-col gap-3 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                <AdminTextarea
-                  label={isRTL ? 'دلیل رد (در صورت رد کردن)' : 'Rejection reason (if rejecting)'}
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  rows={2}
-                />
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={approveFromDetail}
-                    disabled={detailActionLoading}
-                    className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
-                    style={{ border: '1px solid rgba(16,185,129,0.35)', color: '#10b981', backgroundColor: 'rgba(16,185,129,0.06)' }}
-                  >
-                    <Check className="w-4 h-4" />
-                    {isRTL ? 'تأیید' : 'Approve'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={rejectFromDetail}
-                    disabled={detailActionLoading}
-                    className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
-                    style={{ border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.06)' }}
-                  >
-                    <X className="w-4 h-4" />
-                    {isRTL ? 'رد' : 'Reject'}
-                  </button>
-                </div>
+                {rejecting ? (
+                  <>
+                    <AdminTextarea
+                      label={isRTL ? 'دلیل رد (اختیاری)' : 'Rejection reason (optional)'}
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      rows={2}
+                    />
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={confirmReject}
+                        disabled={statusActionLoading}
+                        className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
+                        style={{ border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.06)' }}
+                      >
+                        <X className="w-4 h-4" />
+                        {isRTL ? 'تأیید رد' : 'Confirm Reject'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setRejecting(false); setRejectReason(''); }}
+                        className="rounded-xl px-5 py-2.5 text-sm font-medium text-white/60 hover:text-white/90 transition-colors"
+                      >
+                        {isRTL ? 'انصراف' : 'Cancel'}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={approve}
+                      disabled={statusActionLoading}
+                      className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
+                      style={{ border: '1px solid rgba(16,185,129,0.35)', color: '#10b981', backgroundColor: 'rgba(16,185,129,0.06)' }}
+                    >
+                      <Check className="w-4 h-4" />
+                      {isRTL ? 'تأیید' : 'Approve'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRejecting(true)}
+                      disabled={statusActionLoading}
+                      className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
+                      style={{ border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.06)' }}
+                    >
+                      <X className="w-4 h-4" />
+                      {isRTL ? 'رد' : 'Reject'}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
-      </AdminModal>
-
-      {/* Edit modal */}
-      <AdminModal isOpen={editModalOpen} onClose={() => setEditModalOpen(false)} title={isRTL ? 'ویرایش نظر' : 'Edit Comment'} maxWidth="max-w-2xl">
-        {editLoading ? (
-          <div className="py-8 text-center text-white/40 text-sm">{isRTL ? 'در حال بارگذاری...' : 'Loading...'}</div>
-        ) : (
-          <form onSubmit={submitEdit} className="flex flex-col gap-4">
-            <AdminTextarea label={isRTL ? 'متن نظر' : 'Comment Text'} value={editText} onChange={(e) => setEditText(e.target.value)} rows={4} />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <AdminSelect label={isRTL ? 'امتیاز' : 'Rating'} value={editRating} onChange={(e) => setEditRating(e.target.value)} options={RATING_OPTIONS(isRTL)} />
-              <AdminSelect
-                label={isRTL ? 'وضعیت' : 'Status'}
-                value={editStatus}
-                onChange={(e) => setEditStatus(e.target.value as CommentStatus)}
-                options={STATUS_OPTIONS_BIDIRECTIONAL(isRTL)}
-              />
-            </div>
-
-            {editStatus === 'rejected' && (
-              <AdminTextarea label={isRTL ? 'دلیل رد' : 'Rejection reason'} value={editRejectionReason} onChange={(e) => setEditRejectionReason(e.target.value)} rows={2} />
-            )}
-
-            <div className="flex items-center gap-3 mt-1">
-              <button
-                type="submit"
-                disabled={editSaving}
-                className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
-                style={{ backgroundColor: '#00ffff', color: '#0a0a0f', boxShadow: '0 0 16px rgba(0,255,255,0.3)' }}
-              >
-                {editSaving ? (isRTL ? 'در حال ذخیره...' : 'Saving...') : (isRTL ? 'ذخیره' : 'Save')}
-              </button>
-              <button type="button" onClick={() => setEditModalOpen(false)} className="rounded-xl px-5 py-2.5 text-sm font-medium text-white/60 hover:text-white/90 transition-colors">
-                {isRTL ? 'انصراف' : 'Cancel'}
-              </button>
-            </div>
-          </form>
         )}
       </AdminModal>
     </div>

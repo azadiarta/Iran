@@ -157,6 +157,14 @@ export const SETTINGS_META: Record<string, SettingMeta> = {
     },
     type: 'text',
   },
+  auth_sync_interval_seconds: {
+    label: { en: 'Session Sync Interval (seconds)', fa: 'فاصله همگام‌سازی نشست (ثانیه)' },
+    description: {
+      en: 'How often signed-in clients re-fetch their own profile and permissions in the background.',
+      fa: 'هر چند ثانیه یک‌بار، کاربران واردشده به‌صورت خودکار پروفایل و دسترسی‌های خود را به‌روزرسانی کنند.',
+    },
+    type: 'number',
+  },
 };
 
 // Bilingual metadata for the payment settings rendered on /admin/payments.

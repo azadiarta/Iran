@@ -39,6 +39,8 @@ DEFAULT_SETTINGS = {
     'contact_email':               ('', 'Public contact email shown on the Contact Us page.'),
     'contact_phone':               ('', 'Public contact phone number shown on the Contact Us page.'),
 
+    'auth_sync_interval_seconds':  ('15', 'How often (in seconds) logged-in clients re-fetch their own profile/permissions in the background.'),
+
     'payment_manual_enabled':         ('false', 'Whether the manual bank transfer payment method is available.'),
     'payment_manual_bank_name':       ('', 'Bank name shown to contributors for manual bank transfers.'),
     'payment_manual_account_name':    ('', 'Account holder name shown to contributors for manual bank transfers.'),
