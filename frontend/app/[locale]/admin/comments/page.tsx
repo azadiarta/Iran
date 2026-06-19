@@ -324,6 +324,10 @@ export default function AdminCommentsPage() {
                 </span>
               </div>
               <div>
+                <span className="block text-xs text-white/40 mb-1">{isRTL ? 'کد پیگیری' : 'Tracking Code'}</span>
+                <span className="text-white/80 text-sm font-mono">{detailItem.tracking_code}</span>
+              </div>
+              <div>
                 <span className="block text-xs text-white/40 mb-1">{isRTL ? 'وضعیت' : 'Status'}</span>
                 <AdminBadge status={detailItem.status} />
               </div>

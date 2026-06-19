@@ -13,6 +13,7 @@ from accounts.serializers import (
     MemberListSerializer,
     MemberUpdateSerializer,
 )
+from core.log_utils import actor_display_for, target_display_for
 from core.models import DefaultSetting
 from core.pagination import paginate
 from core.utils import api_error, api_success
@@ -22,18 +23,16 @@ from logs.models import ActivityLog
 def _log(actor, action, target=None, extra_data=None, ip=None):
     target_type = None
     target_id = None
-    target_display = ''
     if target:
         target_type = ContentType.objects.get_for_model(target)
         target_id = target.pk
-        target_display = str(target)
     ActivityLog.objects.create(
         actor=actor,
-        actor_display=str(actor),
+        actor_display=actor_display_for(actor),
         action=action,
         target_type=target_type,
         target_id=target_id,
-        target_display=target_display,
+        target_display=target_display_for(target),
         ip_address=ip,
         extra_data=extra_data,
     )
@@ -293,11 +292,10 @@ class MemberDeleteView(APIView):
             return api_error('Cannot delete superuser.', status_code=403)
 
         # Snapshot display before deletion (signal also logs, but we log here for the actor)
-        actor_display = str(request.user)
-        target_display = str(member)
+        target_display = target_display_for(member)
         ActivityLog.objects.create(
             actor=request.user,
-            actor_display=actor_display,
+            actor_display=actor_display_for(request.user),
             action='member_deleted',
             target_display=target_display,
             ip_address=_get_ip(request),

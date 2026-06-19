@@ -109,6 +109,11 @@ export default function AdminContactMessagesPage() {
 
   const columns: AdminTableColumn<ContactMessage>[] = [
     { key: 'name', header: isRTL ? 'نام' : 'Name', render: (m) => <span className="text-white/80 text-sm">{m.name}</span> },
+    {
+      key: 'tracking_code',
+      header: isRTL ? 'کد پیگیری' : 'Tracking Code',
+      render: (m) => <span className="text-white/50 text-xs font-mono">{m.tracking_code}</span>,
+    },
     { key: 'contact_info', header: isRTL ? 'راه ارتباطی' : 'Contact Info', render: (m) => <span className="text-white/60 text-xs">{m.contact_info}</span> },
     {
       key: 'message',
@@ -242,6 +247,10 @@ export default function AdminContactMessagesPage() {
               <div>
                 <span className="block text-xs text-white/40 mb-1">{isRTL ? 'راه ارتباطی' : 'Contact Info'}</span>
                 <span className="text-white/80 text-sm">{detailItem.contact_info}</span>
+              </div>
+              <div>
+                <span className="block text-xs text-white/40 mb-1">{isRTL ? 'کد پیگیری' : 'Tracking Code'}</span>
+                <span className="text-white/80 text-sm font-mono">{detailItem.tracking_code}</span>
               </div>
               <div>
                 <span className="block text-xs text-white/40 mb-1">{isRTL ? 'فرستنده' : 'Sender'}</span>

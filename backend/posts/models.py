@@ -4,6 +4,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
+from core.tracking_codes import generate_tracking_code
+
 
 class Post(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -44,6 +46,10 @@ class Comment(models.Model):
         REJECTED = 'rejected', 'Rejected'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    # System-assigned lookup code (never user-supplied), admin-panel-only —
+    # see save()/core/tracking_codes.py. Format matches Contribution and
+    # ContactMessage's tracking_code (letter 'C' for Comment).
+    tracking_code = models.CharField(max_length=20, unique=True, editable=False, blank=True)
     author = models.ForeignKey(
         'accounts.Member', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='comments',
@@ -65,6 +71,12 @@ class Comment(models.Model):
     class Meta:
         ordering = ['-created_at']
         indexes = [models.Index(fields=['content_type', 'object_id'])]
+
+    def save(self, *args, **kwargs):
+        if not self.tracking_code:
+            member_number = self.author.member_number if self.author_id else None
+            self.tracking_code = generate_tracking_code(Comment, 'C', member_number)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         name = (

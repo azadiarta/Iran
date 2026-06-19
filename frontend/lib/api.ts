@@ -269,6 +269,8 @@ export interface Comment {
 }
 
 export interface CommentDetail extends Comment {
+  // Admin-only lookup code — never exposed to the comment's own author.
+  tracking_code: string;
   author: CommentAuthor | null;
   rejection_reason: string;
   target_type: 'post' | 'expense';
@@ -871,6 +873,8 @@ export const systemAPI = {
 // ═══════════════════════════════════════════════════════════════════════════════
 export interface ContactMessage {
   id: string;
+  // Admin lookup code; only ever shown to admins or to the sender's own "my messages" view.
+  tracking_code: string;
   name: string;
   contact_info: string;
   message: string;

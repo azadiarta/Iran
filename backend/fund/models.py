@@ -1,6 +1,7 @@
-import random
 import uuid
 from django.db import models
+
+from core.tracking_codes import generate_tracking_code
 
 
 class Contribution(models.Model):
@@ -18,9 +19,9 @@ class Contribution(models.Model):
         FAILED         = 'failed',         'Failed'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    # System-assigned lookup code (never user-supplied), used by admins to find
-    # a contribution quickly (e.g. when a contributor quotes it in a support
-    # request). Immutable once assigned — see save()/_generate_tracking_code().
+    # System-assigned lookup code (never user-supplied), admin-panel-only —
+    # see save()/core/tracking_codes.py. Format matches Comment and
+    # ContactMessage's tracking_code (letter 'F' for Fund contribution).
     tracking_code = models.CharField(max_length=20, unique=True, editable=False, blank=True)
     contributor = models.ForeignKey(
         'accounts.Member', on_delete=models.SET_NULL,
@@ -56,16 +57,9 @@ class Contribution(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.tracking_code:
-            self.tracking_code = self._generate_tracking_code()
+            member_number = self.contributor.member_number if self.contributor_id else None
+            self.tracking_code = generate_tracking_code(Contribution, 'F', member_number)
         super().save(*args, **kwargs)
-
-    @staticmethod
-    def _generate_tracking_code():
-        for _ in range(20):
-            candidate = f'FUND-{random.randint(100000, 999999)}'
-            if not Contribution.objects.filter(tracking_code=candidate).exists():
-                return candidate
-        raise RuntimeError('Could not generate a unique tracking code.')
 
     def __str__(self):
         name = (

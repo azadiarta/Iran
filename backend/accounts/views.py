@@ -10,6 +10,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from accounts.models import Member
 from accounts.serializers import LoginSerializer, MemberProfileSerializer, RegisterSerializer
+from core.log_utils import actor_display_for
 from logs.models import ActivityLog
 
 
@@ -44,7 +45,7 @@ class RegisterView(APIView):
 
         _log(
             actor=member,
-            actor_display=member.display_name or member.full_name,
+            actor_display=actor_display_for(member),
             action='registered',
             ip=_get_client_ip(request),
         )
@@ -79,7 +80,7 @@ class LoginView(APIView):
             try:
                 lookup = {'email': credential} if '@' in credential else {'phone': credential}
                 found = Member.objects.get(**lookup)
-                actor, display = found, found.display_name or found.full_name
+                actor, display = found, actor_display_for(found)
             except Member.DoesNotExist:
                 pass
 
@@ -88,7 +89,7 @@ class LoginView(APIView):
             return Response({'message': 'Invalid credentials.'}, status=status.HTTP_401_UNAUTHORIZED)
 
         refresh = RefreshToken.for_user(member)
-        _log(actor=member, actor_display=member.display_name or member.full_name,
+        _log(actor=member, actor_display=actor_display_for(member),
              action='login', ip=ip)
 
         return Response({
@@ -122,7 +123,7 @@ class LogoutView(APIView):
 
         _log(
             actor=request.user,
-            actor_display=request.user.display_name or request.user.full_name,
+            actor_display=actor_display_for(request.user),
             action='logout',
             ip=_get_client_ip(request),
         )

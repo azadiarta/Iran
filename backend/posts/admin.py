@@ -7,6 +7,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.utils.html import mark_safe
 from django.utils.translation import gettext_lazy as _
 
+from core.log_utils import actor_display_for, target_display_for
 from logs.models import ActivityLog
 from posts.models import Comment, Post, PostImage
 
@@ -92,16 +93,16 @@ class PostImageAdmin(admin.ModelAdmin):
 
 @admin.register(Comment)
 class CommentAdmin(admin.ModelAdmin):
-    list_display = ['author_display', 'text_preview', 'target', 'rating', 'status', 'created_at']
+    list_display = ['tracking_code', 'author_display', 'text_preview', 'target', 'rating', 'status', 'created_at']
     list_filter = ['status', 'created_at']
-    search_fields = ['text', 'guest_name']
-    readonly_fields = ['id', 'created_at', 'updated_at']
+    search_fields = ['text', 'guest_name', 'tracking_code']
+    readonly_fields = ['id', 'tracking_code', 'created_at', 'updated_at']
     actions = ['approve_comments', 'reject_comments']
 
     fieldsets = [
         (_('Author'),   {'fields': ['author', 'guest_name']}),
         (_('Content'),  {'fields': ['content_type', 'object_id', 'text', 'rating', 'status', 'rejection_reason']}),
-        (_('Meta'),     {'fields': ['id', 'created_at', 'updated_at'], 'classes': ['collapse']}),
+        (_('Meta'),     {'fields': ['id', 'tracking_code', 'created_at', 'updated_at'], 'classes': ['collapse']}),
     ]
 
     def author_display(self, obj):
@@ -129,11 +130,11 @@ class CommentAdmin(admin.ModelAdmin):
         for obj in queryset:
             ActivityLog.objects.create(
                 actor=request.user,
-                actor_display=str(request.user),
+                actor_display=actor_display_for(request.user),
                 action='comment_approved_via_admin',
                 target_type=ContentType.objects.get_for_model(obj),
                 target_id=obj.pk,
-                target_display=str(obj),
+                target_display=target_display_for(obj),
                 ip_address=_get_ip(request),
             )
         self.message_user(request, f'{updated} comment(s) approved.')
@@ -144,11 +145,11 @@ class CommentAdmin(admin.ModelAdmin):
         for obj in queryset:
             ActivityLog.objects.create(
                 actor=request.user,
-                actor_display=str(request.user),
+                actor_display=actor_display_for(request.user),
                 action='comment_rejected_via_admin',
                 target_type=ContentType.objects.get_for_model(obj),
                 target_id=obj.pk,
-                target_display=str(obj),
+                target_display=target_display_for(obj),
                 ip_address=_get_ip(request),
             )
         self.message_user(request, f'{updated} comment(s) rejected.')

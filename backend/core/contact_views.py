@@ -5,6 +5,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
 from accounts.permissions import HasGroupPermission
+from core.log_utils import actor_display_for, target_display_for
 from core.models import ContactMessage
 from core.pagination import paginate
 from core.serializers import ContactMessageCreateSerializer, ContactMessageSerializer
@@ -13,21 +14,18 @@ from logs.models import ActivityLog
 
 
 def _log(actor, action, target=None, extra_data=None, ip=None):
-    actor_display = str(actor) if (actor and actor.is_authenticated) else 'guest'
     target_type = None
     target_id = None
-    target_display = ''
     if target:
         target_type = ContentType.objects.get_for_model(target)
         target_id = target.pk
-        target_display = str(target)
     ActivityLog.objects.create(
-        actor=actor if (actor and actor.is_authenticated) else None,
-        actor_display=actor_display,
+        actor=actor,
+        actor_display=actor_display_for(actor),
         action=action,
         target_type=target_type,
         target_id=target_id,
-        target_display=target_display,
+        target_display=target_display_for(target),
         ip_address=ip,
         extra_data=extra_data,
     )
@@ -47,12 +45,21 @@ class ContactMessageCreateView(APIView):
     def post(self, request):
         if request.user.is_authenticated:
             pending_count = ContactMessage.objects.filter(sender=request.user, is_handled=False).count()
-            if pending_count >= MAX_PENDING_MESSAGES:
-                return api_error(
-                    'You have reached the maximum of 4 unresolved messages. '
-                    'Please wait until they are handled before submitting a new one.',
-                    status_code=429,
-                )
+        else:
+            contact_info = (request.data.get('contact_info') or '').strip()
+            pending_count = (
+                ContactMessage.objects.filter(
+                    sender__isnull=True, contact_info=contact_info, is_handled=False,
+                ).count()
+                if contact_info else 0
+            )
+
+        if pending_count >= MAX_PENDING_MESSAGES:
+            return api_error(
+                'You have reached the maximum of 4 unresolved messages. '
+                'Please wait until they are handled before submitting a new one.',
+                status_code=429,
+            )
 
         serializer = ContactMessageCreateSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid():
@@ -91,6 +98,7 @@ class ContactMessageListView(APIView):
                 Q(name__icontains=search)
                 | Q(contact_info__icontains=search)
                 | Q(message__icontains=search)
+                | Q(tracking_code__icontains=search)
             )
 
         return paginate(qs, request, ContactMessageSerializer)

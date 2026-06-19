@@ -6,6 +6,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
 from accounts.permissions import HasGroupPermission
+from core.log_utils import actor_display_for, target_display_for
 from core.models import DefaultSetting
 from core.pagination import paginate
 from core.utils import api_error, api_success
@@ -27,20 +28,18 @@ from logs.models import ActivityLog
 
 
 def _log(actor, action, target=None, extra_data=None, ip=None):
-    actor_display = str(actor) if actor else 'guest'
-    target_display = str(target) if target else ''
     target_type = None
     target_id = None
     if target:
         target_type = ContentType.objects.get_for_model(target)
         target_id = target.pk
     ActivityLog.objects.create(
-        actor=actor if (actor and actor.is_authenticated) else None,
-        actor_display=actor_display,
+        actor=actor,
+        actor_display=actor_display_for(actor),
         action=action,
         target_type=target_type,
         target_id=target_id,
-        target_display=target_display,
+        target_display=target_display_for(target),
         ip_address=ip,
         extra_data=extra_data,
     )

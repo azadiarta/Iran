@@ -4,6 +4,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext_lazy as _
 
 from accounts.models import AccessGroup, Member
+from core.log_utils import actor_display_for, target_display_for
 from core.models import DefaultSetting
 from fund.models import Contribution, Expense
 from logs.models import ActivityLog
@@ -79,11 +80,11 @@ class MemberAdmin(UserAdmin):
         for pk in pks:
             ActivityLog.objects.create(
                 actor=request.user,
-                actor_display=str(request.user),
+                actor_display=actor_display_for(request.user),
                 action='member_activated_via_admin',
                 target_type=ContentType.objects.get_for_model(Member),
                 target_id=pk,
-                target_display=str(Member.objects.filter(pk=pk).first() or pk),
+                target_display=target_display_for(Member.objects.filter(pk=pk).first()) or str(pk),
                 ip_address=_get_ip(request),
             )
         self.message_user(request, f'{len(pks)} member(s) activated.')
@@ -96,11 +97,11 @@ class MemberAdmin(UserAdmin):
         for pk in pks:
             ActivityLog.objects.create(
                 actor=request.user,
-                actor_display=str(request.user),
+                actor_display=actor_display_for(request.user),
                 action='member_deactivated_via_admin',
                 target_type=ContentType.objects.get_for_model(Member),
                 target_id=pk,
-                target_display=str(Member.objects.filter(pk=pk).first() or pk),
+                target_display=target_display_for(Member.objects.filter(pk=pk).first()) or str(pk),
                 ip_address=_get_ip(request),
             )
         self.message_user(request, f'{len(pks)} member(s) deactivated.')
@@ -110,11 +111,11 @@ class MemberAdmin(UserAdmin):
         if change:
             ActivityLog.objects.create(
                 actor=request.user,
-                actor_display=str(request.user),
+                actor_display=actor_display_for(request.user),
                 action='member_updated_via_admin',
                 target_type=ContentType.objects.get_for_model(obj),
                 target_id=obj.pk,
-                target_display=str(obj),
+                target_display=target_display_for(obj),
                 ip_address=_get_ip(request),
             )
 
@@ -154,11 +155,11 @@ class AccessGroupAdmin(admin.ModelAdmin):
         setting.save(update_fields=['value', 'updated_by', 'updated_at'])
         ActivityLog.objects.create(
             actor=request.user,
-            actor_display=str(request.user),
+            actor_display=actor_display_for(request.user),
             action='default_group_changed_via_admin',
             target_type=ContentType.objects.get_for_model(group),
             target_id=group.pk,
-            target_display=str(group),
+            target_display=target_display_for(group),
             ip_address=_get_ip(request),
         )
         self.message_user(request, f'"{group.name}" set as default group.')
