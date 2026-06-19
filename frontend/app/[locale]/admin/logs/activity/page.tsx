@@ -129,8 +129,8 @@ export default function AdminActivityLogPage() {
       )}
 
       <form onSubmit={applyFilters} className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
-        <AdminInput label={isRTL ? 'انجام‌دهنده' : 'Actor'} value={actorFilter} onChange={(e) => setActorFilter(e.target.value)} />
-        <AdminInput label={isRTL ? 'عملیات' : 'Action'} value={actionFilter} onChange={(e) => setActionFilter(e.target.value)} />
+        <AdminInput label={isRTL ? 'انجام‌دهنده' : 'Actor'} value={actorFilter} onChange={(e) => setActorFilter(e.target.value)} maxLength={150} />
+        <AdminInput label={isRTL ? 'عملیات' : 'Action'} value={actionFilter} onChange={(e) => setActionFilter(e.target.value)} maxLength={150} />
         <AdminInput label={isRTL ? 'از تاریخ' : 'Date From'} type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
         <AdminInput label={isRTL ? 'تا تاریخ' : 'Date To'} type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
         <button

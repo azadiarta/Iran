@@ -223,8 +223,8 @@ export default function AdminPostsPage() {
 
       <AdminModal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editing ? (isRTL ? 'ویرایش پست' : 'Edit Post') : (isRTL ? 'پست جدید' : 'New Post')} maxWidth="max-w-2xl">
         <form onSubmit={submit} className="flex flex-col gap-4">
-          <AdminInput label={isRTL ? 'عنوان' : 'Title'} value={title} onChange={(e) => setTitle(e.target.value)} required />
-          <AdminTextarea label={isRTL ? 'متن' : 'Body'} value={body} onChange={(e) => setBody(e.target.value)} rows={6} required />
+          <AdminInput label={isRTL ? 'عنوان' : 'Title'} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={150} />
+          <AdminTextarea label={isRTL ? 'متن' : 'Body'} value={body} onChange={(e) => setBody(e.target.value)} rows={6} required maxLength={550} />
 
           {editing && editing.images.length > 0 && (
             <div>

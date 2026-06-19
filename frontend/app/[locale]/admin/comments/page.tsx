@@ -250,7 +250,7 @@ export default function AdminCommentsPage() {
       )}
 
       <form onSubmit={applySearch} className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
-        <AdminInput label={isRTL ? 'جست‌وجو' : 'Search'} value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
+        <AdminInput label={isRTL ? 'جست‌وجو' : 'Search'} value={searchInput} onChange={(e) => setSearchInput(e.target.value)} maxLength={150} />
         <AdminSelect
           label={isRTL ? 'وضعیت' : 'Status'}
           value={statusFilter}
@@ -337,7 +337,7 @@ export default function AdminCommentsPage() {
               </div>
             </div>
 
-            <AdminTextarea label={isRTL ? 'متن نظر' : 'Comment Text'} value={editText} onChange={(e) => setEditText(e.target.value)} rows={4} />
+            <AdminTextarea label={isRTL ? 'متن نظر' : 'Comment Text'} value={editText} onChange={(e) => setEditText(e.target.value)} rows={4} maxLength={550} />
             <AdminSelect label={isRTL ? 'امتیاز' : 'Rating'} value={editRating} onChange={(e) => setEditRating(e.target.value)} options={RATING_OPTIONS(isRTL)} />
 
             <div>
@@ -369,6 +369,7 @@ export default function AdminCommentsPage() {
                     value={rejectReason}
                     onChange={(e) => setRejectReason(e.target.value)}
                     rows={2}
+                    maxLength={550}
                   />
                   <div className="flex items-center gap-3">
                     <button

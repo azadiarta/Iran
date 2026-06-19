@@ -347,6 +347,7 @@ export default function AdminContributionsPage() {
           label={isRTL ? 'جست‌وجو (نام یا کد پیگیری)' : 'Search (name or tracking code)'}
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
+          maxLength={150}
         />
         <AdminSelect
           label={isRTL ? 'وضعیت' : 'Status'}
@@ -412,7 +413,7 @@ export default function AdminContributionsPage() {
 
       <AdminModal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={isRTL ? 'افزودن مشارکت' : 'Add Contribution'}>
         <form onSubmit={submit} className="flex flex-col gap-4">
-          <AdminInput label={isRTL ? 'نام مشارکت‌کننده' : 'Contributor Name'} value={guestName} onChange={(e) => setGuestName(e.target.value)} required />
+          <AdminInput label={isRTL ? 'نام مشارکت‌کننده' : 'Contributor Name'} value={guestName} onChange={(e) => setGuestName(e.target.value)} required maxLength={50} />
           <AdminInput label={isRTL ? 'مبلغ' : 'Amount'} type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
           <AdminSelect
             label={isRTL ? 'واحد پول' : 'Currency'}
@@ -444,7 +445,7 @@ export default function AdminContributionsPage() {
               { value: 'failed', label: STATUS_LABELS(isRTL).failed },
             ]}
           />
-          <AdminTextarea label={isRTL ? 'یادداشت (اختیاری)' : 'Notes (optional)'} value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+          <AdminTextarea label={isRTL ? 'یادداشت (اختیاری)' : 'Notes (optional)'} value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} maxLength={550} />
           <div className="flex items-center gap-3 mt-1">
             <button
               type="submit"
@@ -503,7 +504,7 @@ export default function AdminContributionsPage() {
             {canManage ? (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <AdminInput label={isRTL ? 'نام مشارکت‌کننده' : 'Contributor Name'} value={editGuestName} onChange={(e) => setEditGuestName(e.target.value)} />
+                  <AdminInput label={isRTL ? 'نام مشارکت‌کننده' : 'Contributor Name'} value={editGuestName} onChange={(e) => setEditGuestName(e.target.value)} maxLength={50} />
                   <AdminInput label={isRTL ? 'مبلغ' : 'Amount'} type="number" min="0" step="0.01" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} required />
                   <AdminSelect
                     label={isRTL ? 'واحد پول' : 'Currency'}
@@ -525,7 +526,7 @@ export default function AdminContributionsPage() {
                   />
                 </div>
 
-                <AdminTextarea label={isRTL ? 'یادداشت' : 'Notes'} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={2} />
+                <AdminTextarea label={isRTL ? 'یادداشت' : 'Notes'} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={2} maxLength={550} />
 
                 <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex flex-col gap-3">
                   <AdminToggle
@@ -659,6 +660,7 @@ export default function AdminContributionsPage() {
                       value={rejectReason}
                       onChange={(e) => setRejectReason(e.target.value)}
                       rows={2}
+                      maxLength={550}
                     />
                     <div className="flex items-center gap-3">
                       <button

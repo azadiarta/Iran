@@ -13,10 +13,13 @@ from accounts.serializers import (
     MemberListSerializer,
     MemberUpdateSerializer,
 )
+from rest_framework.exceptions import ValidationError as DRFValidationError
+
 from core.log_utils import actor_display_for, target_display_for
 from core.models import DefaultSetting
 from core.pagination import paginate
 from core.utils import api_error, api_success
+from core.validators import LONG_TEXT_ADMIN_MAX_LENGTH, sanitize_and_limit
 from logs.models import ActivityLog
 
 
@@ -262,7 +265,13 @@ class MemberToggleActiveView(APIView):
             member.deactivated_by = None
             update_fields = ['is_active', 'deactivation_reason', 'deactivated_by']
         else:
-            member.deactivation_reason = (request.data.get('reason') or '').strip()
+            try:
+                reason = sanitize_and_limit(request.data.get('reason') or '', LONG_TEXT_ADMIN_MAX_LENGTH)
+            except DRFValidationError as exc:
+                return api_error(str(exc.detail[0]) if isinstance(exc.detail, list) else str(exc.detail))
+            if not reason:
+                return api_error('A reason is required to deactivate a member.')
+            member.deactivation_reason = reason
             member.deactivated_by = request.user
             update_fields = ['is_active', 'deactivation_reason', 'deactivated_by']
 

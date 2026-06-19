@@ -1,7 +1,11 @@
-from django.utils.html import strip_tags
 from rest_framework import serializers
 
 from core.models import ContactMessage, DefaultSetting, Permission
+from core.validators import (
+    LONG_TEXT_ADMIN_MAX_LENGTH,
+    LONG_TEXT_PUBLIC_MAX_LENGTH,
+    sanitize_and_limit,
+)
 
 
 class RelativeImageField(serializers.ImageField):
@@ -45,6 +49,9 @@ class DefaultSettingSerializer(serializers.ModelSerializer):
     def get_updated_by_name(self, obj):
         return str(obj.updated_by) if obj.updated_by else None
 
+    def validate_value(self, value):
+        return sanitize_and_limit(value, LONG_TEXT_ADMIN_MAX_LENGTH)
+
 
 class ContactMessageCreateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -52,13 +59,13 @@ class ContactMessageCreateSerializer(serializers.ModelSerializer):
         fields = ['name', 'contact_info', 'message']
 
     def validate_name(self, value):
-        return strip_tags(value).strip()
+        return sanitize_and_limit(value, 100)
 
     def validate_contact_info(self, value):
-        return strip_tags(value).strip()
+        return sanitize_and_limit(value, 150)
 
     def validate_message(self, value):
-        return strip_tags(value).strip()
+        return sanitize_and_limit(value, LONG_TEXT_PUBLIC_MAX_LENGTH)
 
     def create(self, validated_data):
         request = self.context.get('request')

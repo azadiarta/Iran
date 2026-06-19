@@ -4,11 +4,14 @@ from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
+from rest_framework.exceptions import ValidationError as DRFValidationError
+
 from accounts.permissions import HasGroupPermission
 from core.log_utils import actor_display_for, target_display_for
 from core.models import DefaultSetting
 from core.pagination import paginate
 from core.utils import api_error, api_success
+from core.validators import validate_image_file
 from fund.models import Expense
 from logs.models import ActivityLog
 from posts.models import Comment, Post, PostImage
@@ -133,8 +136,11 @@ class PostCreateView(APIView):
         max_mb = float(setting.value) if setting else 5.0
         images = request.FILES.getlist('images')
         for img in images:
-            if img.size > max_mb * 1024 * 1024:
-                return api_error(f'Image "{img.name}" exceeds {max_mb}MB limit.')
+            try:
+                validate_image_file(img, max_mb)
+            except DRFValidationError as exc:
+                detail = exc.detail[0] if isinstance(exc.detail, list) else exc.detail
+                return api_error(f'Image "{img.name}": {detail}')
 
         post = serializer.save()
         for img in images:
@@ -209,8 +215,11 @@ class PostImageUploadView(APIView):
 
         images = request.FILES.getlist('images')
         for img in images:
-            if img.size > max_mb * 1024 * 1024:
-                return api_error(f'Image "{img.name}" exceeds {max_mb}MB limit.')
+            try:
+                validate_image_file(img, max_mb)
+            except DRFValidationError as exc:
+                detail = exc.detail[0] if isinstance(exc.detail, list) else exc.detail
+                return api_error(f'Image "{img.name}": {detail}')
 
         created = []
         for img in images:

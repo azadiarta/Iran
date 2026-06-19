@@ -3,6 +3,11 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import BASELINE_GROUP_PERMISSIONS, AccessGroup, Member
 from core.models import Permission
+from core.validators import (
+    sanitize_and_limit,
+    validate_phone_format,
+    validate_phone_or_email,
+)
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -13,11 +18,20 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = Member
         fields = ['full_name', 'display_name', 'phone', 'email', 'password', 'password_confirm']
 
+    def validate_full_name(self, value):
+        return sanitize_and_limit(value, 35)
+
+    def validate_display_name(self, value):
+        return sanitize_and_limit(value, 20) if value else value
+
     def validate_email(self, value):
         return value or None
 
     def validate_phone(self, value):
-        return value or None
+        value = value or None
+        if value:
+            validate_phone_format(value)
+        return value
 
     def validate(self, data):
         if not data.get('phone') and not data.get('email'):
@@ -87,8 +101,13 @@ class MemberCreateSerializer(RegisterSerializer):
 
 
 class LoginSerializer(serializers.Serializer):
-    credential = serializers.CharField(help_text='Phone number or email address')
+    credential = serializers.CharField(max_length=254, help_text='Phone number or email address')
     password = serializers.CharField(write_only=True)
+
+    def validate_credential(self, value):
+        value = value.strip()
+        validate_phone_or_email(value)
+        return value
 
 
 class MemberProfileSerializer(serializers.ModelSerializer):
@@ -163,11 +182,23 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
             'phone':         {'required': False, 'allow_null': True},
         }
 
+    def validate_full_name(self, value):
+        return sanitize_and_limit(value, 35)
+
+    def validate_display_name(self, value):
+        return sanitize_and_limit(value, 20) if value else value
+
     def validate_email(self, value):
         return value or None
 
     def validate_phone(self, value):
-        return value or None
+        value = value or None
+        # Only enforce the strict "00"-prefixed format when the phone number
+        # is actually being changed — existing members may have a legacy
+        # format and must not be locked out of saving unrelated profile edits.
+        if value and value != self.instance.phone:
+            validate_phone_format(value)
+        return value
 
     def validate(self, data):
         instance = self.instance
@@ -224,6 +255,12 @@ class AccessGroupCreateSerializer(serializers.ModelSerializer):
         model = AccessGroup
         fields = ['name', 'description', 'permission_ids']
 
+    def validate_name(self, value):
+        return sanitize_and_limit(value, 20)
+
+    def validate_description(self, value):
+        return sanitize_and_limit(value, 350) if value else value
+
     def create(self, validated_data):
         permission_ids = validated_data.pop('permission_ids', [])
         if not permission_ids:
@@ -245,6 +282,12 @@ class AccessGroupUpdateSerializer(serializers.ModelSerializer):
             'name':        {'required': False},
             'description': {'required': False},
         }
+
+    def validate_name(self, value):
+        return sanitize_and_limit(value, 20)
+
+    def validate_description(self, value):
+        return sanitize_and_limit(value, 350) if value else value
 
     def update(self, instance, validated_data):
         permission_ids = validated_data.pop('permission_ids', None)

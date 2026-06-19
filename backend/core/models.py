@@ -56,7 +56,7 @@ class Permission(models.Model):
 class DefaultSetting(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     key = models.CharField(max_length=100, unique=True)
-    value = models.TextField()
+    value = models.TextField(max_length=550)
     description = models.CharField(max_length=350, blank=True)
     updated_by = models.ForeignKey(
         'accounts.Member', on_delete=models.SET_NULL,
@@ -77,7 +77,7 @@ class ContactMessage(models.Model):
     tracking_code = models.CharField(max_length=20, unique=True, editable=False, blank=True)
     name = models.CharField(max_length=100)
     contact_info = models.CharField(max_length=150)
-    message = models.TextField()
+    message = models.TextField(max_length=250)
     sender = models.ForeignKey(
         'accounts.Member', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='contact_messages',

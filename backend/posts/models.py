@@ -14,7 +14,7 @@ class Post(models.Model):
         null=True, blank=True, related_name='posts',
     )
     title = models.CharField(max_length=150)
-    body = models.TextField()
+    body = models.TextField(max_length=550)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -58,13 +58,13 @@ class Comment(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.UUIDField()
     content_object = GenericForeignKey('content_type', 'object_id')
-    text = models.TextField()
+    text = models.TextField(max_length=550)
     rating = models.IntegerField(
         null=True, blank=True,
         validators=[MinValueValidator(1), MaxValueValidator(5)],
     )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
-    rejection_reason = models.TextField(blank=True)
+    rejection_reason = models.TextField(max_length=550, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

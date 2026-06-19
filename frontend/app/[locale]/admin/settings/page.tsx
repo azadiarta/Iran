@@ -10,6 +10,10 @@ import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
 import { settingsAPI, groupsAPI, DefaultSettingItem, AccessGroup } from '@/lib/api';
 import { SETTINGS_META } from '@/lib/settingsMeta';
+import { isValidPhoneStrict, isValidEmail, phoneFormatError, PHONE_PLACEHOLDER, LONG_TEXT_ADMIN_MAX_LENGTH } from '@/lib/validation';
+
+const _EMAIL_KEYS = ['contact_email'];
+const _PHONE_KEYS = ['contact_phone'];
 
 const PAYMENT_PREFIXES = ['payment_manual_', 'payment_paypal_', 'payment_stripe_', 'payment_google_pay_'];
 
@@ -59,9 +63,18 @@ export default function AdminSettingsPage() {
   }
 
   async function save(key: string) {
+    const value = values[key] ?? '';
+    if (value && _EMAIL_KEYS.includes(key) && !isValidEmail(value)) {
+      showToast('warning', isRTL ? 'ایمیل وارد شده معتبر نیست' : 'Enter a valid email address');
+      return;
+    }
+    if (value && _PHONE_KEYS.includes(key) && !isValidPhoneStrict(value)) {
+      showToast('warning', phoneFormatError(isRTL));
+      return;
+    }
     setSavingKey(key);
     try {
-      await settingsAPI.update(key, values[key] ?? '');
+      await settingsAPI.update(key, value);
       showToast('success', isRTL ? 'تنظیمات ذخیره شد' : 'Setting saved');
     } catch {
       showToast('error', isRTL ? 'ذخیره تنظیمات ناموفق بود' : 'Failed to save setting');
@@ -168,6 +181,8 @@ export default function AdminSettingsPage() {
                       type={meta?.type === 'number' ? 'number' : 'text'}
                       value={values[s.key] ?? ''}
                       onChange={(e) => set(s.key, e.target.value)}
+                      placeholder={_PHONE_KEYS.includes(s.key) ? PHONE_PLACEHOLDER : undefined}
+                      maxLength={LONG_TEXT_ADMIN_MAX_LENGTH}
                     />
                     {meta && <p className="mt-1.5 text-xs text-white/40">{isRTL ? meta.description.fa : meta.description.en}</p>}
                   </div>

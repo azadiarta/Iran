@@ -7,6 +7,7 @@ import { Eye, EyeOff, LogIn } from 'lucide-react';
 import { authAPI } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
+import { isValidPhoneOrEmail } from '@/lib/validation';
 
 export default function LoginPage() {
   const t = useTranslations('auth');
@@ -34,6 +35,10 @@ export default function LoginPage() {
 
     if (!credential.trim()) {
       setError('Phone or email is required.');
+      return;
+    }
+    if (!isValidPhoneOrEmail(credential)) {
+      setError(t('credential_format_error'));
       return;
     }
     if (!password) {
@@ -113,6 +118,7 @@ export default function LoginPage() {
               value={credential}
               onChange={(e) => setCredential(e.target.value)}
               disabled={loading}
+              maxLength={254}
               className="w-full rounded-xl px-4 py-3 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50"
               style={{
                 background: 'rgba(255,255,255,0.05)',
