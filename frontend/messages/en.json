@@ -13,7 +13,7 @@
     "admin_panel": "Admin Panel"
   },
   "landing": {
-    "headline": "Group Fund",
+    "headline": "Birmingham Iranian Political Association",
     "tagline": "Transparent crowdfunding for our community",
     "cta_join": "Join the Group",
     "cta_profile": "My Profile",
@@ -64,11 +64,12 @@
     "comment_name": "Your Name",
     "comment_name_placeholder": "Your name",
     "comment_text": "Write your comment...",
-    "comment_rating": "Rating (optional)",
+    "comment_rating": "Rating",
     "comment_submit": "Submit Comment",
     "comment_pending": "Your comment has been submitted and is pending approval.",
     "anonymous": "Anonymous",
     "comment_text_required": "Comment text is required.",
+    "comment_rating_required": "A rating is required.",
     "name_required": "Your name is required.",
     "comment_submit_error": "Failed to submit comment. Please try again.",
     "back_to_posts": "Back to posts",
@@ -111,10 +112,11 @@
     "comment_name": "Your Name",
     "comment_name_placeholder": "Your name",
     "comment_text": "Write your comment...",
-    "comment_rating": "Rating (optional)",
+    "comment_rating": "Rating",
     "comment_submit": "Submit Comment",
     "comment_pending": "Your comment has been submitted and is pending approval.",
     "comment_text_required": "Comment text is required.",
+    "comment_rating_required": "A rating is required.",
     "name_required": "Your name is required.",
     "comment_submit_error": "Failed to submit comment. Please try again.",
     "no_comments": "No comments yet. Be the first!",
@@ -223,9 +225,6 @@
     "my_contributions_empty": "You haven't made any contributions yet.",
     "my_contributions_rejection_reason": "Reason",
     "status_pending": "Pending",
-    "status_pending_review": "Pending Review",
-    "status_completed": "Completed",
-    "status_failed": "Rejected",
     "status_approved": "Approved",
     "status_rejected": "Rejected",
     "back_to_profile": "Back to profile",
@@ -235,12 +234,9 @@
     "my_comments_target_post": "Comment on post",
     "my_comments_target_expense": "Comment on expense",
     "my_comments_rating_label": "Rating",
-    "my_comments_no_rating": "No rating",
     "my_comments_edit_notice": "Editing this comment will send it back for approval.",
     "my_comments_text_required": "Enter the comment text.",
     "my_comments_save_error": "Failed to save the comment. Please try again.",
-    "my_comments_delete_error": "Failed to delete the comment. Please try again.",
-    "my_comments_delete_confirm": "Are you sure you want to delete this comment?",
     "my_messages_title": "My Messages",
     "my_messages_empty": "You haven't sent any messages yet.",
     "my_messages_status_pending": "Pending",
@@ -268,7 +264,7 @@
   },
   "help": {
     "title": "Site Guide",
-    "subtitle": "A complete walkthrough of every section of Group Fund — only the parts relevant to your account are shown below.",
+    "subtitle": "A complete walkthrough of every section of the Birmingham Iranian Political Association site — only the parts relevant to your account are shown below.",
     "guest_heading": "Getting Started",
     "member_heading": "Member Features",
     "admin_heading": "Admin Panel",
@@ -278,7 +274,7 @@
     "sections": {
       "home": {
         "title": "Home Page",
-        "desc": "The landing page introduces Group Fund, shows live statistics (members, total contributions, current balance) and highlights recent posts."
+        "desc": "The landing page introduces the Birmingham Iranian Political Association, shows live statistics (members, total contributions, current balance) and highlights recent posts."
       },
       "posts": {
         "title": "Posts",
@@ -385,7 +381,7 @@
   },
   "footer": {
     "slogan": "Long Live Iran",
-    "copyright": "Group Fund. All rights reserved.",
+    "copyright": "Birmingham Iranian Political Association. All rights reserved.",
     "dedication": "This site was made in memory of Iran's eternal heroes, by arta"
   },
   "common": {

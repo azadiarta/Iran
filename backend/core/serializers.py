@@ -69,18 +69,25 @@ class ContactMessageCreateSerializer(serializers.ModelSerializer):
 
 class ContactMessageSerializer(serializers.ModelSerializer):
     sender_label = serializers.SerializerMethodField()
+    # Internal admin lookup aid only (see accounts.Member.member_number) — safe
+    # here because the only consumers are the admin list (can_manage_contact_messages)
+    # and a member's own "my messages" view, where it can only ever be their own number.
+    sender_member_number = serializers.SerializerMethodField()
     handled_by_label = serializers.SerializerMethodField()
 
     class Meta:
         model = ContactMessage
         fields = [
-            'id', 'name', 'contact_info', 'message', 'sender_label',
+            'id', 'name', 'contact_info', 'message', 'sender_label', 'sender_member_number',
             'is_handled', 'handled_by_label', 'handled_at', 'created_at',
         ]
         read_only_fields = fields
 
     def get_sender_label(self, obj):
         return str(obj.sender) if obj.sender else None
+
+    def get_sender_member_number(self, obj):
+        return obj.sender.member_number if obj.sender else None
 
     def get_handled_by_label(self, obj):
         return str(obj.handled_by) if obj.handled_by else None

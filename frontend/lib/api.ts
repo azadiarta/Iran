@@ -247,17 +247,19 @@ export interface PostDetail extends PostSummary {
   images: PostImage[];
 }
 
+// Admin-only — never present on the public Comment shape, only on CommentDetail
+// (returned by admin-gated endpoints). Carries member_number for admin lookup.
 export interface CommentAuthor {
   id: string;
   display_name: string | null;
   full_name: string;
+  member_number: number;
 }
 
 export type CommentStatus = 'pending' | 'approved' | 'rejected';
 
 export interface Comment {
   id: string;
-  author: CommentAuthor | null;
   author_label: string;
   guest_name: string | null;
   text: string;
@@ -267,16 +269,22 @@ export interface Comment {
 }
 
 export interface CommentDetail extends Comment {
+  author: CommentAuthor | null;
   rejection_reason: string;
   target_type: 'post' | 'expense';
   target_label: string | null;
   updated_at: string;
 }
 
-export interface MyComment extends Comment {
+export interface MyComment {
+  id: string;
+  text: string;
+  rating: number | null;
+  status: CommentStatus;
   rejection_reason: string;
   target_type: 'post' | 'expense';
   target_label: string | null;
+  created_at: string;
 }
 
 export interface Paginated<T> {
@@ -372,9 +380,6 @@ export const commentsAPI = {
     params.set('page', String(page));
     return api.get<ApiResponse>(`/api/posts/comments/mine/?${params.toString()}`);
   },
-
-  delete: (id: string) =>
-    api.delete<ApiResponse>(`/api/posts/comments/${id}/delete/`),
 };
 
 // ─── Fund types ───────────────────────────────────────────────────────────────
@@ -389,12 +394,16 @@ export interface MemberMinimal {
   id: string;
   display_name: string;
   full_name: string;
+  // Admin-only — only populated by admin-gated endpoints (e.g. contribution/
+  // comment admin detail views). Never present on public-facing responses.
+  member_number?: number;
 }
 
 export type ContributionDisplayNameChoice = 'hidden' | 'display_name' | 'full_name' | 'custom';
 
 export interface Contribution {
   id: string;
+  tracking_code: string;
   contributor: MemberMinimal | null;
   guest_name: string;
   amount: number;
@@ -424,6 +433,7 @@ export interface ContributionPublic {
 
 export interface MyContribution {
   id: string;
+  tracking_code: string;
   amount: number;
   currency: string;
   payment_method: string;
@@ -452,7 +462,7 @@ export const fundAPI = {
 
   getContributions: (
     page = 1,
-    filters: { status?: string; payment_method?: string; date_from?: string; date_to?: string; contributor?: string } = {}
+    filters: { status?: string; payment_method?: string; date_from?: string; date_to?: string; contributor?: string; search?: string } = {}
   ) => {
     const params = new URLSearchParams();
     params.set('page', String(page));
@@ -461,6 +471,7 @@ export const fundAPI = {
     if (filters.date_from) params.set('date_from', filters.date_from);
     if (filters.date_to) params.set('date_to', filters.date_to);
     if (filters.contributor) params.set('contributor', filters.contributor);
+    if (filters.search) params.set('search', filters.search);
     return api.get<ApiResponse>(`/api/fund/contributions/?${params.toString()}`);
   },
 
@@ -475,9 +486,6 @@ export const fundAPI = {
 
   updateContributionStatus: (id: string, status: 'completed' | 'failed') =>
     api.patch<ApiResponse>(`/api/fund/contributions/${id}/status/`, { status }),
-
-  deleteContribution: (id: string) =>
-    api.delete<ApiResponse>(`/api/fund/contributions/${id}/delete/`),
 
   getContributionsPublic: (page = 1) => {
     const params = new URLSearchParams();
@@ -867,6 +875,8 @@ export interface ContactMessage {
   contact_info: string;
   message: string;
   sender_label: string | null;
+  // Admin-only — only populated when the submitter was logged in.
+  sender_member_number: number | null;
   is_handled: boolean;
   handled_by_label: string | null;
   handled_at: string | null;

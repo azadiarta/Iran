@@ -36,7 +36,7 @@ def _validate_value(key, value):
     elif key == 'default_currency':
         if len(value) > 3:
             return 'Must be at most 3 characters.'
-    elif key == 'max_receipt_image_size_mb':
+    elif key in ('max_receipt_image_size_mb', 'auth_sync_interval_seconds'):
         if not value.isdigit() or int(value) <= 0:
             return 'Must be a positive integer.'
     elif key in _CHOICES:
@@ -60,7 +60,7 @@ class DefaultSettingListView(APIView):
 
 # Settings safe to expose to anyone, including guests (e.g. for the public
 # Contact Us page) — deliberately a tiny allowlist, never the full settings list.
-PUBLIC_SETTING_KEYS = ['contact_email', 'contact_phone']
+PUBLIC_SETTING_KEYS = ['contact_email', 'contact_phone', 'auth_sync_interval_seconds']
 
 
 class PublicSettingListView(APIView):

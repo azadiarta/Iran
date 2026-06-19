@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { useParams, useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight, MessageSquare, AlertTriangle, Star, Pencil, Trash2, Save, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MessageSquare, AlertTriangle, Star, Pencil, Save, X } from 'lucide-react';
 import { commentsAPI, MyComment, Paginated } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 
@@ -18,7 +18,6 @@ export default function MyCommentsPage() {
   const params = useParams();
   const router = useRouter();
   const locale = (params?.locale as string) || 'en';
-  const isRTL = locale === 'fa';
   const { member, isAuthenticated, hasHydrated } = useAuthStore();
 
   const [comments, setComments] = useState<MyComment[]>([]);
@@ -31,13 +30,9 @@ export default function MyCommentsPage() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
-  const [editRating, setEditRating] = useState('0');
+  const [editRating, setEditRating] = useState('1');
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
-
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -98,7 +93,7 @@ export default function MyCommentsPage() {
   function startEdit(c: MyComment) {
     setEditingId(c.id);
     setEditText(c.text);
-    setEditRating(String(c.rating || 0));
+    setEditRating(String(c.rating || 1));
     setEditError(null);
   }
 
@@ -118,7 +113,7 @@ export default function MyCommentsPage() {
     try {
       await commentsAPI.updateMine(editingId, {
         text: editText.trim(),
-        rating: parseInt(editRating, 10) || null,
+        rating: parseInt(editRating, 10),
       });
       setEditingId(null);
       fetchComments(page);
@@ -126,20 +121,6 @@ export default function MyCommentsPage() {
       setEditError(t('my_comments_save_error'));
     } finally {
       setEditSaving(false);
-    }
-  }
-
-  async function confirmDelete(id: string) {
-    setDeleting(true);
-    setDeleteError(null);
-    try {
-      await commentsAPI.delete(id);
-      setConfirmDeleteId(null);
-      fetchComments(page);
-    } catch {
-      setDeleteError(t('my_comments_delete_error'));
-    } finally {
-      setDeleting(false);
     }
   }
 
@@ -207,7 +188,6 @@ export default function MyCommentsPage() {
                         <div>
                           <label className="block text-xs text-white/50 mb-1.5">{t('my_comments_rating_label')}</label>
                           <select value={editRating} onChange={(e) => setEditRating(e.target.value)} className={inputClass}>
-                            <option value="0">{t('my_comments_no_rating')}</option>
                             {[1, 2, 3, 4, 5].map((n) => (
                               <option key={n} value={n}>{n}</option>
                             ))}
@@ -259,13 +239,6 @@ export default function MyCommentsPage() {
                           </div>
                         )}
 
-                        {confirmDeleteId === c.id && (
-                          <p className="text-xs mt-3" style={{ color: '#ef4444' }}>
-                            {t('my_comments_delete_confirm')}
-                            {deleteError ? ` — ${deleteError}` : ''}
-                          </p>
-                        )}
-
                         <div className="flex items-center gap-3 mt-3 pt-3 border-t border-white/5">
                           <button
                             onClick={() => startEdit(c)}
@@ -275,33 +248,6 @@ export default function MyCommentsPage() {
                             <Pencil className="w-3.5 h-3.5" />
                             {t('edit')}
                           </button>
-                          {confirmDeleteId === c.id ? (
-                            <>
-                              <button
-                                onClick={() => confirmDelete(c.id)}
-                                disabled={deleting}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-50"
-                                style={{ border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.06)' }}
-                              >
-                                {isRTL ? 'بله، حذف کن' : 'Yes, delete'}
-                              </button>
-                              <button
-                                onClick={() => { setConfirmDeleteId(null); setDeleteError(null); }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white/50 hover:text-white/80 transition-all"
-                              >
-                                {t('cancel')}
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              onClick={() => { setConfirmDeleteId(c.id); setDeleteError(null); }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                              style={{ border: '1px solid rgba(239,68,68,0.25)', color: 'rgba(239,68,68,0.8)', backgroundColor: 'transparent' }}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              {isRTL ? 'حذف' : 'Delete'}
-                            </button>
-                          )}
                         </div>
                       </>
                     )}
