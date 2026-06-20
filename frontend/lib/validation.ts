@@ -81,8 +81,8 @@ export function phoneOrEmailFormatError(isRTL: boolean): string {
 // format required for new submissions on the register/profile forms).
 export function phoneLenientFormatError(isRTL: boolean): string {
   return isRTL
-    ? 'شماره تلفن باید با ۰۰ یا + شروع شود و فقط شامل عدد باشد (مثال: 00447700900000).'
-    : "Phone number must start with '00' or '+' followed by digits only (e.g. 00447700900000).";
+    ? 'شماره تلفن باید با ۰۰ شروع شود و فقط شامل عدد باشد (مثال: 00447700900000).'
+    : "Phone number must start with '00' followed by digits only (e.g. 00447700900000).";
 }
 
 export function maxLengthError(isRTL: boolean, max: number): string {
