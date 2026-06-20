@@ -6,7 +6,7 @@ project_summary:
     total_forms: 22
     total_action_buttons: 9
     total_search_inputs: 11
-    total_realtime_search_inputs: 2
+    total_realtime_search_inputs: 8
     total_api_endpoints: 67
     total_view_classes: 65
     total_models: 12
@@ -356,10 +356,10 @@ action_buttons:
 search_inputs:
   scope: frontend
   total_count: 11
-  description: Every search box or filter input across the frontend, verified individually for real-time (debounced) vs manual-submit vs absent behavior.
+  description: Every search box or filter input across the frontend, verified individually for real-time (debounced) vs absent behavior. As of Phase 28, ALL 8 search/filter inputs (public site + admin panel) are real-time — the manual-submit pattern has been fully retired.
   subcategories:
     realtime_debounced:
-      count: 2
+      count: 8
       items:
         - id: search_posts
           label: Posts page search (real-time)
@@ -368,7 +368,7 @@ search_inputs:
             - frontend/app/[locale]/posts/page.tsx
             - frontend/lib/api.ts
             - backend/posts/views.py
-          notes: "300ms debounce (line ~120), triggers postsAPI.getList(page, search) -> GET /api/posts/?search=... (PostListView). One of only two real-time search inputs in the whole frontend."
+          notes: "300ms debounce (line ~120), triggers postsAPI.getList(page, search) -> GET /api/posts/?search=... (PostListView)."
         - id: search_expenses
           label: Expenses page search + filters (real-time)
           scope: frontend
@@ -376,52 +376,49 @@ search_inputs:
             - frontend/app/[locale]/expenses/page.tsx
             - frontend/lib/api.ts
             - backend/fund/views.py
-          notes: "300ms debounce (line ~58), combines 5 filters: search, dateFrom, dateTo, amountMin, amountMax -> GET /api/fund/expenses/?... (ExpenseListView). The other of only two real-time search inputs."
-    manual_submit_filters:
-      count: 6
-      items:
+          notes: "300ms debounce (line ~58), combines 5 filters: search, dateFrom, dateTo, amountMin, amountMax -> GET /api/fund/expenses/?... (ExpenseListView)."
         - id: search_admin_members
-          label: Admin members list search (manual submit)
+          label: Admin members list search (real-time)
           scope: frontend
           location:
             - frontend/app/[locale]/admin/members/page.tsx
             - backend/accounts/member_views.py
-          notes: "Requires Enter/button submit, no debounce. Backend: Q(phone__icontains=search) OR name/email match in MemberListView."
+          notes: "Converted in Phase 28: 300ms debounce on the text search field (searchInput -> search); the group/status AdminSelect filters were already instant. Submit button + form removed. Backend MemberListView's group__id lookup now wrapped in core.validators.safe_filter to avoid crashing on a malformed UUID."
         - id: search_admin_comments
-          label: Admin comments filter (manual submit)
+          label: Admin comments filter (real-time)
           scope: frontend
           location:
             - frontend/app/[locale]/admin/comments/page.tsx
             - backend/posts/views.py
-          notes: "Manual submit form, GET only, no debounce."
+          notes: "Converted in Phase 28: 300ms debounce on the text search field (searchInput -> appliedSearch); status/target-type AdminSelects were already instant. Form/submit button removed, grid reflowed to 3 columns. Backend CommentGlobalListView's author_id lookup now wrapped in safe_filter."
         - id: search_admin_contact_messages
-          label: Admin contact-messages filter (manual submit)
+          label: Admin contact-messages filter (real-time)
           scope: frontend
           location:
             - frontend/app/[locale]/admin/contact-messages/page.tsx
             - backend/core/contact_views.py
-          notes: "Manual submit form, GET only, no debounce."
+          notes: "Converted in Phase 28: 300ms debounce on the text search field; status AdminSelect was already instant. Form/submit button removed, grid reflowed to 2 columns. Backend ContactMessageListView's sender_id lookup now wrapped in safe_filter."
         - id: search_admin_contributions
-          label: Admin contributions filter (manual submit)
+          label: Admin contributions filter (real-time)
           scope: frontend
           location:
             - frontend/app/[locale]/admin/contributions/page.tsx
             - backend/fund/views.py
-          notes: "Manual submit form, GET only, no debounce."
+          notes: "Converted in Phase 28: 300ms debounce on the text search field; status/method AdminSelects and dateFrom/dateTo were already instant. Form/submit button removed, grid reflowed to 5 columns. Backend ContributionListView's contributor__id lookup and date_from/date_to now wrapped in safe_filter."
         - id: search_admin_logs_activity
-          label: Admin activity-log filter — Actor + Action fields (manual submit)
+          label: Admin activity-log filter — Actor + Action + date range (real-time)
           scope: frontend
           location:
             - frontend/app/[locale]/admin/logs/activity/page.tsx
             - backend/logs/views.py
-          notes: "Two text fields (Actor, Action), manual submit form, GET only, no debounce."
+          notes: "Converted in Phase 28: nothing was previously instant on this page, so all 4 fields (actor, action, dateFrom, dateTo) now share ONE combined 300ms debounce -> appliedFilters (mirrors the expenses page's multi-filter pattern). Form/submit button removed. Backend ActivityLogListView's actor__id, ip_address, and date_from/date_to lookups now wrapped in safe_filter. NOTE: the 'Actor' field is free text but the backend filter is an exact actor__id UUID match (it's only reliably populated via the deep-link from a member's profile, ?member=<uuid>); typing a name now safely yields zero results instead of a 500 error."
         - id: search_admin_logs_system
-          label: Admin system-log filter — Source field (manual submit)
+          label: Admin system-log filter — Level + Source + date range (real-time)
           scope: frontend
           location:
             - frontend/app/[locale]/admin/logs/system/page.tsx
             - backend/logs/views.py
-          notes: "Single Source text field, manual submit form, GET only, no debounce."
+          notes: "Converted in Phase 28: nothing was previously instant on this page, so all 4 fields (level, source, dateFrom, dateTo) now share ONE combined 300ms debounce -> appliedFilters. Form/submit button removed. Backend SystemLogListView's date_from/date_to lookups now wrapped in safe_filter."
     no_search_input:
       count: 3
       items:
@@ -443,7 +440,7 @@ search_inputs:
           location:
             - frontend/app/[locale]/admin/expenses/page.tsx
           notes: "Confirmed zero search or filter inputs on this admin page (distinct from the public expenses/page.tsx which DOES have real-time search — see search_expenses)."
-  notes_general: "There is no shared debounce hook/utility anywhere in the frontend — each of the two real-time inputs implements its own inline 300ms setTimeout/debounce logic independently. To make all search inputs real-time, each of the 9 non-realtime page.tsx files listed above would need its own debounce logic added (and the 3 'absent' pages would need a search input added first)."
+  notes_general: "There is still no shared debounce hook/utility anywhere in the frontend — each of the 8 real-time inputs implements its own inline 300ms setTimeout/debounce logic independently (one combined debounce per page when a page has multiple filter fields, per the expenses/page.tsx precedent). As of Phase 28 every search/filter input that exists is real-time; the 3 'absent' pages still have no search input at all (out of scope — no input exists to convert)."
 
 api_calls:
   scope: frontend
@@ -1727,7 +1724,7 @@ validation_logic:
           label: "backend/core/validators.py — canonical server-side validation module"
           scope: backend
           location: [backend/core/validators.py]
-          notes: "Exports PHONE_REGEX, LENIENT_PHONE_REGEX, SHORT_TEXT_MAX_LENGTH, LONG_TEXT_PUBLIC_MAX_LENGTH, LONG_TEXT_ADMIN_MAX_LENGTH, ALLOWED_IMAGE_FORMATS, and functions validate_phone_format, validate_phone_lenient, validate_email_format, validate_phone_or_email, sanitize_text (strip_tags+strip), validate_max_length, sanitize_and_limit (combo), validate_image_content (Pillow-based real content/format verification, rejects SVG and mislabeled files), validate_pdf_content (magic-byte check), validate_image_file, validate_receipt_file. Used by accounts/core/posts/fund/payments serializers and views instead of ad-hoc inline strip_tags()/length checks."
+          notes: "Exports PHONE_REGEX, LENIENT_PHONE_REGEX, SHORT_TEXT_MAX_LENGTH, LONG_TEXT_PUBLIC_MAX_LENGTH, LONG_TEXT_ADMIN_MAX_LENGTH, ALLOWED_IMAGE_FORMATS, and functions validate_phone_format, validate_phone_lenient, validate_email_format, validate_phone_or_email, sanitize_text (strip_tags+strip), validate_max_length, sanitize_and_limit (combo), validate_image_content (Pillow-based real content/format verification, rejects SVG and mislabeled files), validate_pdf_content (magic-byte check), validate_image_file, validate_receipt_file. Used by accounts/core/posts/fund/payments serializers and views instead of ad-hoc inline strip_tags()/length checks. Phase 28 added safe_filter(queryset, **lookups): wraps a .filter() call in try/except (ValueError, TypeError, django.core.exceptions.ValidationError), returning queryset.none() instead of raising — used everywhere a GET list view builds a filter straight from a query param against a typed field (UUID FK exact-match, DateField range, DecimalField range) so malformed/attacker-controlled query params degrade to an empty result instead of an uncaught 500 (there is still no global DRF exception handler in this project)."
         - id: validate_shared_frontend
           label: "frontend/lib/validation.ts — canonical client-side validation module"
           scope: frontend

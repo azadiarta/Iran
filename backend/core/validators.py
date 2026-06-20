@@ -162,3 +162,18 @@ def validate_receipt_file(file_obj, max_size_mb):
     if ext == 'pdf':
         return validate_pdf_content(file_obj)
     raise drf_serializers.ValidationError("Unsupported file type. Allowed: JPG, PNG, PDF.")
+
+
+def safe_filter(queryset, **lookups):
+    """Apply .filter(**lookups), returning an empty queryset instead of raising
+    when a value doesn't match its field's expected type (e.g. a non-UUID
+    string against a UUID FK, an unparsable date, or a non-numeric amount).
+    Needed for filters built straight from arbitrary, attacker-controlled
+    query params, since there is no global DRF exception handler — an
+    uncaught ValueError/ValidationError here would otherwise surface as a
+    raw 500 response.
+    """
+    try:
+        return queryset.filter(**lookups)
+    except (ValueError, TypeError, DjangoValidationError):
+        return queryset.none()

@@ -62,11 +62,13 @@ export default function AdminActivityLogPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canView, page, appliedFilters]);
 
-  function applyFilters(e: React.FormEvent) {
-    e.preventDefault();
-    setPage(1);
-    setAppliedFilters({ actor: actorFilter.trim(), action: actionFilter.trim(), date_from: dateFrom, date_to: dateTo });
-  }
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedFilters({ actor: actorFilter.trim(), action: actionFilter.trim(), date_from: dateFrom, date_to: dateTo });
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [actorFilter, actionFilter, dateFrom, dateTo]);
 
   function clearMemberFilter() {
     setActorFilter('');
@@ -128,19 +130,12 @@ export default function AdminActivityLogPage() {
         </div>
       )}
 
-      <form onSubmit={applyFilters} className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+      <div className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
         <AdminInput label={isRTL ? 'انجام‌دهنده' : 'Actor'} value={actorFilter} onChange={(e) => setActorFilter(e.target.value)} maxLength={150} />
         <AdminInput label={isRTL ? 'عملیات' : 'Action'} value={actionFilter} onChange={(e) => setActionFilter(e.target.value)} maxLength={150} />
         <AdminInput label={isRTL ? 'از تاریخ' : 'Date From'} type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
         <AdminInput label={isRTL ? 'تا تاریخ' : 'Date To'} type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-        <button
-          type="submit"
-          className="rounded-xl px-5 py-2.5 text-sm font-bold transition-all"
-          style={{ backgroundColor: '#00ffff', color: '#0a0a0f', boxShadow: '0 0 16px rgba(0,255,255,0.3)' }}
-        >
-          {isRTL ? 'فیلتر' : 'Filter'}
-        </button>
-      </form>
+      </div>
 
       <AdminTable
         columns={columns}

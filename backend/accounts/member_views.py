@@ -19,7 +19,7 @@ from core.log_utils import actor_display_for, target_display_for
 from core.models import DefaultSetting
 from core.pagination import paginate
 from core.utils import api_error, api_success
-from core.validators import LONG_TEXT_ADMIN_MAX_LENGTH, sanitize_and_limit
+from core.validators import LONG_TEXT_ADMIN_MAX_LENGTH, safe_filter, sanitize_and_limit
 from logs.models import ActivityLog
 
 
@@ -72,7 +72,7 @@ class MemberListView(APIView):
 
         group_id = request.query_params.get('group')
         if group_id:
-            qs = qs.filter(group__id=group_id)
+            qs = safe_filter(qs, group__id=group_id)
 
         is_active = request.query_params.get('is_active')
         if is_active is not None:

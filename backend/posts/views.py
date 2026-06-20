@@ -11,7 +11,7 @@ from core.log_utils import actor_display_for, target_display_for
 from core.models import DefaultSetting
 from core.pagination import paginate
 from core.utils import api_error, api_success
-from core.validators import validate_image_file
+from core.validators import safe_filter, validate_image_file
 from fund.models import Expense
 from logs.models import ActivityLog
 from posts.models import Comment, Post, PostImage
@@ -290,7 +290,7 @@ class CommentGlobalListView(APIView):
 
         author_id = request.query_params.get('author')
         if author_id:
-            qs = qs.filter(author_id=author_id)
+            qs = safe_filter(qs, author_id=author_id)
 
         search = request.query_params.get('search')
         if search:

@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Search, Eye, Plus } from 'lucide-react';
+import { Eye, Plus } from 'lucide-react';
 import AdminTable, { AdminTableColumn } from '@/components/admin/AdminTable';
 import AdminBadge from '@/components/admin/AdminBadge';
 import AdminModal from '@/components/admin/AdminModal';
@@ -80,11 +80,13 @@ export default function AdminMembersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canView, page, search, groupFilter, activeFilter]);
 
-  function submitSearch(e: React.FormEvent) {
-    e.preventDefault();
-    setPage(1);
-    setSearch(searchInput.trim());
-  }
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   function openCreate() {
     setFullName('');
@@ -212,23 +214,14 @@ export default function AdminMembersPage() {
       </div>
 
       <div className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <form onSubmit={submitSearch} className="lg:col-span-2 flex gap-2">
-          <div className="flex-1">
-            <AdminInput
-              placeholder={isRTL ? 'جستجو بر اساس نام یا شناسه...' : 'Search by name or ID...'}
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              maxLength={150}
-            />
-          </div>
-          <button
-            type="submit"
-            className="flex items-center justify-center rounded-xl px-4 transition-all"
-            style={{ border: '1px solid rgba(0,255,255,0.3)', color: '#00ffff', backgroundColor: 'rgba(0,255,255,0.05)' }}
-          >
-            <Search className="w-4 h-4" />
-          </button>
-        </form>
+        <div className="lg:col-span-2">
+          <AdminInput
+            placeholder={isRTL ? 'جستجو بر اساس نام یا شناسه...' : 'Search by name or ID...'}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            maxLength={150}
+          />
+        </div>
         <AdminSelect
           value={groupFilter}
           onChange={(e) => { setGroupFilter(e.target.value); setPage(1); }}
