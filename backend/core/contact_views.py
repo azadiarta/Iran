@@ -10,6 +10,7 @@ from core.models import ContactMessage
 from core.pagination import paginate
 from core.serializers import ContactMessageCreateSerializer, ContactMessageSerializer
 from core.utils import api_error, api_success
+from core.validators import safe_filter
 from logs.models import ActivityLog
 
 
@@ -90,7 +91,7 @@ class ContactMessageListView(APIView):
 
         sender_id = request.query_params.get('sender')
         if sender_id:
-            qs = qs.filter(sender_id=sender_id)
+            qs = safe_filter(qs, sender_id=sender_id)
 
         search = request.query_params.get('search')
         if search:

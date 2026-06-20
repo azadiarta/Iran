@@ -119,11 +119,13 @@ export default function AdminContributionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canView, page, statusFilter, methodFilter, dateFrom, dateTo, memberFilterId, appliedSearch]);
 
-  function applySearch(e: React.FormEvent) {
-    e.preventDefault();
-    setPage(1);
-    setAppliedSearch(searchInput.trim());
-  }
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedSearch(searchInput.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   function clearMemberFilter() {
     setMemberFilterId('');
@@ -342,7 +344,7 @@ export default function AdminContributionsPage() {
         </div>
       )}
 
-      <form onSubmit={applySearch} className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 items-end">
+      <div className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 items-end">
         <AdminInput
           label={isRTL ? 'جست‌وجو (نام یا کد پیگیری)' : 'Search (name or tracking code)'}
           value={searchInput}
@@ -383,14 +385,7 @@ export default function AdminContributionsPage() {
           value={dateTo}
           onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
         />
-        <button
-          type="submit"
-          className="rounded-xl px-5 py-2.5 text-sm font-bold transition-all"
-          style={{ backgroundColor: '#00ffff', color: '#0a0a0f', boxShadow: '0 0 16px rgba(0,255,255,0.3)' }}
-        >
-          {isRTL ? 'جست‌وجو' : 'Search'}
-        </button>
-      </form>
+      </div>
 
       <AdminTable
         columns={columns}
