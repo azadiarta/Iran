@@ -7,6 +7,7 @@ import { Eye, EyeOff, UserPlus } from 'lucide-react';
 import { authAPI } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
+import Turnstile from '@/components/common/Turnstile';
 import {
   isValidPhoneStrict,
   isValidEmail,
@@ -137,6 +138,7 @@ function Field({
 
 export default function RegisterPage() {
   const t = useTranslations('auth');
+  const tc = useTranslations('common');
   const router = useRouter();
   const params = useParams();
   const locale = params?.locale as string || 'en';
@@ -156,6 +158,8 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [generalError, setGeneralError] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -257,6 +261,11 @@ export default function RegisterPage() {
 
     if (!validate()) return;
 
+    if (!captchaToken) {
+      setGeneralError(tc('captcha_required_error'));
+      return;
+    }
+
     setLoading(true);
     try {
       const payload: {
@@ -266,10 +275,12 @@ export default function RegisterPage() {
         email?: string;
         password: string;
         password_confirm: string;
+        captcha_token: string;
       } = {
         full_name: form.full_name.trim(),
         password: form.password,
         password_confirm: form.confirm_password,
+        captcha_token: captchaToken,
       };
       if (form.display_name.trim()) payload.display_name = form.display_name.trim();
       if (form.phone.trim()) payload.phone = form.phone.trim();
@@ -327,6 +338,8 @@ export default function RegisterPage() {
       } else {
         setGeneralError('Registration failed. Please check your connection and try again.');
       }
+      setCaptchaToken('');
+      setCaptchaResetKey((k) => k + 1);
     } finally {
       setLoading(false);
     }
@@ -517,6 +530,15 @@ export default function RegisterPage() {
             )}
           </div>
 
+          {/* CAPTCHA */}
+          <div className="flex justify-center">
+            <Turnstile
+              onVerify={setCaptchaToken}
+              onExpire={() => setCaptchaToken('')}
+              resetKey={captchaResetKey}
+            />
+          </div>
+
           {/* General error */}
           {generalError && (
             <p
@@ -535,7 +557,7 @@ export default function RegisterPage() {
           {/* Submit */}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !captchaToken}
             className="w-full flex items-center justify-center gap-2 rounded-xl py-3 font-semibold text-base transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed mt-2"
             style={{
               background: 'rgba(0,255,255,0.1)',

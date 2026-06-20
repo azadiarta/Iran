@@ -7,6 +7,7 @@ import { Eye, EyeOff, LogIn } from 'lucide-react';
 import { authAPI } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
+import Turnstile from '@/components/common/Turnstile';
 import {
   isValidPhoneOrEmail,
   isValidPhoneLenient,
@@ -20,6 +21,7 @@ import {
 
 export default function LoginPage() {
   const t = useTranslations('auth');
+  const tc = useTranslations('common');
   const router = useRouter();
   const params = useParams();
   const locale = params?.locale as string || 'en';
@@ -32,6 +34,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<{ credential?: string; password?: string }>({});
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -73,9 +77,14 @@ export default function LoginPage() {
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
+    if (!captchaToken) {
+      setError(tc('captcha_required_error'));
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await authAPI.login(credential.trim(), password);
+      const res = await authAPI.login(credential.trim(), password, captchaToken);
       const { tokens, member } = res.data as unknown as {
         tokens: { access: string; refresh: string };
         member: Parameters<typeof login>[0];
@@ -96,6 +105,8 @@ export default function LoginPage() {
       } else {
         setError('Login failed. Please check your connection and try again.');
       }
+      setCaptchaToken('');
+      setCaptchaResetKey((k) => k + 1);
     } finally {
       setLoading(false);
     }
@@ -228,6 +239,15 @@ export default function LoginPage() {
             )}
           </div>
 
+          {/* CAPTCHA */}
+          <div className="flex justify-center">
+            <Turnstile
+              onVerify={setCaptchaToken}
+              onExpire={() => setCaptchaToken('')}
+              resetKey={captchaResetKey}
+            />
+          </div>
+
           {/* Error message */}
           {error && (
             <p
@@ -246,7 +266,7 @@ export default function LoginPage() {
           {/* Submit button */}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !captchaToken}
             className="w-full flex items-center justify-center gap-2 rounded-xl py-3 font-semibold text-base transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
             style={{
               background: 'rgba(0,255,255,0.1)',

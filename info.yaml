@@ -1,6 +1,6 @@
 project_summary:
   generated_at: "2026-06-20"
-  source_files_read: 165
+  source_files_read: 167
   categories_found: 20
   quick_stats:
     total_forms: 23
@@ -17,7 +17,7 @@ project_summary:
     total_frontend_routes: 32
     total_frontend_api_modules: 13
     total_zustand_stores: 3
-    total_reusable_ui_components: 24
+    total_reusable_ui_components: 25
     total_phone_fields: 1
 
 # ============================================================
@@ -64,7 +64,7 @@ forms:
             - frontend/lib/api.ts
             - backend/accounts/views.py
             - backend/accounts/backends.py
-          notes: "Fields: credential (email or phone), password. Calls authAPI.login -> POST /api/auth/login/ (LoginView). noValidate, manual required checks only. credential routed to email-or-phone lookup in MemberAuthBackend.authenticate()."
+          notes: "Fields: credential (email or phone), password. Calls authAPI.login -> POST /api/auth/login/ (LoginView). noValidate, manual required checks only. credential routed to email-or-phone lookup in MemberAuthBackend.authenticate(). Phase 31 — gated by a Cloudflare Turnstile CAPTCHA widget (frontend/components/common/Turnstile.tsx); submit disabled until a token is issued, and captcha_token is sent with every request. LoginView now sets throttle_scope='login' (10/hour, ScopedRateThrottle) and rejects the request with 400 if core.captcha.verify_captcha(captcha_token, ip) fails, BEFORE the credential/password check — this is the ONLY login form in the project (shared by ordinary members and admins/superusers alike), so gating it here satisfies CAPTCHA-on-entry-point for the admin panel too, without ever putting a CAPTCHA inside the authenticated admin UI itself."
         - id: form_register
           label: Registration form
           scope: frontend
@@ -73,7 +73,7 @@ forms:
             - frontend/lib/api.ts
             - backend/accounts/views.py
             - backend/accounts/serializers.py
-          notes: "Fields: full_name, display_name, phone, email, password, confirm_password. Calls authAPI.register -> POST /api/auth/register/ (RegisterView + RegisterSerializer). Client: full_name required (max 35), display_name optional (max 20), phone-or-email required (phone must match strict '00<countrycode><number>' format via frontend/lib/validation.ts isValidPhoneStrict; email format-checked), password min 8 chars, password===confirm_password. Server re-validates via backend/core/validators.py (validate_phone_format, validate_email_format, sanitize_and_limit) in RegisterSerializer.validate_full_name/validate_display_name/validate_phone and validate()."
+          notes: "Fields: full_name, display_name, phone, email, password, confirm_password. Calls authAPI.register -> POST /api/auth/register/ (RegisterView + RegisterSerializer). Client: full_name required (max 35), display_name optional (max 20), phone-or-email required (phone must match strict '00<countrycode><number>' format via frontend/lib/validation.ts isValidPhoneStrict; email format-checked), password min 8 chars, password===confirm_password. Server re-validates via backend/core/validators.py (validate_phone_format, validate_email_format, sanitize_and_limit) in RegisterSerializer.validate_full_name/validate_display_name/validate_phone and validate(). Phase 31 — same Turnstile CAPTCHA gate as form_login (submit disabled until verified, captcha_token included in the payload); RegisterView sets throttle_scope='register' (5/hour) and checks verify_captcha() before touching RegisterSerializer at all."
         - id: form_profile_edit
           label: Own profile edit form
           scope: frontend
@@ -110,7 +110,7 @@ forms:
             - backend/core/contact_views.py
             - backend/core/serializers.py
             - backend/core/models.py
-          notes: "<form onSubmit>. Fields: name (prefilled/disabled if logged in), contact (free text, NOT phone-specific), message. Calls contactAPI.submit -> POST /api/contact/submit/ (ContactMessageCreateView + ContactMessageCreateSerializer). HTML5 required attrs (no noValidate). Special UI handling for HTTP 429 (AnonRateThrottle: 100/hour). Generates a tracking_code (see tracking_code_scheme category)."
+          notes: "<form onSubmit>. Fields: name (prefilled/disabled if logged in), contact (free text, NOT phone-specific), message. Calls contactAPI.submit -> POST /api/contact/submit/ (ContactMessageCreateView + ContactMessageCreateSerializer). HTML5 required attrs (no noValidate). Special UI handling for HTTP 429 (AnonRateThrottle: 100/hour; Phase 31 also added throttle_scope='contact', 5/hour via ScopedRateThrottle, layered on top of the existing global anon rate). Generates a tracking_code (see tracking_code_scheme category). Phase 31 — gated by the same Turnstile CAPTCHA widget as form_login; the widget AND its token are reset (setCaptchaToken/captchaResetKey) both on submit failure and on the post-success 'send another' action, since the form's Turnstile instance unmounts/remounts across that transition and a stale token must never be left able to enable the submit button."
         - id: form_contribute_initiate
           label: Contribute wizard step 1 — initiate contribution
           scope: frontend
@@ -119,7 +119,7 @@ forms:
             - frontend/lib/api.ts
             - backend/payments/views.py
             - backend/payments/serializers.py
-          notes: "No <form> tag, multi-step wizard. Fields: amount, guestName (if unauthenticated), selectedMethod, showInPublicList, displayNameChoice, customDisplayName (if custom), message. Calls paymentsAPI.initiate -> POST /api/payments/initiate/ (PaymentInitiateView + PaymentInitiateSerializer). Client gate: amount>0 matching regex /^\\d{0,9}(\\.\\d{0,2})?$/, method selected, guest name required if unauth, custom name required if that choice selected. Creates a Contribution row + a tracking_code."
+          notes: "No <form> tag, multi-step wizard. Fields: amount, guestName (if unauthenticated), selectedMethod, showInPublicList, displayNameChoice, customDisplayName (if custom), message. Calls paymentsAPI.initiate -> POST /api/payments/initiate/ (PaymentInitiateView + PaymentInitiateSerializer). Client gate: amount>0 matching regex /^\\d{0,9}(\\.\\d{0,2})?$/, method selected, guest name required if unauth, custom name required if that choice selected. Creates a Contribution row + a tracking_code. Phase 31 — `canProceed` additionally requires a verified Turnstile CAPTCHA token (!!captchaToken); PaymentInitiateView sets throttle_scope='contribution' (15/hour) and checks verify_captcha() inside the existing @transaction.atomic post(), before the serializer runs."
         - id: form_contribute_upload_receipt
           label: Contribute wizard step 3 — upload payment receipt
           scope: frontend
@@ -138,7 +138,7 @@ forms:
             - backend/posts/views.py
             - backend/posts/serializers.py
             - backend/posts/models.py
-          notes: "<form onSubmit noValidate>. Fields: commentName (readOnly if authenticated), commentText, commentRating (1-5). Calls postsAPI.createComment -> POST /api/posts/{pk}/comments/create/ (CommentCreateView with kwargs target_type='post', + CommentCreateSerializer). Manual checks: text required, guest name required if not authenticated, rating must be non-zero. Comment is generic (GenericForeignKey via content_type/object_id), shared with expense comments."
+          notes: "<form onSubmit noValidate>. Fields: commentName (readOnly if authenticated), commentText, commentRating (1-5). Calls postsAPI.createComment -> POST /api/posts/{pk}/comments/create/ (CommentCreateView with kwargs target_type='post', + CommentCreateSerializer). Manual checks: text required, guest name required if not authenticated, rating must be non-zero. Comment is generic (GenericForeignKey via content_type/object_id), shared with expense comments. Phase 31 — same Turnstile CAPTCHA gate as form_login, wired identically on BOTH this page and the expense-comment form on frontend/app/[locale]/expenses/[id]/page.tsx (which calls fundAPI.createExpenseComment against the same CommentCreateView, just target_type='expense'); CommentCreateView itself sets throttle_scope='comment' (20/hour) and checks verify_captcha() before resolving the comment target, so the gate applies uniformly to both post and expense comments from one code path."
     admin_data_entry_forms:
       count: 14
       items:
@@ -469,7 +469,7 @@ api_calls:
             - frontend/lib/api.ts
             - backend/accounts/views.py
             - backend/accounts/urls.py
-          notes: "Methods: register, login, logout, getProfile, refreshToken. Targets /api/auth/*."
+          notes: "Methods: register, login, logout, getProfile, refreshToken. Targets /api/auth/*. Phase 31 — register's payload type and login()'s signature both gained a required captcha_token param (login(credential, password, captcha_token)), verified server-side via core.captcha.verify_captcha before LoginView/RegisterView do anything else."
         - id: api_postsAPI
           label: postsAPI — list/detail/create/update/delete posts + image upload
           scope: frontend
@@ -477,7 +477,7 @@ api_calls:
             - frontend/lib/api.ts
             - backend/posts/views.py
             - backend/posts/urls.py
-          notes: "Methods: getList, getDetail, getComments, createComment, create, update, delete, uploadImages, deleteImage, getAdminList. Targets /api/posts/*. getAdminList -> GET /api/posts/admin/ (PostAdminListView, can_post-gated) supports search/author/date_from/date_to filters and returns PostAdminDetail rows (includes tracking_code, author.member_number) instead of the public PostDetail shape."
+          notes: "Methods: getList, getDetail, getComments, createComment, create, update, delete, uploadImages, deleteImage, getAdminList. Targets /api/posts/*. getAdminList -> GET /api/posts/admin/ (PostAdminListView, can_post-gated) supports search/author/date_from/date_to filters and returns PostAdminDetail rows (includes tracking_code, author.member_number) instead of the public PostDetail shape. Phase 31 — createComment's data type gained a required captcha_token field, verified server-side by CommentCreateView via core.captcha.verify_captcha."
         - id: api_commentsAPI
           label: commentsAPI — comment list/detail/status/edit (global + own)
           scope: frontend
@@ -493,7 +493,7 @@ api_calls:
             - frontend/lib/api.ts
             - backend/fund/views.py
             - backend/fund/urls.py
-          notes: "Methods: getBalance, getContributions, createManualContribution, updateContributionStatus, getContributionsPublic, getContributionDetail, updateContribution, getMyContributions, getExpenses, createExpense, deleteExpense, getExpenseDetail, getExpenseComments, createExpenseComment. Targets /api/fund/*."
+          notes: "Methods: getBalance, getContributions, createManualContribution, updateContributionStatus, getContributionsPublic, getContributionDetail, updateContribution, getMyContributions, getExpenses, createExpense, deleteExpense, getExpenseDetail, getExpenseComments, createExpenseComment. Targets /api/fund/*. Phase 31 — createExpenseComment's data type gained a required captcha_token field, same as postsAPI.createComment (both route through the shared CommentCreateView)."
         - id: api_paymentsAPI
           label: paymentsAPI — payment methods, self-service contribution initiate/receipt/status
           scope: frontend
@@ -501,7 +501,7 @@ api_calls:
             - frontend/lib/api.ts
             - backend/payments/views.py
             - backend/payments/urls.py
-          notes: "Methods: getMethods, initiate, uploadReceipt, getStatus. Targets /api/payments/*. This is the self-service contribution flow (contribute/page.tsx); admin manual entry uses fundAPI.createManualContribution instead."
+          notes: "Methods: getMethods, initiate, uploadReceipt, getStatus. Targets /api/payments/*. This is the self-service contribution flow (contribute/page.tsx); admin manual entry uses fundAPI.createManualContribution instead. Phase 31 — initiate's payload type gained a required captcha_token field, verified by PaymentInitiateView via core.captcha.verify_captcha before the serializer runs."
         - id: api_membersAPI
           label: membersAPI — member CRUD, group change, password change, activation
           scope: frontend
@@ -565,12 +565,12 @@ api_calls:
             - frontend/lib/api.ts
             - backend/core/contact_views.py
             - backend/core/contact_urls.py
-          notes: "Methods: submit, getMine, getList, toggleHandled. Targets /api/contact/*."
+          notes: "Methods: submit, getMine, getList, toggleHandled. Targets /api/contact/*. Phase 31 — submit's data type gained a required captcha_token field, verified by ContactMessageCreateView via core.captcha.verify_captcha before the MAX_PENDING_MESSAGES check."
   notes_general: "frontend/lib/api.ts is the single source of truth for every frontend-to-backend call in the project — no component calls axios/fetch directly outside this file."
 
 ui_components:
   scope: frontend
-  total_count: 24
+  total_count: 25
   description: Reusable UI components under frontend/components — admin primitives, admin form fields, layout shells, and shared/animation components.
   subcategories:
     admin_primitives:
@@ -683,8 +683,13 @@ ui_components:
           location: [frontend/components/layout/Navbar.tsx]
           notes: "Locale switcher, auth-aware links (login vs profile), admin-panel link gated by hasAdminAccess()."
     common_and_animation_components:
-      count: 4
+      count: 5
       items:
+        - id: ui_Turnstile
+          label: "Turnstile — Cloudflare Turnstile CAPTCHA widget (Phase 31, NEW)"
+          scope: frontend
+          location: [frontend/components/common/Turnstile.tsx]
+          notes: "Zero-dependency wrapper (no @marsidev/react-turnstile or similar package — loads Cloudflare's https://challenges.cloudflare.com/turnstile/v0/api.js script itself via a module-level singleton Promise, then calls window.turnstile.render()). Props: onVerify(token), onExpire?, resetKey? — incrementing resetKey calls window.turnstile.reset(widgetId) so a fresh token can be obtained after a failed submit (each token is single-use). Site key resolves from NEXT_PUBLIC_TURNSTILE_SITE_KEY, defaulting to Cloudflare's published 'always passes' test key (1x00000000000000000000AA) so it works in dev with zero setup. Used by form_login, form_register, form_contact, form_post_comment (+ its expense-comment twin), and form_contribute_initiate — every public-facing form that creates data without authentication, EXCLUDING every form inside the authenticated /admin/* panel (deliberate — CAPTCHA only guards the panel's single shared entry point, form_login, not the panel's internals)."
         - id: ui_BalanceIndicator
           label: BalanceIndicator — fund balance display widget
           scope: frontend
@@ -906,12 +911,12 @@ api_endpoints:
           label: "POST /api/auth/register/"
           scope: backend
           location: [backend/accounts/urls.py, backend/accounts/views.py, backend/accounts/serializers.py]
-          notes: "RegisterView + RegisterSerializer. AllowAny. Creates Member, auto-assigns default AccessGroup, issues JWT pair."
+          notes: "RegisterView + RegisterSerializer. AllowAny. Creates Member, auto-assigns default AccessGroup, issues JWT pair. Phase 31 — throttle_scope='register' (5/hour, ScopedRateThrottle); rejects with 400 if core.captcha.verify_captcha(request.data['captcha_token'], ip) fails, checked before RegisterSerializer even runs."
         - id: ep_auth_login
           label: "POST /api/auth/login/"
           scope: backend
-          location: [backend/accounts/urls.py, backend/accounts/views.py, backend/accounts/backends.py, backend/accounts/serializers.py]
-          notes: "LoginView + LoginSerializer. AllowAny. Delegates to MemberAuthBackend.authenticate() (phone-or-email lookup via '@' in credential)."
+          location: [backend/accounts/urls.py, backend/accounts/views.py, backend/accounts/backends.py, backend/accounts/serializers.py, backend/core/captcha.py]
+          notes: "LoginView + LoginSerializer. AllowAny. Delegates to MemberAuthBackend.authenticate() (phone-or-email lookup via '@' in credential). Phase 31 — throttle_scope='login' (10/hour); rejects with 400 if verify_captcha() fails, checked before the credential/password check. Since this is the project's ONLY login endpoint (members and admins/superusers alike), this single gate covers CAPTCHA-on-entry-point for the admin panel without ever exposing a CAPTCHA inside the authenticated admin UI."
         - id: ep_auth_logout
           label: "POST /api/auth/logout/"
           scope: backend
@@ -1134,7 +1139,7 @@ api_endpoints:
           label: "POST /api/posts/{pk}/comments/create/ (target_type=post)"
           scope: backend
           location: [backend/posts/urls.py, backend/posts/views.py, backend/posts/serializers.py]
-          notes: "CommentCreateView with kwargs={'target_type':'post'} + CommentCreateSerializer. Supports guest_name for unauthenticated commenters. Generates a tracking_code (see tracking_code_scheme)."
+          notes: "CommentCreateView with kwargs={'target_type':'post'} + CommentCreateSerializer. Supports guest_name for unauthenticated commenters. Generates a tracking_code (see tracking_code_scheme). Phase 31 — throttle_scope='comment' (20/hour); rejects with 400 if core.captcha.verify_captcha() fails, checked before resolving the comment target — applies equally to the target_type='expense' mount below."
         - id: ep_comment_list_expense
           label: "GET /api/fund/expenses/{pk}/comments/ (target_type=expense)"
           scope: backend
@@ -1200,7 +1205,7 @@ api_endpoints:
           label: "POST /api/payments/initiate/"
           scope: backend
           location: [backend/payments/urls.py, backend/payments/views.py, backend/payments/serializers.py]
-          notes: "PaymentInitiateView + PaymentInitiateSerializer. Creates a pending Contribution + tracking_code. Self-service contribution flow step 1."
+          notes: "PaymentInitiateView + PaymentInitiateSerializer. Creates a pending Contribution + tracking_code. Self-service contribution flow step 1. Phase 31 — throttle_scope='contribution' (15/hour); rejects with 400 if core.captcha.verify_captcha() fails, checked inside the existing @transaction.atomic post(), before the serializer runs."
         - id: ep_payment_receipt_upload
           label: "POST /api/payments/{pk}/receipt/"
           scope: backend
@@ -1218,7 +1223,7 @@ api_endpoints:
           label: "POST /api/contact/submit/"
           scope: backend
           location: [backend/core/contact_urls.py, backend/core/contact_views.py, backend/core/serializers.py]
-          notes: "ContactMessageCreateView + ContactMessageCreateSerializer. AnonRateThrottle (100/hour). Generates tracking_code."
+          notes: "ContactMessageCreateView + ContactMessageCreateSerializer. AnonRateThrottle (100/hour). Generates tracking_code. Phase 31 — additionally sets throttle_scope='contact' (5/hour, ScopedRateThrottle, layered on top of the existing global anon rate) and rejects with 400 if core.captcha.verify_captcha() fails, checked before the MAX_PENDING_MESSAGES pending-message count."
         - id: ep_contact_mine
           label: "GET /api/contact/mine/"
           scope: backend
@@ -1730,7 +1735,7 @@ auth_permission_checks:
 
 validation_logic:
   scope: both
-  total_count: 7
+  total_count: 9
   description: >
     Client-side and server-side validation. Both stacks now have a shared, canonical
     validation/sanitization module (added during the input-validation-security hardening
@@ -1743,6 +1748,11 @@ validation_logic:
     panel is now capped and sanitized (HTML-stripped) on the backend via
     sanitize_and_limit()/validate_max_length(), in addition to a matching maxLength prop
     and pre-submit check on the frontend — so no input can rely on only one layer.
+    Phase 31 added a second, distinct line of defense — anti-abuse rather than
+    data-shape validation — covering the 5 public unauthenticated write endpoints
+    (login, register, contact, comment, contribution): a Cloudflare Turnstile CAPTCHA
+    check (see anti_abuse_protections.validate_captcha_backend) and a per-view
+    ScopedRateThrottle rate cap (see anti_abuse_protections.validate_rate_limiting).
   subcategories:
     shared_validation_modules:
       count: 2
@@ -1785,6 +1795,19 @@ validation_logic:
           scope: backend
           location: [backend/payments/serializers.py]
           notes: "validate_amount, validate_message/validate_public_display_name (sanitize_and_limit 150/100), validate_guest_name (50), notes field capped at LONG_TEXT_PUBLIC_MAX_LENGTH with validate_notes (250), validate() in PaymentInitiateSerializer (mirrors fund's ContributionCreateSerializer checks); validate_receipt_image in ReceiptUploadSerializer delegates to core.validators.validate_receipt_file (content-verified file type, not extension-only)."
+    anti_abuse_protections:
+      count: 2
+      items:
+        - id: validate_captcha_backend
+          label: "backend/core/captcha.py — Cloudflare Turnstile server-side verification (Phase 31, NEW)"
+          scope: backend
+          location: [backend/core/captcha.py, backend/groupfund/settings.py]
+          notes: "verify_captcha(token, remote_ip=None) posts the frontend-supplied token + settings.TURNSTILE_SECRET_KEY + remote_ip to Cloudflare's https://challenges.cloudflare.com/turnstile/v0/siteverify via stdlib urllib (no new pip dependency), returns bool(result['success']). Fails closed: a missing token, a network error, or any other exception during the verify request (caught broadly, logged via logger.exception) all return False rather than raising — so a captcha-service outage blocks the gated form instead of silently bypassing it. settings.TURNSTILE_SECRET_KEY defaults to Cloudflare's published 'always passes' test secret (1x0000000000000000000000000000000AA) when the env var is unset, so every CAPTCHA-gated endpoint works out of the box in dev with zero signup. Called directly inside the view (no DRF permission class) at the very top of RegisterView/LoginView/ContactMessageCreateView/CommentCreateView/PaymentInitiateView's post(), before any serializer or business logic runs."
+        - id: validate_rate_limiting
+          label: "Per-view rate limiting — DRF ScopedRateThrottle (Phase 31, NEW)"
+          scope: backend
+          location: [backend/groupfund/settings.py, backend/accounts/views.py, backend/core/contact_views.py, backend/posts/views.py, backend/payments/views.py]
+          notes: "REST_FRAMEWORK.DEFAULT_THROTTLE_CLASSES gained rest_framework.throttling.ScopedRateThrottle (additive — layers on top of the pre-existing global AnonRateThrottle/UserRateThrottle, anon 100/hour + user 1000/hour, from the Phase-11 hardening pass; a view with no throttle_scope set is unaffected). DEFAULT_THROTTLE_RATES gained 5 named scopes: login=10/hour, register=5/hour, contact=5/hour, comment=20/hour, contribution=15/hour. Each scope is opted into by setting throttle_scope='<name>' as a class attribute on the corresponding view (LoginView, RegisterView, ContactMessageCreateView, CommentCreateView — shared by both post- and expense-comment routes, PaymentInitiateView) — the same 5 endpoints gated by validate_captcha_backend above, so every public unauthenticated write path now has BOTH a per-IP request-rate ceiling and a CAPTCHA challenge, rather than relying on either alone."
     frontend_manual_validation:
       count: 1
       items:

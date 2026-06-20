@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
 from accounts.permissions import HasGroupPermission
+from core.captcha import verify_captcha
 from core.log_utils import actor_display_for, target_display_for
 from core.models import DefaultSetting
 from core.pagination import paginate
@@ -372,8 +373,12 @@ class CommentListView(APIView):
 
 class CommentCreateView(APIView):
     permission_classes = [AllowAny]
+    throttle_scope = 'comment'
 
     def post(self, request, target_type, pk):
+        if not verify_captcha(request.data.get('captcha_token'), _get_ip(request)):
+            return api_error('Captcha verification failed.', status_code=400)
+
         ct, object_id, err = _resolve_comment_target(target_type, pk)
         if err:
             return err

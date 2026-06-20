@@ -5,6 +5,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
 from accounts.permissions import HasGroupPermission
+from core.captcha import verify_captcha
 from core.log_utils import actor_display_for, target_display_for
 from core.models import ContactMessage
 from core.pagination import paginate
@@ -42,8 +43,12 @@ MAX_PENDING_MESSAGES = 4
 
 class ContactMessageCreateView(APIView):
     permission_classes = [AllowAny]
+    throttle_scope = 'contact'
 
     def post(self, request):
+        if not verify_captcha(request.data.get('captcha_token'), _get_ip(request)):
+            return api_error('Captcha verification failed.', status_code=400)
+
         if request.user.is_authenticated:
             pending_count = ContactMessage.objects.filter(sender=request.user, is_handled=False).count()
         else:
