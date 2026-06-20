@@ -16,6 +16,7 @@ import {
   passwordTooShortError,
   passwordMismatchError,
   PHONE_PLACEHOLDER,
+  EMAIL_MAX_LENGTH,
 } from '@/lib/validation';
 
 function getInitials(fullName: string): string {
@@ -55,7 +56,7 @@ export default function ProfilePage() {
   const [editSaving, setEditSaving] = useState(false);
   const [editSuccess, setEditSuccess] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
-  const [editFieldErrors, setEditFieldErrors] = useState<Record<string, string>>({});
+  const [editFieldErrors, setEditFieldErrors] = useState<Record<string, string | undefined>>({});
 
   // ── Change password state ────────────────────────────────────────────────
   const [showPasswordSection, setShowPasswordSection] = useState(false);
@@ -185,6 +186,29 @@ export default function ProfilePage() {
     } finally {
       setEditSaving(false);
     }
+  };
+
+  const handleEmailChange = (value: string) => {
+    const isRTL = locale === 'fa';
+    setEditData((d) => ({ ...d, email: value }));
+    setEditFieldErrors((prev) => ({
+      ...prev,
+      email: value.trim() && !isValidEmail(value) ? emailFormatError(isRTL) : undefined,
+    }));
+  };
+
+  const handlePhoneChange = (value: string) => {
+    const isRTL = locale === 'fa';
+    setEditData((d) => ({ ...d, phone: value }));
+    setEditFieldErrors((prev) => ({
+      ...prev,
+      // Only flag the strict "00"-prefixed format once the phone is actually
+      // changing — existing members may have a legacy format on file.
+      phone:
+        value.trim() && value.trim() !== (member?.phone || '') && !isValidPhoneStrict(value)
+          ? phoneFormatError(isRTL)
+          : undefined,
+    }));
   };
 
   const handleNewPasswordChange = (value: string) => {
@@ -386,9 +410,9 @@ export default function ProfilePage() {
                 <input
                   type="email"
                   value={editData.email}
-                  onChange={(e) => setEditData((d) => ({ ...d, email: e.target.value }))}
+                  onChange={(e) => handleEmailChange(e.target.value)}
                   className={inputClass}
-                  maxLength={254}
+                  maxLength={EMAIL_MAX_LENGTH}
                 />
                 <div className="flex items-start justify-between gap-2 mt-1">
                   {editFieldErrors.email ? (
@@ -396,7 +420,7 @@ export default function ProfilePage() {
                   ) : (
                     <span />
                   )}
-                  <p className="text-xs text-white/30 whitespace-nowrap">{editData.email.length}/254</p>
+                  <p className="text-xs text-white/30 whitespace-nowrap">{editData.email.length}/{EMAIL_MAX_LENGTH}</p>
                 </div>
               </div>
 
@@ -406,7 +430,7 @@ export default function ProfilePage() {
                 <input
                   type="tel"
                   value={editData.phone}
-                  onChange={(e) => setEditData((d) => ({ ...d, phone: e.target.value }))}
+                  onChange={(e) => handlePhoneChange(e.target.value)}
                   className={inputClass}
                   placeholder={PHONE_PLACEHOLDER}
                   maxLength={17}

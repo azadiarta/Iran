@@ -309,10 +309,15 @@ export interface Paginated<T> {
 // Posts API
 // ═══════════════════════════════════════════════════════════════════════════════
 export const postsAPI = {
-  getList: (page = 1, search = '') => {
+  getList: (
+    page = 1,
+    filters: { search?: string; date_from?: string; date_to?: string } = {}
+  ) => {
     const params = new URLSearchParams();
     params.set('page', String(page));
-    if (search) params.set('search', search);
+    if (filters.search) params.set('search', filters.search);
+    if (filters.date_from) params.set('date_from', filters.date_from);
+    if (filters.date_to) params.set('date_to', filters.date_to);
     return api.get<ApiResponse>(`/api/posts/?${params.toString()}`);
   },
 

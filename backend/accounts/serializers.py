@@ -4,7 +4,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from accounts.models import BASELINE_GROUP_PERMISSIONS, AccessGroup, Member
 from core.models import Permission
 from core.validators import (
+    EMAIL_MAX_LENGTH,
     sanitize_and_limit,
+    validate_email_format,
     validate_phone_format,
     validate_phone_or_email,
 )
@@ -25,7 +27,10 @@ class RegisterSerializer(serializers.ModelSerializer):
         return sanitize_and_limit(value, 20) if value else value
 
     def validate_email(self, value):
-        return value or None
+        value = value or None
+        if value:
+            validate_email_format(value)
+        return value
 
     def validate_phone(self, value):
         value = value or None
@@ -101,7 +106,9 @@ class MemberCreateSerializer(RegisterSerializer):
 
 
 class LoginSerializer(serializers.Serializer):
-    credential = serializers.CharField(max_length=254, help_text='Phone number or email address')
+    # EMAIL_MAX_LENGTH is the email cap; phone numbers are always far
+    # shorter, so this is never a real constraint on valid phone logins.
+    credential = serializers.CharField(max_length=EMAIL_MAX_LENGTH, help_text='Phone number or email address')
     password = serializers.CharField(write_only=True)
 
     def validate_credential(self, value):
@@ -189,7 +196,14 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
         return sanitize_and_limit(value, 20) if value else value
 
     def validate_email(self, value):
-        return value or None
+        value = value or None
+        # Only enforce format/length when the email is actually being
+        # changed — existing members may have a legacy value (e.g. longer
+        # than the current cap) and must not be locked out of saving
+        # unrelated profile edits.
+        if value and value != self.instance.email:
+            validate_email_format(value)
+        return value
 
     def validate_phone(self, value):
         value = value or None

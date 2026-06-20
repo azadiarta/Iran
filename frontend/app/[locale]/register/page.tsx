@@ -16,6 +16,7 @@ import {
   requiredFieldError,
   emailFormatError,
   PHONE_PLACEHOLDER,
+  EMAIL_MAX_LENGTH,
 } from '@/lib/validation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -190,6 +191,22 @@ export default function RegisterPage() {
     setFieldErrors((prev) => ({
       ...prev,
       confirm_password: value && value !== form.password ? passwordMismatchError(isRTL) : undefined,
+    }));
+  }
+
+  function handlePhoneChange(value: string) {
+    setForm((prev) => ({ ...prev, phone: value }));
+    setFieldErrors((prev) => ({
+      ...prev,
+      phone: value.trim() && !isValidPhoneStrict(value) ? t('phone_format_error') : undefined,
+    }));
+  }
+
+  function handleEmailChange(value: string) {
+    setForm((prev) => ({ ...prev, email: value }));
+    setFieldErrors((prev) => ({
+      ...prev,
+      email: value.trim() && !isValidEmail(value) ? emailFormatError(isRTL) : undefined,
     }));
   }
 
@@ -373,10 +390,16 @@ export default function RegisterPage() {
             label={t('phone_label')}
             type="tel"
             value={form.phone}
-            onChange={setField('phone')}
+            onChange={handlePhoneChange}
             disabled={loading}
             placeholder={PHONE_PLACEHOLDER}
-            hint={!form.phone && !form.email ? phoneOrEmailHint : t('phone_format_hint')}
+            hint={
+              form.phone.trim()
+                ? t('phone_format_hint')
+                : form.email.trim()
+                  ? undefined
+                  : phoneOrEmailHint
+            }
             error={fieldErrors.phone}
             maxLength={17}
           />
@@ -386,12 +409,12 @@ export default function RegisterPage() {
             label={t('email_label')}
             type="email"
             value={form.email}
-            onChange={setField('email')}
+            onChange={handleEmailChange}
             disabled={loading}
             placeholder="you@example.com"
-            hint={!form.phone && !form.email ? phoneOrEmailHint : undefined}
+            hint={!form.phone.trim() && !form.email.trim() ? phoneOrEmailHint : undefined}
             error={fieldErrors.email}
-            maxLength={254}
+            maxLength={EMAIL_MAX_LENGTH}
           />
 
           {/* Password */}

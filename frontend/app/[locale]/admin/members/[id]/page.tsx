@@ -29,6 +29,7 @@ import {
   LONG_TEXT_ADMIN_MAX_LENGTH,
   passwordTooShortError,
   passwordMismatchError,
+  EMAIL_MAX_LENGTH,
 } from '@/lib/validation';
 
 export default function AdminMemberDetailPage() {
@@ -393,7 +394,7 @@ export default function AdminMemberDetailPage() {
           <h2 className="text-sm font-semibold text-white/80">{isRTL ? 'ویرایش پروفایل' : 'Edit Profile'}</h2>
           <AdminInput label={isRTL ? 'نام کامل' : 'Full Name'} value={fullName} onChange={(e) => setFullName(e.target.value)} maxLength={35} />
           <AdminInput label={isRTL ? 'نام نمایشی' : 'Display Name'} value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={20} />
-          <AdminInput label={isRTL ? 'ایمیل' : 'Email'} type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} />
+          <AdminInput label={isRTL ? 'ایمیل' : 'Email'} type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={EMAIL_MAX_LENGTH} />
           <AdminInput
             label={isRTL ? 'تلفن' : 'Phone'}
             value={phone}

@@ -98,9 +98,24 @@ class PostListView(APIView):
             return err
         qs = Post.objects.prefetch_related('images').select_related('author').order_by('-created_at')
 
+        date_from = request.query_params.get('date_from')
+        date_to = request.query_params.get('date_to')
+        if date_from:
+            qs = safe_filter(qs, created_at__date__gte=date_from)
+        if date_to:
+            qs = safe_filter(qs, created_at__date__lte=date_to)
+
+        # Searches the same fields visible on the public post card/detail
+        # (title, body, author name) — tracking_code stays admin-only, since
+        # PostSerializer never exposes it to the public.
         search = request.query_params.get('search')
         if search:
-            qs = qs.filter(models.Q(title__icontains=search) | models.Q(body__icontains=search))
+            qs = qs.filter(
+                models.Q(title__icontains=search)
+                | models.Q(body__icontains=search)
+                | models.Q(author__full_name__icontains=search)
+                | models.Q(author__display_name__icontains=search)
+            )
 
         return paginate(qs, request, PostSerializer)
 
