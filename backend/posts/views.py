@@ -23,6 +23,7 @@ from posts.serializers import (
     CommentSerializer,
     CommentStatusSerializer,
     MyCommentSerializer,
+    PostAdminDetailSerializer,
     PostCreateSerializer,
     PostImageSerializer,
     PostSerializer,
@@ -96,7 +97,43 @@ class PostListView(APIView):
         if not visible:
             return err
         qs = Post.objects.prefetch_related('images').select_related('author').order_by('-created_at')
+
+        search = request.query_params.get('search')
+        if search:
+            qs = qs.filter(models.Q(title__icontains=search) | models.Q(body__icontains=search))
+
         return paginate(qs, request, PostSerializer)
+
+
+class PostAdminListView(APIView):
+    """GET /api/posts/admin/ — paginated, filterable admin post list (search/author/date range)."""
+    permission_classes = [IsAuthenticated, HasGroupPermission('can_post')]
+
+    def get(self, request):
+        qs = Post.objects.prefetch_related('images').select_related('author').order_by('-created_at')
+
+        author_id = request.query_params.get('author')
+        if author_id:
+            qs = safe_filter(qs, author__id=author_id)
+
+        date_from = request.query_params.get('date_from')
+        date_to = request.query_params.get('date_to')
+        if date_from:
+            qs = safe_filter(qs, created_at__date__gte=date_from)
+        if date_to:
+            qs = safe_filter(qs, created_at__date__lte=date_to)
+
+        search = request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                models.Q(title__icontains=search)
+                | models.Q(body__icontains=search)
+                | models.Q(author__full_name__icontains=search)
+                | models.Q(author__display_name__icontains=search)
+                | models.Q(tracking_code__icontains=search)
+            )
+
+        return paginate(qs, request, PostAdminDetailSerializer)
 
 
 class PostDetailView(APIView):

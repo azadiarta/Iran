@@ -5,6 +5,7 @@ import { Mail, Phone, Send, CheckCircle, AlertTriangle } from 'lucide-react';
 import { settingsAPI, contactAPI } from '@/lib/api';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
 import useAuthStore from '@/store/authStore';
+import { SHORT_TEXT_PUBLIC_MAX_LENGTH, LONG_TEXT_PUBLIC_MAX_LENGTH } from '@/lib/validation';
 
 interface ContactInfo {
   email: string | null;
@@ -195,9 +196,14 @@ export default function ContactPage() {
                   onChange={(e) => setFormData((d) => ({ ...d, name: e.target.value }))}
                   placeholder={t('name_placeholder')}
                   disabled={mounted && !!member}
-                  maxLength={100}
+                  maxLength={SHORT_TEXT_PUBLIC_MAX_LENGTH}
                   className={inputClass + (mounted && member ? ' opacity-60 cursor-not-allowed' : '')}
                 />
+                {!(mounted && member) && (
+                  <p className="mt-1 text-xs text-white/30 text-right">
+                    {formData.name.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}
+                  </p>
+                )}
               </div>
 
               {/* Member ID (read-only, shown only when logged in) */}
@@ -224,9 +230,12 @@ export default function ContactPage() {
                   value={formData.contact}
                   onChange={(e) => setFormData((d) => ({ ...d, contact: e.target.value }))}
                   placeholder={t('contact_placeholder')}
-                  maxLength={150}
+                  maxLength={SHORT_TEXT_PUBLIC_MAX_LENGTH}
                   className={inputClass}
                 />
+                <p className="mt-1 text-xs text-white/30 text-right">
+                  {formData.contact.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}
+                </p>
               </div>
 
               {/* Message */}
@@ -240,7 +249,7 @@ export default function ContactPage() {
                   value={formData.message}
                   onChange={(e) => setFormData((d) => ({ ...d, message: e.target.value }))}
                   placeholder={t('message_placeholder')}
-                  maxLength={250}
+                  maxLength={LONG_TEXT_PUBLIC_MAX_LENGTH}
                   className={inputClass + ' resize-none'}
                 />
               </div>

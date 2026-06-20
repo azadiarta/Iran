@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from accounts.models import Member
-from accounts.permissions import HasGroupPermission
+from accounts.permissions import HasGroupPermission, IsSuperuser
 from accounts.serializers import (
     ChangePasswordSerializer,
     MemberCreateSerializer,
@@ -243,6 +243,63 @@ class MemberChangeGroupView(APIView):
              extra_data={'old_group': old_group, 'new_group': str(new_group)},
              ip=_get_ip(request))
         return api_success(MemberDetailSerializer(member).data, message='Group updated.')
+
+
+class MemberChangeNumberView(APIView):
+    """Superuser-only: reassign a member's member_number. Unlike every other
+    member-mutating view here, this intentionally works even when the target
+    is a superuser — gating is solely on the *acting* admin's own is_superuser,
+    not on the target's. Cascades the new 5-digit prefix onto the tracking_code
+    of every Comment/Contribution/ContactMessage/Post already attributed to
+    this member, leaving each row's letter + random suffix untouched."""
+    permission_classes = [IsAuthenticated, IsSuperuser]
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        try:
+            member = Member.objects.get(pk=pk)
+        except Member.DoesNotExist:
+            return api_error('Member not found.', status_code=404)
+
+        try:
+            new_number = int(request.data.get('member_number'))
+        except (TypeError, ValueError):
+            return api_error('Validation failed.',
+                              errors={'member_number': ['Must be an integer.']})
+
+        if not (10000 <= new_number <= 99999):
+            return api_error('Validation failed.',
+                              errors={'member_number': ['Must be between 10000 and 99999.']})
+
+        if Member.objects.filter(member_number=new_number).exclude(pk=member.pk).exists():
+            return api_error('Validation failed.',
+                              errors={'member_number': ['This member number is already in use.']})
+
+        old_number = member.member_number
+        member.member_number = new_number
+        member.save(update_fields=['member_number'])
+
+        from core.models import ContactMessage
+        from fund.models import Contribution
+        from posts.models import Comment, Post
+
+        new_prefix = f'{new_number:05d}'
+        for model_cls, qs in (
+            (Comment, member.comments.all()),
+            (Contribution, member.contributions.all()),
+            (ContactMessage, member.contact_messages.all()),
+            (Post, member.posts.all()),
+        ):
+            rows = [row for row in qs if row.tracking_code]
+            for row in rows:
+                row.tracking_code = new_prefix + row.tracking_code[5:]
+            if rows:
+                model_cls.objects.bulk_update(rows, ['tracking_code'])
+
+        _log(request.user, 'member_number_changed', target=member,
+             extra_data={'old_number': old_number, 'new_number': new_number},
+             ip=_get_ip(request))
+        return api_success(MemberDetailSerializer(member).data, message='Member number updated.')
 
 
 class MemberToggleActiveView(APIView):

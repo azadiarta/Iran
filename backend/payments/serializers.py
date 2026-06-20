@@ -3,6 +3,7 @@ from rest_framework import serializers
 from core.models import DefaultSetting
 from core.validators import (
     LONG_TEXT_PUBLIC_MAX_LENGTH,
+    SHORT_TEXT_PUBLIC_MAX_LENGTH,
     sanitize_and_limit,
     validate_receipt_file,
 )
@@ -28,16 +29,16 @@ class PaymentInitiateSerializer(serializers.Serializer):
         return value
 
     def validate_guest_name(self, value):
-        return sanitize_and_limit(value, 50)
+        return sanitize_and_limit(value, SHORT_TEXT_PUBLIC_MAX_LENGTH)
 
     def validate_notes(self, value):
         return sanitize_and_limit(value, LONG_TEXT_PUBLIC_MAX_LENGTH)
 
     def validate_message(self, value):
-        return sanitize_and_limit(value, 150)
+        return sanitize_and_limit(value, SHORT_TEXT_PUBLIC_MAX_LENGTH)
 
     def validate_public_display_name(self, value):
-        return sanitize_and_limit(value, 100)
+        return sanitize_and_limit(value, SHORT_TEXT_PUBLIC_MAX_LENGTH)
 
     def validate(self, data):
         request = self.context.get('request')

@@ -29,7 +29,12 @@ PHONE_REGEX = re.compile(r'^00\d{6,15}$')
 # update where the value didn't change): "00" or "+" prefix, 6-15 digits.
 LENIENT_PHONE_REGEX = re.compile(r'^(00|\+)?\d{6,15}$')
 
-SHORT_TEXT_MAX_LENGTH = 150
+# Generic single-line "short text" boxes (name/title/message-style fields,
+# not the intentionally tighter name fields like full_name/display_name and
+# not the LONG_TEXT_* textarea fields below): public-site forms cap at 50,
+# the same field edited from the admin panel caps at 100.
+SHORT_TEXT_PUBLIC_MAX_LENGTH = 50
+SHORT_TEXT_ADMIN_MAX_LENGTH = 100
 LONG_TEXT_PUBLIC_MAX_LENGTH = 250
 LONG_TEXT_ADMIN_MAX_LENGTH = 550
 

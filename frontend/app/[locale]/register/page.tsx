@@ -7,7 +7,16 @@ import { Eye, EyeOff, UserPlus } from 'lucide-react';
 import { authAPI } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
-import { isValidPhoneStrict, isValidEmail, maxLengthError, PHONE_PLACEHOLDER } from '@/lib/validation';
+import {
+  isValidPhoneStrict,
+  isValidEmail,
+  maxLengthError,
+  passwordTooShortError,
+  passwordMismatchError,
+  requiredFieldError,
+  emailFormatError,
+  PHONE_PLACEHOLDER,
+} from '@/lib/validation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -98,15 +107,26 @@ function Field({
           <div className="absolute right-3 top-1/2 -translate-y-1/2">{rightElement}</div>
         )}
       </div>
-      {hint && !error && (
-        <p className="text-xs" style={{ color: 'rgba(251,191,36,0.6)' }}>
-          {hint}
-        </p>
-      )}
-      {error && (
-        <p className="text-xs" style={{ color: '#ef4444' }} role="alert">
-          {error}
-        </p>
+      {(hint || error || typeof maxLength === 'number') && (
+        <div className="flex items-start justify-between gap-2">
+          <div className="space-y-1">
+            {hint && !error && (
+              <p className="text-xs" style={{ color: 'rgba(251,191,36,0.6)' }}>
+                {hint}
+              </p>
+            )}
+            {error && (
+              <p className="text-xs" style={{ color: '#ef4444' }} role="alert">
+                {error}
+              </p>
+            )}
+          </div>
+          {typeof maxLength === 'number' && (
+            <p className="text-xs text-white/30 whitespace-nowrap">
+              {value.length}/{maxLength}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
@@ -143,6 +163,8 @@ export default function RegisterPage() {
     }
   }, [hasHydrated, isAuthenticated, authMember, locale, router]);
 
+  const isRTL = locale === 'fa';
+
   function setField(key: keyof FormFields) {
     return (value: string) => {
       setForm((prev) => ({ ...prev, [key]: value }));
@@ -151,13 +173,31 @@ export default function RegisterPage() {
     };
   }
 
+  function handlePasswordChange(value: string) {
+    setForm((prev) => ({ ...prev, password: value }));
+    setFieldErrors((prev) => ({
+      ...prev,
+      password: passwordTooShortError(isRTL, value),
+      confirm_password:
+        form.confirm_password && value !== form.confirm_password
+          ? passwordMismatchError(isRTL)
+          : undefined,
+    }));
+  }
+
+  function handleConfirmPasswordChange(value: string) {
+    setForm((prev) => ({ ...prev, confirm_password: value }));
+    setFieldErrors((prev) => ({
+      ...prev,
+      confirm_password: value && value !== form.password ? passwordMismatchError(isRTL) : undefined,
+    }));
+  }
+
   function validate(): boolean {
     const errors: FieldErrors = {};
 
-    const isRTL = locale === 'fa';
-
     if (!form.full_name.trim()) {
-      errors.full_name = 'Full name is required.';
+      errors.full_name = requiredFieldError(isRTL);
     } else if (form.full_name.trim().length > 35) {
       errors.full_name = maxLengthError(isRTL, 35);
     }
@@ -167,8 +207,8 @@ export default function RegisterPage() {
     }
 
     if (!form.phone.trim() && !form.email.trim()) {
-      errors.phone = 'At least phone or email is required.';
-      errors.email = 'At least phone or email is required.';
+      errors.phone = requiredFieldError(isRTL);
+      errors.email = requiredFieldError(isRTL);
     }
 
     if (form.phone.trim() && !isValidPhoneStrict(form.phone)) {
@@ -176,17 +216,18 @@ export default function RegisterPage() {
     }
 
     if (form.email.trim() && !isValidEmail(form.email)) {
-      errors.email = 'Enter a valid email address.';
+      errors.email = emailFormatError(isRTL);
     }
 
     if (!form.password) {
-      errors.password = 'Password is required.';
-    } else if (form.password.length < 8) {
-      errors.password = 'Password must be at least 8 characters.';
+      errors.password = requiredFieldError(isRTL);
+    } else {
+      const pwError = passwordTooShortError(isRTL, form.password);
+      if (pwError) errors.password = pwError;
     }
 
     if (form.password !== form.confirm_password) {
-      errors.confirm_password = 'Passwords do not match.';
+      errors.confirm_password = passwordMismatchError(isRTL);
     }
 
     setFieldErrors(errors);
@@ -365,7 +406,7 @@ export default function RegisterPage() {
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="new-password"
                 value={form.password}
-                onChange={(e) => setField('password')(e.target.value)}
+                onChange={(e) => handlePasswordChange(e.target.value)}
                 disabled={loading}
                 placeholder="••••••••"
                 className="w-full rounded-xl px-4 py-3 pr-12 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50"
@@ -415,7 +456,7 @@ export default function RegisterPage() {
                 type={showConfirm ? 'text' : 'password'}
                 autoComplete="new-password"
                 value={form.confirm_password}
-                onChange={(e) => setField('confirm_password')(e.target.value)}
+                onChange={(e) => handleConfirmPasswordChange(e.target.value)}
                 disabled={loading}
                 placeholder="••••••••"
                 className="w-full rounded-xl px-4 py-3 pr-12 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50"

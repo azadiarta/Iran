@@ -7,7 +7,7 @@ import { Eye, EyeOff, LogIn } from 'lucide-react';
 import { authAPI } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
-import { isValidPhoneOrEmail } from '@/lib/validation';
+import { isValidPhoneOrEmail, requiredFieldError } from '@/lib/validation';
 
 export default function LoginPage() {
   const t = useTranslations('auth');
@@ -15,6 +15,7 @@ export default function LoginPage() {
   const params = useParams();
   const locale = params?.locale as string || 'en';
   const { login, isAuthenticated, member: authMember, hasHydrated } = useAuthStore();
+  const isRTL = locale === 'fa';
 
   const [credential, setCredential] = useState('');
   const [password, setPassword] = useState('');
@@ -34,7 +35,7 @@ export default function LoginPage() {
     setError('');
 
     if (!credential.trim()) {
-      setError('Phone or email is required.');
+      setError(requiredFieldError(isRTL));
       return;
     }
     if (!isValidPhoneOrEmail(credential)) {
@@ -42,7 +43,7 @@ export default function LoginPage() {
       return;
     }
     if (!password) {
-      setError('Password is required.');
+      setError(requiredFieldError(isRTL));
       return;
     }
 

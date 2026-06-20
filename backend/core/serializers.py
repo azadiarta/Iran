@@ -4,6 +4,7 @@ from core.models import ContactMessage, DefaultSetting, Permission
 from core.validators import (
     LONG_TEXT_ADMIN_MAX_LENGTH,
     LONG_TEXT_PUBLIC_MAX_LENGTH,
+    SHORT_TEXT_PUBLIC_MAX_LENGTH,
     sanitize_and_limit,
 )
 
@@ -59,10 +60,10 @@ class ContactMessageCreateSerializer(serializers.ModelSerializer):
         fields = ['name', 'contact_info', 'message']
 
     def validate_name(self, value):
-        return sanitize_and_limit(value, 100)
+        return sanitize_and_limit(value, SHORT_TEXT_PUBLIC_MAX_LENGTH)
 
     def validate_contact_info(self, value):
-        return sanitize_and_limit(value, 150)
+        return sanitize_and_limit(value, SHORT_TEXT_PUBLIC_MAX_LENGTH)
 
     def validate_message(self, value):
         return sanitize_and_limit(value, LONG_TEXT_PUBLIC_MAX_LENGTH)

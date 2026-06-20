@@ -5,6 +5,8 @@ from core.serializers import RelativeImageField
 from core.validators import (
     LONG_TEXT_ADMIN_MAX_LENGTH,
     LONG_TEXT_PUBLIC_MAX_LENGTH,
+    SHORT_TEXT_ADMIN_MAX_LENGTH,
+    SHORT_TEXT_PUBLIC_MAX_LENGTH,
     sanitize_and_limit,
     validate_image_file,
 )
@@ -66,16 +68,16 @@ class ContributionCreateSerializer(serializers.ModelSerializer):
         return value
 
     def validate_guest_name(self, value):
-        return sanitize_and_limit(value, 50)
+        return sanitize_and_limit(value, SHORT_TEXT_PUBLIC_MAX_LENGTH)
 
     def validate_notes(self, value):
         return sanitize_and_limit(value, LONG_TEXT_PUBLIC_MAX_LENGTH) if value else value
 
     def validate_message(self, value):
-        return sanitize_and_limit(value, 150)
+        return sanitize_and_limit(value, SHORT_TEXT_PUBLIC_MAX_LENGTH)
 
     def validate_public_display_name(self, value):
-        return sanitize_and_limit(value, 100)
+        return sanitize_and_limit(value, SHORT_TEXT_PUBLIC_MAX_LENGTH)
 
     def validate(self, data):
         request = self.context.get('request')
@@ -114,7 +116,7 @@ class ContributionManualCreateSerializer(serializers.ModelSerializer):
         return value
 
     def validate_guest_name(self, value):
-        value = sanitize_and_limit(value, 50)
+        value = sanitize_and_limit(value, 50)  # Contribution.guest_name DB column is capped at 50
         if not value:
             raise serializers.ValidationError('Contributor name is required.')
         return value
@@ -190,7 +192,7 @@ class ContributionAdminEditSerializer(serializers.ModelSerializer):
         return value
 
     def validate_guest_name(self, value):
-        return sanitize_and_limit(value, 50)
+        return sanitize_and_limit(value, 50)  # Contribution.guest_name DB column is capped at 50
 
     def validate_notes(self, value):
         return sanitize_and_limit(value, LONG_TEXT_ADMIN_MAX_LENGTH) if value else value
@@ -199,10 +201,10 @@ class ContributionAdminEditSerializer(serializers.ModelSerializer):
         return sanitize_and_limit(value, LONG_TEXT_ADMIN_MAX_LENGTH) if value else value
 
     def validate_message(self, value):
-        return sanitize_and_limit(value, 150)
+        return sanitize_and_limit(value, SHORT_TEXT_ADMIN_MAX_LENGTH)
 
     def validate_public_display_name(self, value):
-        return sanitize_and_limit(value, 100)
+        return sanitize_and_limit(value, SHORT_TEXT_ADMIN_MAX_LENGTH)
 
 
 class MyContributionSerializer(serializers.ModelSerializer):
@@ -238,7 +240,7 @@ class ExpenseCreateSerializer(serializers.ModelSerializer):
         return value
 
     def validate_short_reason(self, value):
-        return sanitize_and_limit(value, 100)
+        return sanitize_and_limit(value, SHORT_TEXT_ADMIN_MAX_LENGTH)
 
     def validate_description(self, value):
         return sanitize_and_limit(value, LONG_TEXT_ADMIN_MAX_LENGTH) if value else value

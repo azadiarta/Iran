@@ -2,9 +2,16 @@
 // These run BEFORE submission for instant feedback; the backend re-checks
 // everything regardless, since client-side checks can always be bypassed.
 
-export const SHORT_TEXT_MAX_LENGTH = 150;
+// Generic single-line "short text" boxes (name/title/message-style fields,
+// not the intentionally tighter name fields like full_name/display_name and
+// not the LONG_TEXT_* textarea fields below): public-site forms cap at 50,
+// the same field edited from the admin panel caps at 100.
+export const SHORT_TEXT_PUBLIC_MAX_LENGTH = 50;
+export const SHORT_TEXT_ADMIN_MAX_LENGTH = 100;
 export const LONG_TEXT_PUBLIC_MAX_LENGTH = 250;
 export const LONG_TEXT_ADMIN_MAX_LENGTH = 550;
+
+export const PASSWORD_MIN_LENGTH = 8;
 
 // Strict format required for new phone entries: "00" prefix (never "+"),
 // then 6-15 digits, e.g. 00447700900000.
@@ -55,4 +62,25 @@ export function phoneOrEmailFormatError(isRTL: boolean): string {
 
 export function maxLengthError(isRTL: boolean, max: number): string {
   return isRTL ? `حداکثر ${max} نویسه مجاز است.` : `Must be ${max} characters or fewer.`;
+}
+
+// Real-time password-strength check, used as the user types (not just on submit).
+// Returns the error reason, or undefined if the password already satisfies the rule.
+export function passwordTooShortError(isRTL: boolean, value: string): string | undefined {
+  if (!value || value.length >= PASSWORD_MIN_LENGTH) return undefined;
+  return isRTL
+    ? `رمز عبور باید حداقل ${PASSWORD_MIN_LENGTH} نویسه باشد. (${value.length}/${PASSWORD_MIN_LENGTH})`
+    : `Password must be at least ${PASSWORD_MIN_LENGTH} characters. (${value.length}/${PASSWORD_MIN_LENGTH})`;
+}
+
+export function passwordMismatchError(isRTL: boolean): string {
+  return isRTL ? 'رمزهای عبور مطابقت ندارند.' : 'Passwords do not match.';
+}
+
+export function requiredFieldError(isRTL: boolean): string {
+  return isRTL ? 'این فیلد الزامی است.' : 'This field is required.';
+}
+
+export function emailFormatError(isRTL: boolean): string {
+  return isRTL ? 'یک نشانی ایمیل معتبر وارد کنید.' : 'Enter a valid email address.';
 }

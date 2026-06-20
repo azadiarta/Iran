@@ -18,6 +18,7 @@ import { paymentsAPI, ContributionDisplayNameChoice } from '@/lib/api';
 import { getPaymentMethodLabel, getPaymentMethodUnavailableMessage } from '@/lib/paymentMethodsMeta';
 import AdminToggle from '@/components/admin/fields/AdminToggle';
 import useAuthStore from '@/store/authStore';
+import { SHORT_TEXT_PUBLIC_MAX_LENGTH } from '@/lib/validation';
 
 const AMOUNT_REGEX = /^\d{0,9}(\.\d{0,2})?$/;
 
@@ -314,9 +315,12 @@ export default function ContributePage() {
             value={guestName}
             onChange={(e) => setGuestName(e.target.value)}
             placeholder={t('contribute.guest_name_placeholder')}
-            maxLength={50}
+            maxLength={SHORT_TEXT_PUBLIC_MAX_LENGTH}
             className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-white/20 outline-none focus:border-[#00ffff] focus:ring-1 focus:ring-[#00ffff]/30 transition-all"
           />
+          <p className="text-xs text-white/30 mt-1 text-right">
+            {guestName.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}
+          </p>
         </div>
       )}
 
@@ -426,10 +430,15 @@ export default function ContributePage() {
                   type="text"
                   value={customDisplayName}
                   onChange={(e) => setCustomDisplayName(e.target.value)}
-                  maxLength={100}
+                  maxLength={SHORT_TEXT_PUBLIC_MAX_LENGTH}
                   placeholder={t('contribute.custom_name_placeholder')}
                   className="mt-3 w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-white/20 outline-none focus:border-[#00ffff] focus:ring-1 focus:ring-[#00ffff]/30 transition-all"
                 />
+              )}
+              {displayNameChoice === 'custom' && (
+                <p className="text-xs text-white/30 mt-1 text-right">
+                  {customDisplayName.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}
+                </p>
               )}
             </div>
 
@@ -439,13 +448,15 @@ export default function ContributePage() {
               </label>
               <textarea
                 value={message}
-                onChange={(e) => setMessage(e.target.value.slice(0, 150))}
-                maxLength={150}
+                onChange={(e) => setMessage(e.target.value.slice(0, SHORT_TEXT_PUBLIC_MAX_LENGTH))}
+                maxLength={SHORT_TEXT_PUBLIC_MAX_LENGTH}
                 rows={3}
                 placeholder={t('contribute.message_placeholder')}
                 className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-white/20 outline-none focus:border-[#00ffff] focus:ring-1 focus:ring-[#00ffff]/30 transition-all resize-none"
               />
-              <p className="text-xs text-white/30 mt-1 text-right">{message.length}/150</p>
+              <p className="text-xs text-white/30 mt-1 text-right">
+                {message.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}
+              </p>
             </div>
           </div>
         )}
