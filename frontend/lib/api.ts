@@ -247,13 +247,21 @@ export interface PostDetail extends PostSummary {
   images: PostImage[];
 }
 
-// Admin-only — never present on the public Comment shape, only on CommentDetail
-// (returned by admin-gated endpoints). Carries member_number for admin lookup.
-export interface CommentAuthor {
+// Admin-only — never present on the public Post/Comment shape, only on
+// PostAdminDetail/CommentDetail (returned by admin-gated endpoints). Carries
+// member_number for admin lookup.
+export interface MemberAdminBrief {
   id: string;
   display_name: string | null;
   full_name: string;
   member_number: number;
+}
+
+// Admin-only — exposes tracking_code and the author's member_number, gated
+// by can_post. Returned only by the admin post search/filter endpoint.
+export interface PostAdminDetail extends Omit<PostDetail, 'author'> {
+  tracking_code: string;
+  author: MemberAdminBrief | null;
 }
 
 export type CommentStatus = 'pending' | 'approved' | 'rejected';
@@ -271,7 +279,7 @@ export interface Comment {
 export interface CommentDetail extends Comment {
   // Admin-only lookup code — never exposed to the comment's own author.
   tracking_code: string;
-  author: CommentAuthor | null;
+  author: MemberAdminBrief | null;
   rejection_reason: string;
   target_type: 'post' | 'expense';
   target_label: string | null;
@@ -319,6 +327,19 @@ export const postsAPI = {
   ) => api.post<ApiResponse>(`/api/posts/${id}/comments/create/`, data),
 
   // ── Admin ──────────────────────────────────────────────────────────────
+  getAdminList: (
+    page = 1,
+    filters: { search?: string; author?: string; date_from?: string; date_to?: string } = {}
+  ) => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    if (filters.search) params.set('search', filters.search);
+    if (filters.author) params.set('author', filters.author);
+    if (filters.date_from) params.set('date_from', filters.date_from);
+    if (filters.date_to) params.set('date_to', filters.date_to);
+    return api.get<ApiResponse>(`/api/posts/admin/?${params.toString()}`);
+  },
+
   create: (data: { title: string; body: string; images?: File[] }) => {
     const formData = new FormData();
     formData.append('title', data.title);
@@ -675,6 +696,9 @@ export const membersAPI = {
 
   changeGroup: (id: string, groupId: string) =>
     api.patch<ApiResponse>(`/api/members/${id}/group/`, { group_id: groupId }),
+
+  updateMemberNumber: (id: string, memberNumber: number) =>
+    api.patch<ApiResponse>(`/api/members/${id}/number/`, { member_number: memberNumber }),
 
   toggleActive: (id: string, reason?: string) =>
     api.patch<ApiResponse>(`/api/members/${id}/toggle-active/`, reason !== undefined ? { reason } : undefined),

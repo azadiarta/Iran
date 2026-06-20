@@ -34,7 +34,20 @@ const AdminInput = forwardRef<HTMLInputElement, AdminInputProps>(
             props.onBlur?.(e);
           }}
         />
-        {error && <p className="mt-1 text-xs" style={{ color: '#ef4444' }}>{error}</p>}
+        {(error || typeof props.maxLength === 'number') && (
+          <div className="mt-1 flex items-start justify-between gap-2">
+            {error ? (
+              <p className="text-xs" style={{ color: '#ef4444' }}>{error}</p>
+            ) : (
+              <span />
+            )}
+            {typeof props.maxLength === 'number' && (
+              <p className="text-xs text-white/30 whitespace-nowrap">
+                {String(props.value ?? '').length}/{props.maxLength}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     );
   }

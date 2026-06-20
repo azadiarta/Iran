@@ -1,17 +1,17 @@
 project_summary:
-  generated_at: "2026-06-19"
+  generated_at: "2026-06-20"
   source_files_read: 165
   categories_found: 20
   quick_stats:
-    total_forms: 22
+    total_forms: 23
     total_action_buttons: 9
     total_search_inputs: 11
-    total_realtime_search_inputs: 8
-    total_api_endpoints: 67
-    total_view_classes: 65
+    total_realtime_search_inputs: 9
+    total_api_endpoints: 69
+    total_view_classes: 67
     total_models: 12
-    total_serializers: 46
-    total_url_patterns: 67
+    total_serializers: 47
+    total_url_patterns: 69
     total_admin_registrations: 12
     total_django_forms: 0
     total_frontend_routes: 32
@@ -140,7 +140,7 @@ forms:
             - backend/posts/models.py
           notes: "<form onSubmit noValidate>. Fields: commentName (readOnly if authenticated), commentText, commentRating (1-5). Calls postsAPI.createComment -> POST /api/posts/{pk}/comments/create/ (CommentCreateView with kwargs target_type='post', + CommentCreateSerializer). Manual checks: text required, guest name required if not authenticated, rating must be non-zero. Comment is generic (GenericForeignKey via content_type/object_id), shared with expense comments."
     admin_data_entry_forms:
-      count: 13
+      count: 14
       items:
         - id: form_admin_member_create
           label: Admin — Add Member modal form
@@ -168,6 +168,15 @@ forms:
             - frontend/lib/api.ts
             - backend/accounts/member_views.py
           notes: "<form onSubmit>. Field: groupId (select). Calls membersAPI.changeGroup -> PATCH /api/members/{id}/group/ (MemberChangeGroupView). Submit disabled unless a different group is selected; catches HTTP 403 for attempts on a superuser target."
+        - id: form_admin_member_change_number
+          label: Admin — superuser-only member_number reassignment form
+          scope: frontend
+          location:
+            - frontend/app/[locale]/admin/members/[id]/page.tsx
+            - frontend/lib/api.ts
+            - backend/accounts/member_views.py
+            - backend/accounts/member_urls.py
+          notes: "<form onSubmit>, rendered only when the VIEWING admin (currentMember) is is_superuser — deliberately NOT nested inside the `{canManage && !target.is_superuser}` gate, so it stays visible even when editing another superuser's record. Field: member_number (integer, 10000-99999). Calls membersAPI.updateMemberNumber -> PATCH /api/members/{id}/number/ (MemberChangeNumberView, permission_classes=[IsAuthenticated, IsSuperuser] — gated on the actor's own is_superuser, not the target's). Cascades the new 5-digit prefix onto the tracking_code of every Comment/Contribution/ContactMessage/Post already attributed to this member via bulk_update(), wrapped in transaction.atomic()."
         - id: form_admin_member_change_password
           label: Admin — change another member's password form
           scope: frontend
@@ -356,10 +365,10 @@ action_buttons:
 search_inputs:
   scope: frontend
   total_count: 11
-  description: Every search box or filter input across the frontend, verified individually for real-time (debounced) vs absent behavior. As of Phase 28, ALL 8 search/filter inputs (public site + admin panel) are real-time — the manual-submit pattern has been fully retired.
+  description: Every search box or filter input across the frontend, verified individually for real-time (debounced) vs absent behavior. As of Phase 28, ALL 8 search/filter inputs (public site + admin panel) were real-time — the manual-submit pattern had been fully retired. The admin posts page subsequently gained a real-time search input too (see search_admin_posts), bringing the total to 9.
   subcategories:
     realtime_debounced:
-      count: 8
+      count: 9
       items:
         - id: search_posts
           label: Posts page search (real-time)
@@ -419,8 +428,17 @@ search_inputs:
             - frontend/app/[locale]/admin/logs/system/page.tsx
             - backend/logs/views.py
           notes: "Converted in Phase 28: nothing was previously instant on this page, so all 4 fields (level, source, dateFrom, dateTo) now share ONE combined 300ms debounce -> appliedFilters. Form/submit button removed. Backend SystemLogListView's date_from/date_to lookups now wrapped in safe_filter."
+        - id: search_admin_posts
+          label: Admin posts list search (real-time)
+          scope: frontend
+          location:
+            - frontend/app/[locale]/admin/posts/page.tsx
+            - frontend/lib/api.ts
+            - backend/posts/views.py
+            - backend/posts/urls.py
+          notes: "Added alongside the new admin-gated post search/filter endpoint: 300ms debounce on searchInput -> appliedSearch, mirroring admin/comments/page.tsx's pattern. Calls postsAPI.getAdminList(page, {search}) -> GET /api/posts/admin/ (PostAdminListView, permission_classes=[IsAuthenticated, HasGroupPermission('can_post')]), which OR-matches title/body/author full_name/author display_name/tracking_code via icontains, plus author/date_from/date_to params wrapped in safe_filter (only search is currently wired to a frontend control). Also fixed a separate latent bug while building this: the PUBLIC PostListView (GET /api/posts/, no auth) previously accepted a search query param from postsAPI.getList() but silently ignored it server-side; it now actually filters by title/body icontains."
     no_search_input:
-      count: 3
+      count: 2
       items:
         - id: search_admin_groups_absent
           label: Admin groups page — no search/filter input exists
@@ -428,19 +446,13 @@ search_inputs:
           location:
             - frontend/app/[locale]/admin/groups/page.tsx
           notes: "Confirmed zero search or filter inputs on this page."
-        - id: search_admin_posts_absent
-          label: Admin posts page — no search/filter input exists
-          scope: frontend
-          location:
-            - frontend/app/[locale]/admin/posts/page.tsx
-          notes: "Confirmed zero search or filter inputs on this page."
         - id: search_admin_expenses_absent
           label: Admin expenses page (admin panel) — no search/filter input exists
           scope: frontend
           location:
             - frontend/app/[locale]/admin/expenses/page.tsx
           notes: "Confirmed zero search or filter inputs on this admin page (distinct from the public expenses/page.tsx which DOES have real-time search — see search_expenses)."
-  notes_general: "There is still no shared debounce hook/utility anywhere in the frontend — each of the 8 real-time inputs implements its own inline 300ms setTimeout/debounce logic independently (one combined debounce per page when a page has multiple filter fields, per the expenses/page.tsx precedent). As of Phase 28 every search/filter input that exists is real-time; the 3 'absent' pages still have no search input at all (out of scope — no input exists to convert)."
+  notes_general: "There is still no shared debounce hook/utility anywhere in the frontend — each of the 9 real-time inputs implements its own inline 300ms setTimeout/debounce logic independently (one combined debounce per page when a page has multiple filter fields, per the expenses/page.tsx precedent). The admin posts page (search_admin_posts) was converted from absent to real-time after the input-validation-security pass added an admin post search/filter endpoint; the remaining 2 'absent' pages still have no search input at all (out of scope — no input exists to convert)."
 
 api_calls:
   scope: frontend
@@ -465,7 +477,7 @@ api_calls:
             - frontend/lib/api.ts
             - backend/posts/views.py
             - backend/posts/urls.py
-          notes: "Methods: getList, getDetail, getComments, createComment, create, update, delete, uploadImages, deleteImage. Targets /api/posts/*."
+          notes: "Methods: getList, getDetail, getComments, createComment, create, update, delete, uploadImages, deleteImage, getAdminList. Targets /api/posts/*. getAdminList -> GET /api/posts/admin/ (PostAdminListView, can_post-gated) supports search/author/date_from/date_to filters and returns PostAdminDetail rows (includes tracking_code, author.member_number) instead of the public PostDetail shape."
         - id: api_commentsAPI
           label: commentsAPI — comment list/detail/status/edit (global + own)
           scope: frontend
@@ -497,7 +509,7 @@ api_calls:
             - frontend/lib/api.ts
             - backend/accounts/member_views.py
             - backend/accounts/member_urls.py
-          notes: "Methods: getProfile, updateProfile, changePassword, getList, create, changeGroup, toggleActive, delete, getFullProfile. Targets /api/members/*."
+          notes: "Methods: getProfile, updateProfile, changePassword, getList, create, changeGroup, toggleActive, delete, getFullProfile, updateMemberNumber. Targets /api/members/*. updateMemberNumber -> PATCH /api/members/{id}/number/ (MemberChangeNumberView, superuser-only)."
         - id: api_groupsAPI
           label: groupsAPI — access group CRUD + set-default
           scope: frontend
@@ -884,8 +896,8 @@ routes:
 
 api_endpoints:
   scope: backend
-  total_count: 65
-  description: "Every Django URL pattern / DRF APIView / API endpoint in the backend (merged into one category — see methodology note at top of file: this codebase has zero Django Forms and zero ViewSets, so views/urls/endpoints are 1:1 isomorphic and listing them three times would be pure duplication). All routes are mounted under root urlpatterns in backend/groupfund/urls.py. 65 items below represent 67 actual routes total (quick_stats.total_api_endpoints) — two items (ep_comment_admin_edit_update_detail groups 3 routes; this is explicitly noted per-item) cover more than one route each."
+  total_count: 67
+  description: "Every Django URL pattern / DRF APIView / API endpoint in the backend (merged into one category — see methodology note at top of file: this codebase has zero Django Forms and zero ViewSets, so views/urls/endpoints are 1:1 isomorphic and listing them three times would be pure duplication). All routes are mounted under root urlpatterns in backend/groupfund/urls.py. 67 items below represent 69 actual routes total (quick_stats.total_api_endpoints) — two items (ep_comment_admin_edit_update_detail groups 3 routes; this is explicitly noted per-item) cover more than one route each."
   subcategories:
     auth_endpoints:
       count: 5
@@ -916,7 +928,7 @@ api_endpoints:
           location: [backend/accounts/urls.py, backend/accounts/views.py]
           notes: "SafeTokenRefreshView + SafeTokenRefreshSerializer (custom subclass of TokenRefreshSerializer/TokenRefreshView, likely adds is_active re-check on refresh)."
     member_endpoints:
-      count: 9
+      count: 10
       items:
         - id: ep_member_list
           label: "GET /api/members/"
@@ -963,6 +975,11 @@ api_endpoints:
           scope: backend
           location: [backend/accounts/member_urls.py, backend/accounts/member_views.py]
           notes: "MemberFullProfileView. Aggregates member + comments + contributions + contact_messages + activity_logs in one response (requires can_view_member_details). Backs the admin member-detail page."
+        - id: ep_member_change_number
+          label: "PATCH /api/members/{pk}/number/"
+          scope: backend
+          location: [backend/accounts/member_urls.py, backend/accounts/member_views.py, backend/accounts/permissions.py]
+          notes: "MemberChangeNumberView. permission_classes=[IsAuthenticated, IsSuperuser] — gated solely on the ACTING admin's own is_superuser, unlike every other member-mutating view here; intentionally works even when the target member is also a superuser. Validates member_number is an integer in [10000, 99999] and unique (excluding self), then wrapped in transaction.atomic(): updates Member.member_number and cascades the new 5-digit prefix onto the tracking_code of every Comment/Contribution/ContactMessage/Post already attributed to that member via bulk_update() (only the prefix changes; each row's letter + random suffix is left untouched). Logs member_number_changed via ActivityLog."
     group_endpoints:
       count: 5
       items:
@@ -1063,13 +1080,18 @@ api_endpoints:
           location: [backend/fund/urls.py, backend/fund/views.py, backend/fund/serializers.py]
           notes: "FundBalanceView + FundBalanceSerializer. AllowAny. Computed as sum(completed Contributions) - sum(Expenses). Feeds BalanceIndicator component."
     post_endpoints:
-      count: 7
+      count: 8
       items:
         - id: ep_post_list
           label: "GET /api/posts/"
           scope: backend
           location: [backend/posts/urls.py, backend/posts/views.py, backend/posts/serializers.py]
-          notes: "PostListView + PostSerializer. Paginated. Visibility helper _post_visible() gates draft/unpublished logic if any."
+          notes: "PostListView + PostSerializer. Paginated. Visibility helper _post_visible() gates draft/unpublished logic if any. Honors an optional search query param (title/body icontains) — this was previously accepted by the frontend's postsAPI.getList() call but silently ignored server-side; now actually filters."
+        - id: ep_post_admin_list
+          label: "GET /api/posts/admin/"
+          scope: backend
+          location: [backend/posts/urls.py, backend/posts/views.py, backend/posts/serializers.py]
+          notes: "PostAdminListView + PostAdminDetailSerializer. permission_classes=[IsAuthenticated, HasGroupPermission('can_post')]. Paginated, admin-only list exposing tracking_code and the author's member_number (mirrors CommentAdminDetailSerializer's pattern). Filters: search (OR-matches title/body/author full_name/author display_name/tracking_code via icontains), author (FK UUID exact match), date_from/date_to (created_at date range) — author/date_from/date_to wrapped in core.validators.safe_filter. Backs the admin/posts page's new search box (search_admin_posts)."
         - id: ep_post_create
           label: "POST /api/posts/create/"
           scope: backend
@@ -1242,7 +1264,7 @@ api_endpoints:
           scope: backend
           location: [backend/core/urls.py, backend/core/views.py, backend/core/serializers.py]
           notes: "PermissionListView + PermissionSerializer. Lists the 13 seeded Permission codenames. Backs the group-permission-checkbox UI."
-  notes_general: "Two view classes (CommentListView, CommentCreateView) are each mounted twice, once under posts/urls.py (target_type=post) and once under fund/urls.py (target_type=expense) — this is why 65 distinct view classes produce 67 routes. The Django admin panel mount (/admin/, backend/groupfund/urls.py) is documented separately in the admin_panel category, since it is not a DRF API endpoint."
+  notes_general: "Two view classes (CommentListView, CommentCreateView) are each mounted twice, once under posts/urls.py (target_type=post) and once under fund/urls.py (target_type=expense) — this is why 67 distinct view classes produce 69 routes. The Django admin panel mount (/admin/, backend/groupfund/urls.py) is documented separately in the admin_panel category, since it is not a DRF API endpoint."
 
 django_forms:
   scope: backend
@@ -1334,7 +1356,7 @@ models:
 
 serializers:
   scope: backend
-  total_count: 46
+  total_count: 47
   description: All DRF serializers.py classes, grouped by app. Most are ModelSerializer; a few (Login, ChangePassword, PaymentInitiate, ReceiptUpload, FundBalance) are plain Serializer for non-model request/response shapes.
   subcategories:
     accounts_serializers:
@@ -1516,7 +1538,7 @@ serializers:
           location: [backend/payments/serializers.py]
           notes: "Plain Serializer. validate_receipt_image (file type/size check). Used by ReceiptUploadView."
     posts_serializers:
-      count: 13
+      count: 14
       items:
         - id: ser_PostImageSerializer
           label: PostImageSerializer
@@ -1542,11 +1564,16 @@ serializers:
           scope: backend
           location: [backend/posts/serializers.py]
           notes: "title/body only. Used by PostUpdateView."
-        - id: ser_CommentAuthorSerializer
-          label: CommentAuthorSerializer
+        - id: ser_PostAdminDetailSerializer
+          label: PostAdminDetailSerializer
           scope: backend
           location: [backend/posts/serializers.py]
-          notes: "Plain Serializer, minimal nested author shape for comments."
+          notes: "Admin-only, exposes tracking_code + author.member_number via MemberAdminBriefSerializer (gated by can_post — never reachable through the public PostSerializer/PostListView). Used by the new PostAdminListView (ep_post_admin_list)."
+        - id: ser_MemberAdminBriefSerializer
+          label: MemberAdminBriefSerializer (renamed from CommentAuthorSerializer)
+          scope: backend
+          location: [backend/posts/serializers.py]
+          notes: "Plain Serializer, minimal admin-only nested author shape (id, display_name, full_name, member_number) — renamed from CommentAuthorSerializer and moved earlier in the file once it became shared by both CommentAdminDetailSerializer and the new PostAdminDetailSerializer, since it is no longer Comment-specific. Never used by the public CommentSerializer/PostSerializer."
         - id: ser_CommentSerializer
           label: CommentSerializer
           scope: backend
@@ -1671,7 +1698,7 @@ auth_permission_checks:
           label: IsSuperuser permission class
           scope: backend
           location: [backend/accounts/permissions.py]
-          notes: "Passes ONLY for is_superuser. Superuser bypasses ALL permission checks project-wide. No API endpoint can create/modify a superuser — only via `manage.py createsuperuser` or Railway env vars (DJANGO_SUPERUSER_EMAIL/PASSWORD, see backend/scripts/prepare.sh). No member, regardless of permissions, can delete or modify a superuser."
+          notes: "Passes ONLY for is_superuser. Superuser bypasses ALL permission checks project-wide. No API endpoint can create a superuser, and no member regardless of permissions can delete one — only via `manage.py createsuperuser` or Railway env vars (DJANGO_SUPERUSER_EMAIL/PASSWORD, see backend/scripts/prepare.sh). One narrow exception exists for modification: MemberChangeNumberView (ep_member_change_number) lets a superuser reassign ANY member's member_number, including another superuser's — gating is solely on the ACTING admin's own is_superuser via this same IsSuperuser class, not on the target's."
         - id: auth_HasGroupPermission
           label: HasGroupPermission(codename) — permission factory
           scope: backend
@@ -1906,8 +1933,8 @@ tracking_code_scheme:
         - id: tracking_code_format
           label: "Tracking code format: {member_number:05d or 00000}{LETTER}{3-digit sequence}"
           scope: backend
-          location: [backend/fund/models.py, backend/posts/models.py, backend/core/models.py]
-          notes: "LETTER is C=Comment, F=Contribution (Fund), M=ContactMessage. member_number is zero-padded to 5 digits, or '00000' for guests (no Member). Auto-generated on save() for Contribution, Comment, and ContactMessage — these are the only 3 models with a tracking_code field. Lets a guest reference their submission without an account."
+          location: [backend/fund/models.py, backend/posts/models.py, backend/core/models.py, backend/core/tracking_codes.py, backend/accounts/member_views.py]
+          notes: "LETTER is C=Comment, F=Contribution (Fund), M=ContactMessage, P=Post. member_number is zero-padded to 5 digits, or '00000' for guests (no Member). Generated via the shared core/tracking_codes.py:generate_tracking_code(model_cls, letter, member_number) helper, auto-called on save() for Contribution, Comment, ContactMessage, and Post — these are the only 4 models with a tracking_code field. Lets a guest (or an admin, for Post) reference their submission without exposing the underlying Member id. When a superuser reassigns a member's member_number via MemberChangeNumberView (ep_member_change_number), only the 5-digit prefix of every existing tracking_code already attributed to that member is rewritten across all 4 models — the LETTER and random suffix are preserved."
 
 i18n_localization:
   scope: both

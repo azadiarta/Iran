@@ -4,6 +4,8 @@ from core.serializers import RelativeImageField
 from core.validators import (
     LONG_TEXT_ADMIN_MAX_LENGTH,
     LONG_TEXT_PUBLIC_MAX_LENGTH,
+    SHORT_TEXT_ADMIN_MAX_LENGTH,
+    SHORT_TEXT_PUBLIC_MAX_LENGTH,
     sanitize_and_limit,
 )
 from posts.models import Comment, Post, PostImage
@@ -24,6 +26,17 @@ class PostAuthorSerializer(serializers.Serializer):
     full_name = serializers.CharField(read_only=True)
 
 
+# Admin-only — includes the raw id and member_number, which must never be
+# exposed publicly. Used by CommentAdminDetailSerializer (gated by
+# can_approve_comments) and PostAdminDetailSerializer (gated by can_post),
+# never by the public CommentSerializer/PostSerializer below.
+class MemberAdminBriefSerializer(serializers.Serializer):
+    id = serializers.UUIDField(read_only=True)
+    display_name = serializers.CharField(read_only=True)
+    full_name = serializers.CharField(read_only=True)
+    member_number = serializers.IntegerField(read_only=True)
+
+
 class PostSerializer(serializers.ModelSerializer):
     author = PostAuthorSerializer(read_only=True)
     images = PostImageSerializer(many=True, read_only=True)
@@ -40,7 +53,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
         fields = ['title', 'body']
 
     def validate_title(self, value):
-        return sanitize_and_limit(value, 150)
+        return sanitize_and_limit(value, SHORT_TEXT_ADMIN_MAX_LENGTH)
 
     def validate_body(self, value):
         return sanitize_and_limit(value, LONG_TEXT_ADMIN_MAX_LENGTH)
@@ -60,20 +73,21 @@ class PostUpdateSerializer(serializers.ModelSerializer):
         }
 
     def validate_title(self, value):
-        return sanitize_and_limit(value, 150)
+        return sanitize_and_limit(value, SHORT_TEXT_ADMIN_MAX_LENGTH)
 
     def validate_body(self, value):
         return sanitize_and_limit(value, LONG_TEXT_ADMIN_MAX_LENGTH)
 
 
-# Admin-only — includes the raw id and member_number, which must never be
-# exposed publicly. Only used by CommentAdminDetailSerializer (gated by
-# can_approve_comments), never by the public CommentSerializer below.
-class CommentAuthorSerializer(serializers.Serializer):
-    id = serializers.UUIDField(read_only=True)
-    display_name = serializers.CharField(read_only=True)
-    full_name = serializers.CharField(read_only=True)
-    member_number = serializers.IntegerField(read_only=True)
+# Admin-only — exposes tracking_code and the author's member_number, gated
+# by can_post. Mirrors CommentAdminDetailSerializer.
+class PostAdminDetailSerializer(serializers.ModelSerializer):
+    author = MemberAdminBriefSerializer(read_only=True)
+    images = PostImageSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Post
+        fields = ['id', 'tracking_code', 'author', 'title', 'body', 'images', 'created_at', 'updated_at']
 
 
 class CommentSerializer(serializers.ModelSerializer):
@@ -96,7 +110,7 @@ class CommentCreateSerializer(serializers.ModelSerializer):
         fields = ['guest_name', 'text', 'rating']
 
     def validate_guest_name(self, value):
-        return sanitize_and_limit(value, 50)
+        return sanitize_and_limit(value, SHORT_TEXT_PUBLIC_MAX_LENGTH)
 
     def validate_text(self, value):
         return sanitize_and_limit(value, LONG_TEXT_PUBLIC_MAX_LENGTH)
@@ -136,7 +150,7 @@ class CommentStatusSerializer(serializers.ModelSerializer):
 
 
 class CommentAdminDetailSerializer(serializers.ModelSerializer):
-    author = CommentAuthorSerializer(read_only=True)
+    author = MemberAdminBriefSerializer(read_only=True)
     author_label = serializers.SerializerMethodField()
     target_type = serializers.SerializerMethodField()
     target_label = serializers.SerializerMethodField()
