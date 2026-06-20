@@ -629,6 +629,8 @@ export interface MemberFullProfile {
 }
 
 export const membersAPI = {
+  getPublicCount: () => api.get<ApiResponse>('/api/members/count/'),
+
   getProfile: (id: string) => api.get<ApiResponse>(`/api/members/${id}/`),
 
   updateProfile: (

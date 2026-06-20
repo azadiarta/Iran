@@ -41,6 +41,11 @@ DEFAULT_SETTINGS = {
 
     'auth_sync_interval_seconds':  ('15', 'How often (in seconds) logged-in clients re-fetch their own profile/permissions in the background.'),
 
+    'landing_headline_en':          ('Birmingham Iranian Political Association', 'Homepage hero headline (English).'),
+    'landing_headline_fa':          ('انجمن سیاسی ایرانیان بیرمنگام', 'Homepage hero headline (Farsi).'),
+    'landing_tagline_en':           ('Transparent crowdfunding for our community', 'Homepage hero tagline (English).'),
+    'landing_tagline_fa':           ('جمع‌آوری کمک مالی شفاف برای جامعه ما', 'Homepage hero tagline (Farsi).'),
+
     'payment_manual_enabled':         ('false', 'Whether the manual bank transfer payment method is available.'),
     'payment_manual_bank_name':       ('', 'Bank name shown to contributors for manual bank transfers.'),
     'payment_manual_account_name':    ('', 'Account holder name shown to contributors for manual bank transfers.'),

@@ -15,7 +15,7 @@ import {
   HafezIcon,
   SaadiIcon,
 } from '@/components/animations/IranianSymbols';
-import { postsAPI, fundAPI } from '@/lib/api';
+import { postsAPI, fundAPI, membersAPI, settingsAPI } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 import type { PostSummary, FundBalance } from '@/lib/api';
 
@@ -122,6 +122,12 @@ export default function LandingPage() {
   const [balance, setBalance] = useState<FundBalance | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(true);
 
+  const [memberCount, setMemberCount] = useState(0);
+  const [memberCountLoading, setMemberCountLoading] = useState(true);
+
+  const [heroHeadline, setHeroHeadline] = useState<string | null>(null);
+  const [heroTagline, setHeroTagline] = useState<string | null>(null);
+
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [postsLoading, setPostsLoading] = useState(true);
   const [postsError, setPostsError] = useState(false);
@@ -142,6 +148,22 @@ export default function LandingPage() {
       .then((res) => setBalance(res.data as unknown as FundBalance))
       .catch(() => setBalance(null))
       .finally(() => setBalanceLoading(false));
+
+    membersAPI.getPublicCount()
+      .then((res) => setMemberCount((res.data as unknown as { count: number }).count))
+      .catch(() => setMemberCount(0))
+      .finally(() => setMemberCountLoading(false));
+
+    settingsAPI.getPublicSettings().then((res) => {
+      const results = res?.data as unknown as { key: string; value: string }[] | undefined;
+      if (!Array.isArray(results)) return;
+      const headlineKey = locale === 'fa' ? 'landing_headline_fa' : 'landing_headline_en';
+      const taglineKey = locale === 'fa' ? 'landing_tagline_fa' : 'landing_tagline_en';
+      const headline = results.find((s) => s.key === headlineKey);
+      const tagline = results.find((s) => s.key === taglineKey);
+      if (headline?.value) setHeroHeadline(headline.value);
+      if (tagline?.value) setHeroTagline(tagline.value);
+    });
 
     postsAPI.getList(1, '')
       .then((res) => setPosts((res.data as unknown as { results: PostSummary[] }).results.slice(0, 3)))
@@ -276,7 +298,7 @@ export default function LandingPage() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
           >
-            {t('landing.headline')}
+            {heroHeadline || t('landing.headline')}
           </motion.h1>
 
           <motion.p
@@ -285,7 +307,7 @@ export default function LandingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.4 }}
           >
-            {t('landing.tagline')}
+            {heroTagline || t('landing.tagline')}
           </motion.p>
 
           <motion.div
@@ -374,47 +396,6 @@ export default function LandingPage() {
         </motion.div>
       </section>
 
-      {/* ─── Stats Bar ────────────────────────────────────────────────────── */}
-      <section
-        className="relative overflow-hidden py-12 px-4"
-        style={{ background: 'rgba(255,255,255,0.02)', borderTop: '1px solid rgba(255,255,255,0.06)' }}
-      >
-        <div
-          className="absolute -bottom-6 -end-6 pointer-events-none select-none hidden md:block"
-          style={{ color: '#b45309', opacity: 0.06 }}
-          aria-hidden="true"
-        >
-          <NaqsheRostamIcon size={130} />
-        </div>
-
-        <FadeInSection>
-          <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            <StatCard
-              icon={Users}
-              value="—"
-              label={t('landing.stats_members')}
-              loading={false}
-            />
-            <StatCard
-              icon={TrendingUp}
-              value={balance?.total_contributions ?? 0}
-              prefix="£"
-              label={t('landing.stats_contributions')}
-              loading={balanceLoading}
-            />
-            {canViewBalance && (
-              <StatCard
-                icon={Wallet}
-                value={balance?.balance ?? 0}
-                prefix="£"
-                label={t('landing.stats_balance')}
-                loading={balanceLoading}
-              />
-            )}
-          </div>
-        </FadeInSection>
-      </section>
-
       {/* ─── Recent Posts ─────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden py-16 px-4">
         <div
@@ -494,6 +475,47 @@ export default function LandingPage() {
                   ))
                 }
               </div>
+            )}
+          </div>
+        </FadeInSection>
+      </section>
+
+      {/* ─── Stats Bar ────────────────────────────────────────────────────── */}
+      <section
+        className="relative overflow-hidden py-12 px-4"
+        style={{ background: 'rgba(255,255,255,0.02)', borderTop: '1px solid rgba(255,255,255,0.06)' }}
+      >
+        <div
+          className="absolute -bottom-6 -end-6 pointer-events-none select-none hidden md:block"
+          style={{ color: '#b45309', opacity: 0.06 }}
+          aria-hidden="true"
+        >
+          <NaqsheRostamIcon size={130} />
+        </div>
+
+        <FadeInSection>
+          <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            <StatCard
+              icon={Users}
+              value={memberCount}
+              label={t('landing.stats_members')}
+              loading={memberCountLoading}
+            />
+            <StatCard
+              icon={TrendingUp}
+              value={balance?.total_contributions ?? 0}
+              prefix="£"
+              label={t('landing.stats_contributions')}
+              loading={balanceLoading}
+            />
+            {canViewBalance && (
+              <StatCard
+                icon={Wallet}
+                value={balance?.balance ?? 0}
+                prefix="£"
+                label={t('landing.stats_balance')}
+                loading={balanceLoading}
+              />
             )}
           </div>
         </FadeInSection>
@@ -614,7 +636,7 @@ export default function LandingPage() {
               {isAuthenticated && member ? t('landing.cta_authed_title') : t('landing.cta_ready_title')}
             </h2>
             <p className="text-white/60 text-lg mb-8">
-              {isAuthenticated && member ? t('landing.cta_authed_desc') : t('landing.tagline')}
+              {isAuthenticated && member ? t('landing.cta_authed_desc') : (heroTagline || t('landing.tagline'))}
             </p>
             {isAuthenticated && member ? (
               <Link

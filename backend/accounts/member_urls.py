@@ -8,12 +8,14 @@ from accounts.member_views import (
     MemberDetailView,
     MemberFullProfileView,
     MemberListView,
+    MemberPublicCountView,
     MemberToggleActiveView,
     MemberUpdateView,
 )
 
 urlpatterns = [
     path('',                              MemberListView.as_view(),         name='member-list'),
+    path('count/',                        MemberPublicCountView.as_view(),  name='member-public-count'),
     path('create/',                       MemberCreateView.as_view(),       name='member-create'),
     path('<uuid:pk>/',                    MemberDetailView.as_view(),       name='member-detail'),
     path('<uuid:pk>/update/',             MemberUpdateView.as_view(),       name='member-update'),
