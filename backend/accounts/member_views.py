@@ -1,7 +1,7 @@
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.db.models import Q
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
 from accounts.models import Member
@@ -59,6 +59,14 @@ def _can_view_member_details(user):
             codename__in=['can_manage_permissions', 'can_view_member_details']
         ).exists()
     )
+
+
+class MemberPublicCountView(APIView):
+    """Active member count for the public homepage stats bar — no member detail leaked."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return api_success({'count': Member.objects.filter(is_active=True).count()})
 
 
 class MemberListView(APIView):
