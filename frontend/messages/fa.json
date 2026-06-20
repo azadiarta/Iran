@@ -59,7 +59,10 @@
   },
   "posts": {
     "title": "اخبار",
-    "search_placeholder": "جستجو در اخبار...",
+    "search_placeholder": "جستجو در عنوان، متن یا نویسنده...",
+    "advanced_search": "جستجوی پیشرفته",
+    "date_from_label": "از تاریخ",
+    "date_to_label": "تا تاریخ",
     "no_posts": "خبری یافت نشد",
     "read_more": "ادامه مطلب",
     "comments_title": "نظرات",

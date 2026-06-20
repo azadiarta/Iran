@@ -38,6 +38,11 @@ SHORT_TEXT_ADMIN_MAX_LENGTH = 100
 LONG_TEXT_PUBLIC_MAX_LENGTH = 250
 LONG_TEXT_ADMIN_MAX_LENGTH = 550
 
+# The model field allows Django's default 254, but real addresses never get
+# remotely close to that; capping at 75 keeps the field sane everywhere it's
+# entered (registration, profile edit, admin member create/edit, login).
+EMAIL_MAX_LENGTH = 75
+
 ALLOWED_IMAGE_FORMATS = {'JPEG', 'PNG'}
 MAX_UPLOAD_FILENAME_LENGTH = 255
 
@@ -68,6 +73,10 @@ def validate_phone_lenient(value):
 def validate_email_format(value):
     if not value:
         return value
+    if len(value) > EMAIL_MAX_LENGTH:
+        raise drf_serializers.ValidationError(
+            f"Email address must be {EMAIL_MAX_LENGTH} characters or fewer."
+        )
     try:
         django_validate_email(value)
     except DjangoValidationError:
@@ -81,6 +90,10 @@ def validate_phone_or_email(value):
         return value
     try:
         django_validate_email(value)
+        if len(value) > EMAIL_MAX_LENGTH:
+            raise drf_serializers.ValidationError(
+                f"Email address must be {EMAIL_MAX_LENGTH} characters or fewer."
+            )
         return value
     except DjangoValidationError:
         pass

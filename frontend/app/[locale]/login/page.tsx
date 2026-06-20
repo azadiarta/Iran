@@ -7,7 +7,16 @@ import { Eye, EyeOff, LogIn } from 'lucide-react';
 import { authAPI } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
-import { isValidPhoneOrEmail, requiredFieldError } from '@/lib/validation';
+import {
+  isValidPhoneOrEmail,
+  isValidPhoneLenient,
+  isValidEmail,
+  requiredFieldError,
+  emailFormatError,
+  phoneLenientFormatError,
+  detectCredentialKind,
+  EMAIL_MAX_LENGTH,
+} from '@/lib/validation';
 
 export default function LoginPage() {
   const t = useTranslations('auth');
@@ -22,6 +31,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ credential?: string; password?: string }>({});
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -30,22 +40,38 @@ export default function LoginPage() {
     }
   }, [hasHydrated, isAuthenticated, authMember, locale, router]);
 
+  // Detects whether the shared phone-or-email box looks like a phone or an
+  // email as the user types, so the right real-time validator applies. This
+  // is purely advisory for the inline hint — actual submission below always
+  // uses isValidPhoneOrEmail's OR check, so a misdetected "kind" can never
+  // block a credential that's genuinely valid as the other type.
+  function handleCredentialChange(value: string) {
+    setCredential(value);
+    const kind = detectCredentialKind(value);
+    let credentialError: string | undefined;
+    if (kind === 'phone') {
+      if (!isValidPhoneLenient(value)) credentialError = phoneLenientFormatError(isRTL);
+    } else if (kind === 'email') {
+      if (!isValidEmail(value)) credentialError = emailFormatError(isRTL);
+    }
+    setFieldErrors((prev) => ({ ...prev, credential: credentialError }));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
 
+    const errors: { credential?: string; password?: string } = {};
     if (!credential.trim()) {
-      setError(requiredFieldError(isRTL));
-      return;
-    }
-    if (!isValidPhoneOrEmail(credential)) {
-      setError(t('credential_format_error'));
-      return;
+      errors.credential = requiredFieldError(isRTL);
+    } else if (!isValidPhoneOrEmail(credential)) {
+      errors.credential = t('credential_format_error');
     }
     if (!password) {
-      setError(requiredFieldError(isRTL));
-      return;
+      errors.password = requiredFieldError(isRTL);
     }
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
 
     setLoading(true);
     try {
@@ -117,24 +143,33 @@ export default function LoginPage() {
               type="text"
               autoComplete="username"
               value={credential}
-              onChange={(e) => setCredential(e.target.value)}
+              onChange={(e) => handleCredentialChange(e.target.value)}
               disabled={loading}
-              maxLength={254}
+              maxLength={EMAIL_MAX_LENGTH}
               className="w-full rounded-xl px-4 py-3 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50"
               style={{
                 background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
+                border: fieldErrors.credential ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.1)',
               }}
               onFocus={(e) => {
-                e.currentTarget.style.border = '1px solid #00ffff';
-                e.currentTarget.style.boxShadow = '0 0 12px rgba(0,255,255,0.2)';
+                if (!fieldErrors.credential) {
+                  e.currentTarget.style.border = '1px solid #00ffff';
+                  e.currentTarget.style.boxShadow = '0 0 12px rgba(0,255,255,0.2)';
+                }
               }}
               onBlur={(e) => {
-                e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
-                e.currentTarget.style.boxShadow = 'none';
+                if (!fieldErrors.credential) {
+                  e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }
               }}
               placeholder="you@example.com"
             />
+            {fieldErrors.credential && (
+              <p className="text-xs" style={{ color: '#ef4444' }} role="alert">
+                {fieldErrors.credential}
+              </p>
+            )}
           </div>
 
           {/* Password input */}
@@ -152,20 +187,27 @@ export default function LoginPage() {
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="current-password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                }}
                 disabled={loading}
                 className="w-full rounded-xl px-4 py-3 pr-12 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50"
                 style={{
                   background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
+                  border: fieldErrors.password ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.1)',
                 }}
                 onFocus={(e) => {
-                  e.currentTarget.style.border = '1px solid #00ffff';
-                  e.currentTarget.style.boxShadow = '0 0 12px rgba(0,255,255,0.2)';
+                  if (!fieldErrors.password) {
+                    e.currentTarget.style.border = '1px solid #00ffff';
+                    e.currentTarget.style.boxShadow = '0 0 12px rgba(0,255,255,0.2)';
+                  }
                 }}
                 onBlur={(e) => {
-                  e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
-                  e.currentTarget.style.boxShadow = 'none';
+                  if (!fieldErrors.password) {
+                    e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }
                 }}
                 placeholder="••••••••"
               />
@@ -179,6 +221,11 @@ export default function LoginPage() {
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
+            {fieldErrors.password && (
+              <p className="text-xs" style={{ color: '#ef4444' }} role="alert">
+                {fieldErrors.password}
+              </p>
+            )}
           </div>
 
           {/* Error message */}

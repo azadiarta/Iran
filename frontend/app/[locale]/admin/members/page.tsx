@@ -10,7 +10,7 @@ import AdminSelect from '@/components/admin/fields/AdminSelect';
 import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
 import { membersAPI, groupsAPI, MemberListItem, AccessGroup, Paginated } from '@/lib/api';
-import { isValidPhoneStrict, isValidEmail, phoneFormatError, PHONE_PLACEHOLDER } from '@/lib/validation';
+import { isValidPhoneStrict, isValidEmail, phoneFormatError, PHONE_PLACEHOLDER, EMAIL_MAX_LENGTH } from '@/lib/validation';
 
 export default function AdminMembersPage() {
   const params = useParams();
@@ -271,7 +271,7 @@ export default function AdminMembersPage() {
             placeholder={PHONE_PLACEHOLDER}
             maxLength={17}
           />
-          <AdminInput label={isRTL ? 'ایمیل (اختیاری)' : 'Email (optional)'} type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} />
+          <AdminInput label={isRTL ? 'ایمیل (اختیاری)' : 'Email (optional)'} type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={EMAIL_MAX_LENGTH} />
           <AdminSelect
             label={isRTL ? 'گروه دسترسی' : 'Access Group'}
             value={newGroupId}
