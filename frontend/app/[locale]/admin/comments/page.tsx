@@ -87,11 +87,13 @@ export default function AdminCommentsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canManage, page, appliedSearch, statusFilter, targetFilter, memberFilterId]);
 
-  function applySearch(e: React.FormEvent) {
-    e.preventDefault();
-    setPage(1);
-    setAppliedSearch(searchInput.trim());
-  }
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedSearch(searchInput.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   function clearMemberFilter() {
     setMemberFilterId('');
@@ -249,8 +251,8 @@ export default function AdminCommentsPage() {
         </div>
       )}
 
-      <form onSubmit={applySearch} className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
-        <AdminInput label={isRTL ? 'جست‌وجو' : 'Search'} value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
+      <div className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+        <AdminInput label={isRTL ? 'جست‌وجو' : 'Search'} value={searchInput} onChange={(e) => setSearchInput(e.target.value)} maxLength={150} />
         <AdminSelect
           label={isRTL ? 'وضعیت' : 'Status'}
           value={statusFilter}
@@ -272,14 +274,7 @@ export default function AdminCommentsPage() {
             { value: 'expense', label: isRTL ? 'هزینه' : 'Expense' },
           ]}
         />
-        <button
-          type="submit"
-          className="rounded-xl px-5 py-2.5 text-sm font-bold transition-all"
-          style={{ backgroundColor: '#00ffff', color: '#0a0a0f', boxShadow: '0 0 16px rgba(0,255,255,0.3)' }}
-        >
-          {isRTL ? 'جست‌وجو' : 'Search'}
-        </button>
-      </form>
+      </div>
 
       <AdminTable
         columns={columns}
@@ -337,7 +332,7 @@ export default function AdminCommentsPage() {
               </div>
             </div>
 
-            <AdminTextarea label={isRTL ? 'متن نظر' : 'Comment Text'} value={editText} onChange={(e) => setEditText(e.target.value)} rows={4} />
+            <AdminTextarea label={isRTL ? 'متن نظر' : 'Comment Text'} value={editText} onChange={(e) => setEditText(e.target.value)} rows={4} maxLength={550} />
             <AdminSelect label={isRTL ? 'امتیاز' : 'Rating'} value={editRating} onChange={(e) => setEditRating(e.target.value)} options={RATING_OPTIONS(isRTL)} />
 
             <div>
@@ -369,6 +364,7 @@ export default function AdminCommentsPage() {
                     value={rejectReason}
                     onChange={(e) => setRejectReason(e.target.value)}
                     rows={2}
+                    maxLength={550}
                   />
                   <div className="flex items-center gap-3">
                     <button

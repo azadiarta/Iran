@@ -7,19 +7,35 @@ import { Eye, EyeOff, LogIn } from 'lucide-react';
 import { authAPI } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
+import Turnstile from '@/components/common/Turnstile';
+import {
+  isValidPhoneOrEmail,
+  isValidPhoneLenient,
+  isValidEmail,
+  requiredFieldError,
+  emailFormatError,
+  phoneLenientFormatError,
+  detectCredentialKind,
+  EMAIL_MAX_LENGTH,
+} from '@/lib/validation';
 
 export default function LoginPage() {
   const t = useTranslations('auth');
+  const tc = useTranslations('common');
   const router = useRouter();
   const params = useParams();
   const locale = params?.locale as string || 'en';
   const { login, isAuthenticated, member: authMember, hasHydrated } = useAuthStore();
+  const isRTL = locale === 'fa';
 
   const [credential, setCredential] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ credential?: string; password?: string }>({});
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -28,22 +44,47 @@ export default function LoginPage() {
     }
   }, [hasHydrated, isAuthenticated, authMember, locale, router]);
 
+  // Detects whether the shared phone-or-email box looks like a phone or an
+  // email as the user types, so the right real-time validator applies. This
+  // is purely advisory for the inline hint — actual submission below always
+  // uses isValidPhoneOrEmail's OR check, so a misdetected "kind" can never
+  // block a credential that's genuinely valid as the other type.
+  function handleCredentialChange(value: string) {
+    setCredential(value);
+    const kind = detectCredentialKind(value);
+    let credentialError: string | undefined;
+    if (kind === 'phone') {
+      if (!isValidPhoneLenient(value)) credentialError = phoneLenientFormatError(isRTL);
+    } else if (kind === 'email') {
+      if (!isValidEmail(value)) credentialError = emailFormatError(isRTL);
+    }
+    setFieldErrors((prev) => ({ ...prev, credential: credentialError }));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
 
+    const errors: { credential?: string; password?: string } = {};
     if (!credential.trim()) {
-      setError('Phone or email is required.');
-      return;
+      errors.credential = requiredFieldError(isRTL);
+    } else if (!isValidPhoneOrEmail(credential)) {
+      errors.credential = t('credential_format_error');
     }
     if (!password) {
-      setError('Password is required.');
+      errors.password = requiredFieldError(isRTL);
+    }
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    if (!captchaToken) {
+      setError(tc('captcha_required_error'));
       return;
     }
 
     setLoading(true);
     try {
-      const res = await authAPI.login(credential.trim(), password);
+      const res = await authAPI.login(credential.trim(), password, captchaToken);
       const { tokens, member } = res.data as unknown as {
         tokens: { access: string; refresh: string };
         member: Parameters<typeof login>[0];
@@ -64,6 +105,8 @@ export default function LoginPage() {
       } else {
         setError('Login failed. Please check your connection and try again.');
       }
+      setCaptchaToken('');
+      setCaptchaResetKey((k) => k + 1);
     } finally {
       setLoading(false);
     }
@@ -111,23 +154,33 @@ export default function LoginPage() {
               type="text"
               autoComplete="username"
               value={credential}
-              onChange={(e) => setCredential(e.target.value)}
+              onChange={(e) => handleCredentialChange(e.target.value)}
               disabled={loading}
+              maxLength={EMAIL_MAX_LENGTH}
               className="w-full rounded-xl px-4 py-3 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50"
               style={{
                 background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
+                border: fieldErrors.credential ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.1)',
               }}
               onFocus={(e) => {
-                e.currentTarget.style.border = '1px solid #00ffff';
-                e.currentTarget.style.boxShadow = '0 0 12px rgba(0,255,255,0.2)';
+                if (!fieldErrors.credential) {
+                  e.currentTarget.style.border = '1px solid #00ffff';
+                  e.currentTarget.style.boxShadow = '0 0 12px rgba(0,255,255,0.2)';
+                }
               }}
               onBlur={(e) => {
-                e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
-                e.currentTarget.style.boxShadow = 'none';
+                if (!fieldErrors.credential) {
+                  e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }
               }}
               placeholder="you@example.com"
             />
+            {fieldErrors.credential && (
+              <p className="text-xs" style={{ color: '#ef4444' }} role="alert">
+                {fieldErrors.credential}
+              </p>
+            )}
           </div>
 
           {/* Password input */}
@@ -145,20 +198,27 @@ export default function LoginPage() {
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="current-password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                }}
                 disabled={loading}
                 className="w-full rounded-xl px-4 py-3 pr-12 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50"
                 style={{
                   background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
+                  border: fieldErrors.password ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.1)',
                 }}
                 onFocus={(e) => {
-                  e.currentTarget.style.border = '1px solid #00ffff';
-                  e.currentTarget.style.boxShadow = '0 0 12px rgba(0,255,255,0.2)';
+                  if (!fieldErrors.password) {
+                    e.currentTarget.style.border = '1px solid #00ffff';
+                    e.currentTarget.style.boxShadow = '0 0 12px rgba(0,255,255,0.2)';
+                  }
                 }}
                 onBlur={(e) => {
-                  e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
-                  e.currentTarget.style.boxShadow = 'none';
+                  if (!fieldErrors.password) {
+                    e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }
                 }}
                 placeholder="••••••••"
               />
@@ -172,6 +232,20 @@ export default function LoginPage() {
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
+            {fieldErrors.password && (
+              <p className="text-xs" style={{ color: '#ef4444' }} role="alert">
+                {fieldErrors.password}
+              </p>
+            )}
+          </div>
+
+          {/* CAPTCHA */}
+          <div className="flex justify-center">
+            <Turnstile
+              onVerify={setCaptchaToken}
+              onExpire={() => setCaptchaToken('')}
+              resetKey={captchaResetKey}
+            />
           </div>
 
           {/* Error message */}
@@ -192,7 +266,7 @@ export default function LoginPage() {
           {/* Submit button */}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !captchaToken}
             className="w-full flex items-center justify-center gap-2 rounded-xl py-3 font-semibold text-base transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
             style={{
               background: 'rgba(0,255,255,0.1)',

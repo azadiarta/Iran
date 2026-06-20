@@ -260,13 +260,30 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
+        # Per-view rates below, keyed by each view's throttle_scope. A view
+        # without throttle_scope set is unaffected (ScopedRateThrottle is a
+        # no-op when there's no scope), so this only tightens the specific
+        # abuse-prone endpoints that opt in.
+        'rest_framework.throttling.ScopedRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/hour',
         'user': '1000/hour',
+        'login': '10/hour',
+        'register': '5/hour',
+        'contact': '5/hour',
+        'comment': '20/hour',
+        'contribution': '15/hour',
     },
     'COERCE_DECIMAL_TO_STRING': False,
 }
+
+# ─── CAPTCHA (Cloudflare Turnstile) ────────────────────────────────────────────
+# Verifies tokens submitted by the frontend's Turnstile widget on public forms
+# (login, register, contact, comments, contributions). Defaults below are
+# Cloudflare's published "always passes" test keys, safe for local/dev use;
+# set real keys via env vars before deploying publicly.
+TURNSTILE_SECRET_KEY = os.environ.get('TURNSTILE_SECRET_KEY', '1x0000000000000000000000000000000AA')
 
 # ─── i18n ─────────────────────────────────────────────────────────────────────
 # Run: django-admin makemessages -l fa

@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Search, Eye, Plus } from 'lucide-react';
+import { Eye, Plus } from 'lucide-react';
 import AdminTable, { AdminTableColumn } from '@/components/admin/AdminTable';
 import AdminBadge from '@/components/admin/AdminBadge';
 import AdminModal from '@/components/admin/AdminModal';
@@ -10,6 +10,7 @@ import AdminSelect from '@/components/admin/fields/AdminSelect';
 import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
 import { membersAPI, groupsAPI, MemberListItem, AccessGroup, Paginated } from '@/lib/api';
+import { isValidPhoneStrict, isValidEmail, phoneFormatError, PHONE_PLACEHOLDER, EMAIL_MAX_LENGTH } from '@/lib/validation';
 
 export default function AdminMembersPage() {
   const params = useParams();
@@ -79,11 +80,13 @@ export default function AdminMembersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canView, page, search, groupFilter, activeFilter]);
 
-  function submitSearch(e: React.FormEvent) {
-    e.preventDefault();
-    setPage(1);
-    setSearch(searchInput.trim());
-  }
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   function openCreate() {
     setFullName('');
@@ -100,6 +103,22 @@ export default function AdminMembersPage() {
     e.preventDefault();
     if (!phone.trim() && !email.trim()) {
       showToast('warning', isRTL ? 'حداقل یکی از تلفن یا ایمیل را وارد کنید' : 'Enter at least one of phone or email');
+      return;
+    }
+    if (phone.trim() && !isValidPhoneStrict(phone)) {
+      showToast('warning', phoneFormatError(isRTL));
+      return;
+    }
+    if (email.trim() && !isValidEmail(email)) {
+      showToast('warning', isRTL ? 'ایمیل وارد شده معتبر نیست' : 'Enter a valid email address');
+      return;
+    }
+    if (fullName.trim().length > 35) {
+      showToast('warning', isRTL ? 'نام کامل باید حداکثر ۳۵ نویسه باشد' : 'Full name must be 35 characters or fewer');
+      return;
+    }
+    if (displayName.trim().length > 20) {
+      showToast('warning', isRTL ? 'نام نمایشی باید حداکثر ۲۰ نویسه باشد' : 'Display name must be 20 characters or fewer');
       return;
     }
     if (password !== passwordConfirm) {
@@ -195,22 +214,14 @@ export default function AdminMembersPage() {
       </div>
 
       <div className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <form onSubmit={submitSearch} className="lg:col-span-2 flex gap-2">
-          <div className="flex-1">
-            <AdminInput
-              placeholder={isRTL ? 'جستجو بر اساس نام یا شناسه...' : 'Search by name or ID...'}
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-            />
-          </div>
-          <button
-            type="submit"
-            className="flex items-center justify-center rounded-xl px-4 transition-all"
-            style={{ border: '1px solid rgba(0,255,255,0.3)', color: '#00ffff', backgroundColor: 'rgba(0,255,255,0.05)' }}
-          >
-            <Search className="w-4 h-4" />
-          </button>
-        </form>
+        <div className="lg:col-span-2">
+          <AdminInput
+            placeholder={isRTL ? 'جستجو بر اساس نام یا شناسه...' : 'Search by name or ID...'}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            maxLength={150}
+          />
+        </div>
         <AdminSelect
           value={groupFilter}
           onChange={(e) => { setGroupFilter(e.target.value); setPage(1); }}
@@ -251,10 +262,16 @@ export default function AdminMembersPage() {
 
       <AdminModal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={isRTL ? 'افزودن عضو' : 'Add Member'}>
         <form onSubmit={submitCreate} className="flex flex-col gap-4">
-          <AdminInput label={isRTL ? 'نام کامل' : 'Full Name'} value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-          <AdminInput label={isRTL ? 'نام نمایشی (اختیاری)' : 'Display Name (optional)'} value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
-          <AdminInput label={isRTL ? 'تلفن (اختیاری)' : 'Phone (optional)'} value={phone} onChange={(e) => setPhone(e.target.value)} />
-          <AdminInput label={isRTL ? 'ایمیل (اختیاری)' : 'Email (optional)'} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <AdminInput label={isRTL ? 'نام کامل' : 'Full Name'} value={fullName} onChange={(e) => setFullName(e.target.value)} required maxLength={35} />
+          <AdminInput label={isRTL ? 'نام نمایشی (اختیاری)' : 'Display Name (optional)'} value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={20} />
+          <AdminInput
+            label={isRTL ? 'تلفن (اختیاری)' : 'Phone (optional)'}
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder={PHONE_PLACEHOLDER}
+            maxLength={17}
+          />
+          <AdminInput label={isRTL ? 'ایمیل (اختیاری)' : 'Email (optional)'} type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={EMAIL_MAX_LENGTH} />
           <AdminSelect
             label={isRTL ? 'گروه دسترسی' : 'Access Group'}
             value={newGroupId}

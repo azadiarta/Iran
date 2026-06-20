@@ -6,12 +6,20 @@ from django.db import connection
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
+from rest_framework.exceptions import ValidationError as DRFValidationError
+
 from accounts.models import AccessGroup, Member
 from accounts.permissions import IsSuperuser
 from core.log_utils import actor_display_for
 from core.models import DefaultSetting
 from core.serializers import DefaultSettingSerializer
 from core.utils import api_error, api_success
+from core.validators import (
+    LONG_TEXT_ADMIN_MAX_LENGTH,
+    sanitize_text,
+    validate_email_format,
+    validate_phone_format,
+)
 from fund.models import Contribution, Expense
 from logs.models import ActivityLog
 from posts.models import Comment, Post
@@ -24,8 +32,15 @@ _CHOICES = {
     'member_profile_visibility': ['all', 'members_only', 'group_based'],
 }
 
+# Keys whose value must be a well-formed email/phone, beyond the generic
+# length+sanitization check applied to every setting below.
+_EMAIL_KEYS = ('contact_email', 'payment_paypal_email')
+_PHONE_KEYS = ('contact_phone',)
+
 
 def _validate_value(key, value):
+    if len(value) > LONG_TEXT_ADMIN_MAX_LENGTH:
+        return f'Must be {LONG_TEXT_ADMIN_MAX_LENGTH} characters or fewer.'
     if key == 'default_group':
         try:
             import uuid
@@ -49,6 +64,18 @@ def _validate_value(key, value):
     elif key in _CHOICES:
         if value not in _CHOICES[key]:
             return f"Must be one of: {', '.join(_CHOICES[key])}."
+    elif key in _EMAIL_KEYS:
+        if value:
+            try:
+                validate_email_format(value)
+            except DRFValidationError as exc:
+                return str(exc.detail[0]) if isinstance(exc.detail, list) else str(exc.detail)
+    elif key in _PHONE_KEYS:
+        if value:
+            try:
+                validate_phone_format(value)
+            except DRFValidationError as exc:
+                return str(exc.detail[0]) if isinstance(exc.detail, list) else str(exc.detail)
     return None
 
 
@@ -95,7 +122,7 @@ class DefaultSettingUpdateView(APIView):
         if new_value is None:
             return api_error('value is required.', errors={'value': ['This field is required.']})
 
-        new_value = str(new_value).strip()
+        new_value = sanitize_text(str(new_value))
         error = _validate_value(key, new_value)
         if error:
             return api_error('Validation failed.', errors={'value': [error]})

@@ -6,6 +6,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
+from core.captcha import verify_captcha
 from core.log_utils import actor_display_for, target_display_for
 from core.models import DefaultSetting
 from core.utils import api_error, api_success
@@ -54,9 +55,13 @@ class PaymentMethodsView(APIView):
 
 class PaymentInitiateView(APIView):
     permission_classes = [AllowAny]
+    throttle_scope = 'contribution'
 
     @transaction.atomic
     def post(self, request):
+        if not verify_captcha(request.data.get('captcha_token'), _get_ip(request)):
+            return api_error('Captcha verification failed.', status_code=400)
+
         serializer = PaymentInitiateSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid():
             return api_error('Validation failed.', errors=serializer.errors)

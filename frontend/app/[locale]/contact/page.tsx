@@ -4,7 +4,9 @@ import { useTranslations } from 'next-intl';
 import { Mail, Phone, Send, CheckCircle, AlertTriangle } from 'lucide-react';
 import { settingsAPI, contactAPI } from '@/lib/api';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
+import Turnstile from '@/components/common/Turnstile';
 import useAuthStore from '@/store/authStore';
+import { SHORT_TEXT_PUBLIC_MAX_LENGTH, LONG_TEXT_PUBLIC_MAX_LENGTH } from '@/lib/validation';
 
 interface ContactInfo {
   email: string | null;
@@ -22,6 +24,8 @@ export default function ContactPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [mounted, setMounted] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -55,12 +59,19 @@ export default function ContactPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError('');
+
+    if (!captchaToken) {
+      setSubmitError(tCommon('captcha_required_error'));
+      return;
+    }
+
     setSubmitting(true);
     try {
       await contactAPI.submit({
         name: formData.name,
         contact_info: formData.contact,
         message: formData.message,
+        captcha_token: captchaToken,
       });
       setSubmitted(true);
     } catch (err: unknown) {
@@ -70,6 +81,8 @@ export default function ContactPage() {
           ? (err.response as { status?: number }).status
           : undefined;
       setSubmitError(status === 429 ? t('pending_limit_error') : t('submit_error'));
+      setCaptchaToken('');
+      setCaptchaResetKey((k) => k + 1);
     } finally {
       setSubmitting(false);
     }
@@ -177,6 +190,8 @@ export default function ContactPage() {
                 onClick={() => {
                   setSubmitted(false);
                   setFormData({ name: '', contact: '', message: '' });
+                  setCaptchaToken('');
+                  setCaptchaResetKey((k) => k + 1);
                 }}
                 className="text-sm text-white/40 hover:text-white/70 transition-colors underline"
               >
@@ -195,8 +210,14 @@ export default function ContactPage() {
                   onChange={(e) => setFormData((d) => ({ ...d, name: e.target.value }))}
                   placeholder={t('name_placeholder')}
                   disabled={mounted && !!member}
+                  maxLength={SHORT_TEXT_PUBLIC_MAX_LENGTH}
                   className={inputClass + (mounted && member ? ' opacity-60 cursor-not-allowed' : '')}
                 />
+                {!(mounted && member) && (
+                  <p className="mt-1 text-xs text-white/30 text-right">
+                    {formData.name.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}
+                  </p>
+                )}
               </div>
 
               {/* Member ID (read-only, shown only when logged in) */}
@@ -223,8 +244,12 @@ export default function ContactPage() {
                   value={formData.contact}
                   onChange={(e) => setFormData((d) => ({ ...d, contact: e.target.value }))}
                   placeholder={t('contact_placeholder')}
+                  maxLength={SHORT_TEXT_PUBLIC_MAX_LENGTH}
                   className={inputClass}
                 />
+                <p className="mt-1 text-xs text-white/30 text-right">
+                  {formData.contact.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}
+                </p>
               </div>
 
               {/* Message */}
@@ -238,7 +263,17 @@ export default function ContactPage() {
                   value={formData.message}
                   onChange={(e) => setFormData((d) => ({ ...d, message: e.target.value }))}
                   placeholder={t('message_placeholder')}
+                  maxLength={LONG_TEXT_PUBLIC_MAX_LENGTH}
                   className={inputClass + ' resize-none'}
+                />
+              </div>
+
+              {/* CAPTCHA */}
+              <div className="flex justify-center">
+                <Turnstile
+                  onVerify={setCaptchaToken}
+                  onExpire={() => setCaptchaToken('')}
+                  resetKey={captchaResetKey}
                 />
               </div>
 
@@ -256,7 +291,7 @@ export default function ContactPage() {
               {/* Submit */}
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || !captchaToken}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-50"
                 style={{
                   backgroundColor: '#00ffff',

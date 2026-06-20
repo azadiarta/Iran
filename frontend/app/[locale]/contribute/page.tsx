@@ -17,7 +17,9 @@ import {
 import { paymentsAPI, ContributionDisplayNameChoice } from '@/lib/api';
 import { getPaymentMethodLabel, getPaymentMethodUnavailableMessage } from '@/lib/paymentMethodsMeta';
 import AdminToggle from '@/components/admin/fields/AdminToggle';
+import Turnstile from '@/components/common/Turnstile';
 import useAuthStore from '@/store/authStore';
+import { SHORT_TEXT_PUBLIC_MAX_LENGTH } from '@/lib/validation';
 
 const AMOUNT_REGEX = /^\d{0,9}(\.\d{0,2})?$/;
 
@@ -89,6 +91,8 @@ export default function ContributePage() {
   const [displayNameChoice, setDisplayNameChoice] = useState<ContributionDisplayNameChoice>('display_name');
   const [customDisplayName, setCustomDisplayName] = useState('');
   const [message, setMessage] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
 
   useEffect(() => {
     const fetchMethods = async () => {
@@ -118,6 +122,10 @@ export default function ContributePage() {
 
   const handleInitiate = async () => {
     if (!selectedMethod || !amount) return;
+    if (!captchaToken) {
+      setError(t('common.captcha_required_error'));
+      return;
+    }
     setInitiating(true);
     setError(null);
     try {
@@ -129,11 +137,13 @@ export default function ContributePage() {
         display_name_choice?: ContributionDisplayNameChoice;
         public_display_name?: string;
         message?: string;
+        captcha_token: string;
       } = {
         amount: parseFloat(amount),
         payment_method: selectedMethod,
         show_in_public_list: showInPublicList,
         display_name_choice: displayNameChoice,
+        captcha_token: captchaToken,
       };
       if (!isAuthenticated && guestName.trim()) {
         payload.guest_name = guestName.trim();
@@ -163,6 +173,8 @@ export default function ContributePage() {
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
       setError(axiosErr?.response?.data?.message || t('contribute.error_generic'));
+      setCaptchaToken('');
+      setCaptchaResetKey((k) => k + 1);
     } finally {
       setInitiating(false);
     }
@@ -217,7 +229,8 @@ export default function ContributePage() {
     parseFloat(amount) > 0 &&
     selectedMethod !== null &&
     (isAuthenticated || guestName.trim().length > 0) &&
-    (!showInPublicList || displayNameChoice !== 'custom' || customDisplayName.trim().length > 0);
+    (!showInPublicList || displayNameChoice !== 'custom' || customDisplayName.trim().length > 0) &&
+    !!captchaToken;
 
   const manualInstructions = instructions as ManualInstructions | null;
   const paypalInstructions = instructions as PaypalInstructions | null;
@@ -314,8 +327,12 @@ export default function ContributePage() {
             value={guestName}
             onChange={(e) => setGuestName(e.target.value)}
             placeholder={t('contribute.guest_name_placeholder')}
+            maxLength={SHORT_TEXT_PUBLIC_MAX_LENGTH}
             className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-white/20 outline-none focus:border-[#00ffff] focus:ring-1 focus:ring-[#00ffff]/30 transition-all"
           />
+          <p className="text-xs text-white/30 mt-1 text-right">
+            {guestName.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}
+          </p>
         </div>
       )}
 
@@ -425,10 +442,15 @@ export default function ContributePage() {
                   type="text"
                   value={customDisplayName}
                   onChange={(e) => setCustomDisplayName(e.target.value)}
-                  maxLength={100}
+                  maxLength={SHORT_TEXT_PUBLIC_MAX_LENGTH}
                   placeholder={t('contribute.custom_name_placeholder')}
                   className="mt-3 w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-white/20 outline-none focus:border-[#00ffff] focus:ring-1 focus:ring-[#00ffff]/30 transition-all"
                 />
+              )}
+              {displayNameChoice === 'custom' && (
+                <p className="text-xs text-white/30 mt-1 text-right">
+                  {customDisplayName.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}
+                </p>
               )}
             </div>
 
@@ -438,16 +460,27 @@ export default function ContributePage() {
               </label>
               <textarea
                 value={message}
-                onChange={(e) => setMessage(e.target.value.slice(0, 150))}
-                maxLength={150}
+                onChange={(e) => setMessage(e.target.value.slice(0, SHORT_TEXT_PUBLIC_MAX_LENGTH))}
+                maxLength={SHORT_TEXT_PUBLIC_MAX_LENGTH}
                 rows={3}
                 placeholder={t('contribute.message_placeholder')}
                 className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-white/20 outline-none focus:border-[#00ffff] focus:ring-1 focus:ring-[#00ffff]/30 transition-all resize-none"
               />
-              <p className="text-xs text-white/30 mt-1 text-right">{message.length}/150</p>
+              <p className="text-xs text-white/30 mt-1 text-right">
+                {message.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}
+              </p>
             </div>
           </div>
         )}
+      </div>
+
+      {/* CAPTCHA */}
+      <div className="flex justify-center">
+        <Turnstile
+          onVerify={setCaptchaToken}
+          onExpire={() => setCaptchaToken('')}
+          resetKey={captchaResetKey}
+        />
       </div>
 
       {/* Error */}

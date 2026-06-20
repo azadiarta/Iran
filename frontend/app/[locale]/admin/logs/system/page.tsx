@@ -67,11 +67,13 @@ export default function AdminSystemLogPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSuperuser, page, appliedFilters]);
 
-  function applyFilters(e: React.FormEvent) {
-    e.preventDefault();
-    setPage(1);
-    setAppliedFilters({ level: levelFilter, source: sourceFilter, date_from: dateFrom, date_to: dateTo });
-  }
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedFilters({ level: levelFilter, source: sourceFilter, date_from: dateFrom, date_to: dateTo });
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [levelFilter, sourceFilter, dateFrom, dateTo]);
 
   if (!isSuperuser) {
     return (
@@ -114,7 +116,7 @@ export default function AdminSystemLogPage() {
         <p className="text-sm text-white/40 mt-1">{isRTL ? 'رویدادها و خطاهای سطح سیستم' : 'System-level events and errors'}</p>
       </div>
 
-      <form onSubmit={applyFilters} className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+      <div className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
         <AdminSelect
           label={isRTL ? 'سطح' : 'Level'}
           value={levelFilter}
@@ -127,17 +129,10 @@ export default function AdminSystemLogPage() {
             { value: 'critical', label: isRTL ? 'بحرانی' : 'Critical' },
           ]}
         />
-        <AdminInput label={isRTL ? 'منبع' : 'Source'} value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} />
+        <AdminInput label={isRTL ? 'منبع' : 'Source'} value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} maxLength={150} />
         <AdminInput label={isRTL ? 'از تاریخ' : 'Date From'} type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
         <AdminInput label={isRTL ? 'تا تاریخ' : 'Date To'} type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-        <button
-          type="submit"
-          className="rounded-xl px-5 py-2.5 text-sm font-bold transition-all"
-          style={{ backgroundColor: '#00ffff', color: '#0a0a0f', boxShadow: '0 0 16px rgba(0,255,255,0.3)' }}
-        >
-          {isRTL ? 'فیلتر' : 'Filter'}
-        </button>
-      </form>
+      </div>
 
       <AdminTable
         columns={columns}

@@ -7,6 +7,18 @@ import { Eye, EyeOff, UserPlus } from 'lucide-react';
 import { authAPI } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
+import Turnstile from '@/components/common/Turnstile';
+import {
+  isValidPhoneStrict,
+  isValidEmail,
+  maxLengthError,
+  passwordTooShortError,
+  passwordMismatchError,
+  requiredFieldError,
+  emailFormatError,
+  PHONE_PLACEHOLDER,
+  EMAIL_MAX_LENGTH,
+} from '@/lib/validation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,6 +56,7 @@ function Field({
   hint,
   error,
   rightElement,
+  maxLength,
 }: {
   id: string;
   label: string;
@@ -56,6 +69,7 @@ function Field({
   hint?: string;
   error?: string;
   rightElement?: React.ReactNode;
+  maxLength?: number;
 }) {
   return (
     <div className="space-y-1.5">
@@ -71,6 +85,7 @@ function Field({
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
           placeholder={placeholder}
+          maxLength={maxLength}
           className="w-full rounded-xl px-4 py-3 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50"
           style={{
             background: 'rgba(255,255,255,0.05)',
@@ -94,15 +109,26 @@ function Field({
           <div className="absolute right-3 top-1/2 -translate-y-1/2">{rightElement}</div>
         )}
       </div>
-      {hint && !error && (
-        <p className="text-xs" style={{ color: 'rgba(251,191,36,0.6)' }}>
-          {hint}
-        </p>
-      )}
-      {error && (
-        <p className="text-xs" style={{ color: '#ef4444' }} role="alert">
-          {error}
-        </p>
+      {(hint || error || typeof maxLength === 'number') && (
+        <div className="flex items-start justify-between gap-2">
+          <div className="space-y-1">
+            {hint && !error && (
+              <p className="text-xs" style={{ color: 'rgba(251,191,36,0.6)' }}>
+                {hint}
+              </p>
+            )}
+            {error && (
+              <p className="text-xs" style={{ color: '#ef4444' }} role="alert">
+                {error}
+              </p>
+            )}
+          </div>
+          {typeof maxLength === 'number' && (
+            <p className="text-xs text-white/30 whitespace-nowrap">
+              {value.length}/{maxLength}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
@@ -112,6 +138,7 @@ function Field({
 
 export default function RegisterPage() {
   const t = useTranslations('auth');
+  const tc = useTranslations('common');
   const router = useRouter();
   const params = useParams();
   const locale = params?.locale as string || 'en';
@@ -131,6 +158,8 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [generalError, setGeneralError] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -138,6 +167,8 @@ export default function RegisterPage() {
       router.replace(`/${locale}`);
     }
   }, [hasHydrated, isAuthenticated, authMember, locale, router]);
+
+  const isRTL = locale === 'fa';
 
   function setField(key: keyof FormFields) {
     return (value: string) => {
@@ -147,26 +178,77 @@ export default function RegisterPage() {
     };
   }
 
+  function handlePasswordChange(value: string) {
+    setForm((prev) => ({ ...prev, password: value }));
+    setFieldErrors((prev) => ({
+      ...prev,
+      password: passwordTooShortError(isRTL, value),
+      confirm_password:
+        form.confirm_password && value !== form.confirm_password
+          ? passwordMismatchError(isRTL)
+          : undefined,
+    }));
+  }
+
+  function handleConfirmPasswordChange(value: string) {
+    setForm((prev) => ({ ...prev, confirm_password: value }));
+    setFieldErrors((prev) => ({
+      ...prev,
+      confirm_password: value && value !== form.password ? passwordMismatchError(isRTL) : undefined,
+    }));
+  }
+
+  function handlePhoneChange(value: string) {
+    setForm((prev) => ({ ...prev, phone: value }));
+    setFieldErrors((prev) => ({
+      ...prev,
+      phone: value.trim() && !isValidPhoneStrict(value) ? t('phone_format_error') : undefined,
+    }));
+  }
+
+  function handleEmailChange(value: string) {
+    setForm((prev) => ({ ...prev, email: value }));
+    setFieldErrors((prev) => ({
+      ...prev,
+      email: value.trim() && !isValidEmail(value) ? emailFormatError(isRTL) : undefined,
+    }));
+  }
+
   function validate(): boolean {
     const errors: FieldErrors = {};
 
     if (!form.full_name.trim()) {
-      errors.full_name = 'Full name is required.';
+      errors.full_name = requiredFieldError(isRTL);
+    } else if (form.full_name.trim().length > 35) {
+      errors.full_name = maxLengthError(isRTL, 35);
+    }
+
+    if (form.display_name.trim().length > 20) {
+      errors.display_name = maxLengthError(isRTL, 20);
     }
 
     if (!form.phone.trim() && !form.email.trim()) {
-      errors.phone = 'At least phone or email is required.';
-      errors.email = 'At least phone or email is required.';
+      errors.phone = requiredFieldError(isRTL);
+      errors.email = requiredFieldError(isRTL);
+    }
+
+    if (form.phone.trim() && !isValidPhoneStrict(form.phone)) {
+      errors.phone = t('phone_format_error');
+    }
+
+    if (form.email.trim() && !isValidEmail(form.email)) {
+      errors.email = emailFormatError(isRTL);
     }
 
     if (!form.password) {
-      errors.password = 'Password is required.';
-    } else if (form.password.length < 6) {
-      errors.password = 'Password must be at least 6 characters.';
+      errors.password = requiredFieldError(isRTL);
+    } else {
+      const pwError = passwordTooShortError(isRTL, form.password);
+      if (pwError) errors.password = pwError;
     }
 
     if (form.password !== form.confirm_password) {
-      errors.confirm_password = 'Passwords do not match.';
+      errors.confirm_password = passwordMismatchError(isRTL);
     }
 
     setFieldErrors(errors);
@@ -179,6 +261,11 @@ export default function RegisterPage() {
 
     if (!validate()) return;
 
+    if (!captchaToken) {
+      setGeneralError(tc('captcha_required_error'));
+      return;
+    }
+
     setLoading(true);
     try {
       const payload: {
@@ -188,10 +275,12 @@ export default function RegisterPage() {
         email?: string;
         password: string;
         password_confirm: string;
+        captcha_token: string;
       } = {
         full_name: form.full_name.trim(),
         password: form.password,
         password_confirm: form.confirm_password,
+        captcha_token: captchaToken,
       };
       if (form.display_name.trim()) payload.display_name = form.display_name.trim();
       if (form.phone.trim()) payload.phone = form.phone.trim();
@@ -249,6 +338,8 @@ export default function RegisterPage() {
       } else {
         setGeneralError('Registration failed. Please check your connection and try again.');
       }
+      setCaptchaToken('');
+      setCaptchaResetKey((k) => k + 1);
     } finally {
       setLoading(false);
     }
@@ -293,6 +384,7 @@ export default function RegisterPage() {
             placeholder="Ali Hosseini"
             required
             error={fieldErrors.full_name}
+            maxLength={35}
           />
 
           <Field
@@ -303,6 +395,7 @@ export default function RegisterPage() {
             disabled={loading}
             placeholder="Ali"
             error={fieldErrors.display_name}
+            maxLength={20}
           />
 
           <Field
@@ -310,11 +403,18 @@ export default function RegisterPage() {
             label={t('phone_label')}
             type="tel"
             value={form.phone}
-            onChange={setField('phone')}
+            onChange={handlePhoneChange}
             disabled={loading}
-            placeholder="+44 7700 900000"
-            hint={!form.phone && !form.email ? phoneOrEmailHint : undefined}
+            placeholder={PHONE_PLACEHOLDER}
+            hint={
+              form.phone.trim()
+                ? t('phone_format_hint')
+                : form.email.trim()
+                  ? undefined
+                  : phoneOrEmailHint
+            }
             error={fieldErrors.phone}
+            maxLength={17}
           />
 
           <Field
@@ -322,11 +422,12 @@ export default function RegisterPage() {
             label={t('email_label')}
             type="email"
             value={form.email}
-            onChange={setField('email')}
+            onChange={handleEmailChange}
             disabled={loading}
             placeholder="you@example.com"
-            hint={!form.phone && !form.email ? phoneOrEmailHint : undefined}
+            hint={!form.phone.trim() && !form.email.trim() ? phoneOrEmailHint : undefined}
             error={fieldErrors.email}
+            maxLength={EMAIL_MAX_LENGTH}
           />
 
           {/* Password */}
@@ -341,7 +442,7 @@ export default function RegisterPage() {
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="new-password"
                 value={form.password}
-                onChange={(e) => setField('password')(e.target.value)}
+                onChange={(e) => handlePasswordChange(e.target.value)}
                 disabled={loading}
                 placeholder="••••••••"
                 className="w-full rounded-xl px-4 py-3 pr-12 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50"
@@ -391,7 +492,7 @@ export default function RegisterPage() {
                 type={showConfirm ? 'text' : 'password'}
                 autoComplete="new-password"
                 value={form.confirm_password}
-                onChange={(e) => setField('confirm_password')(e.target.value)}
+                onChange={(e) => handleConfirmPasswordChange(e.target.value)}
                 disabled={loading}
                 placeholder="••••••••"
                 className="w-full rounded-xl px-4 py-3 pr-12 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50"
@@ -429,6 +530,15 @@ export default function RegisterPage() {
             )}
           </div>
 
+          {/* CAPTCHA */}
+          <div className="flex justify-center">
+            <Turnstile
+              onVerify={setCaptchaToken}
+              onExpire={() => setCaptchaToken('')}
+              resetKey={captchaResetKey}
+            />
+          </div>
+
           {/* General error */}
           {generalError && (
             <p
@@ -447,7 +557,7 @@ export default function RegisterPage() {
           {/* Submit */}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !captchaToken}
             className="w-full flex items-center justify-center gap-2 rounded-xl py-3 font-semibold text-base transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed mt-2"
             style={{
               background: 'rgba(0,255,255,0.1)',

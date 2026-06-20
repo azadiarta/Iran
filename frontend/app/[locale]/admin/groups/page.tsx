@@ -244,8 +244,8 @@ export default function AdminGroupsPage() {
 
       <AdminModal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editing ? (isRTL ? 'ویرایش گروه' : 'Edit Group') : (isRTL ? 'گروه جدید' : 'New Group')} maxWidth="max-w-2xl">
         <form onSubmit={submit} className="flex flex-col gap-4">
-          <AdminInput label={isRTL ? 'نام گروه' : 'Group Name'} value={name} onChange={(e) => setName(e.target.value)} required />
-          <AdminTextarea label={isRTL ? 'توضیحات' : 'Description'} value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+          <AdminInput label={isRTL ? 'نام گروه' : 'Group Name'} value={name} onChange={(e) => setName(e.target.value)} required maxLength={20} />
+          <AdminTextarea label={isRTL ? 'توضیحات' : 'Description'} value={description} onChange={(e) => setDescription(e.target.value)} rows={3} maxLength={350} />
           <div>
             <label className="block text-xs text-white/50 mb-1.5">{isRTL ? 'دسترسی‌ها' : 'Permissions'}</label>
             <AdminPermissionCheckbox permissions={allPermissions} selected={selectedPermissions} onChange={setSelectedPermissions} isRTL={isRTL} />

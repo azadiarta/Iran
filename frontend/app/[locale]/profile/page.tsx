@@ -7,6 +7,17 @@ import { User, Edit2, Save, X, Lock, Eye, EyeOff, CheckCircle, AlertTriangle, Ch
 import { membersAPI } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 import type { Member } from '@/store/authStore';
+import {
+  isValidPhoneStrict,
+  isValidEmail,
+  phoneFormatError,
+  maxLengthError,
+  emailFormatError,
+  passwordTooShortError,
+  passwordMismatchError,
+  PHONE_PLACEHOLDER,
+  EMAIL_MAX_LENGTH,
+} from '@/lib/validation';
 
 function getInitials(fullName: string): string {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
@@ -45,7 +56,7 @@ export default function ProfilePage() {
   const [editSaving, setEditSaving] = useState(false);
   const [editSuccess, setEditSuccess] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
-  const [editFieldErrors, setEditFieldErrors] = useState<Record<string, string>>({});
+  const [editFieldErrors, setEditFieldErrors] = useState<Record<string, string | undefined>>({});
 
   // ── Change password state ────────────────────────────────────────────────
   const [showPasswordSection, setShowPasswordSection] = useState(false);
@@ -60,6 +71,7 @@ export default function ProfilePage() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordFieldErrors, setPasswordFieldErrors] = useState<{ new_password?: string; confirm_new_password?: string }>({});
 
   // ── Auth guard ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -105,6 +117,31 @@ export default function ProfilePage() {
 
   const handleEditSave = async () => {
     if (!member) return;
+    const isRTL = locale === 'fa';
+    const errs: Record<string, string> = {};
+    if (editData.full_name.trim().length > 35) {
+      errs.full_name = maxLengthError(isRTL, 35);
+    }
+    if (editData.display_name.trim().length > 20) {
+      errs.display_name = maxLengthError(isRTL, 20);
+    }
+    if (editData.email.trim() && !isValidEmail(editData.email)) {
+      errs.email = emailFormatError(isRTL);
+    }
+    // Only enforce the strict "00"-prefixed format if the phone is actually
+    // changing — existing members may have a legacy format on file.
+    if (
+      editData.phone.trim() &&
+      editData.phone.trim() !== (member.phone || '') &&
+      !isValidPhoneStrict(editData.phone)
+    ) {
+      errs.phone = phoneFormatError(isRTL);
+    }
+    if (Object.keys(errs).length > 0) {
+      setEditFieldErrors(errs);
+      return;
+    }
+
     setEditSaving(true);
     setEditError(null);
     setEditFieldErrors({});
@@ -151,10 +188,67 @@ export default function ProfilePage() {
     }
   };
 
+  const handleEmailChange = (value: string) => {
+    const isRTL = locale === 'fa';
+    setEditData((d) => ({ ...d, email: value }));
+    setEditFieldErrors((prev) => ({
+      ...prev,
+      email: value.trim() && !isValidEmail(value) ? emailFormatError(isRTL) : undefined,
+    }));
+  };
+
+  const handlePhoneChange = (value: string) => {
+    const isRTL = locale === 'fa';
+    setEditData((d) => ({ ...d, phone: value }));
+    setEditFieldErrors((prev) => ({
+      ...prev,
+      // Only flag the strict "00"-prefixed format once the phone is actually
+      // changing — existing members may have a legacy format on file.
+      phone:
+        value.trim() && value.trim() !== (member?.phone || '') && !isValidPhoneStrict(value)
+          ? phoneFormatError(isRTL)
+          : undefined,
+    }));
+  };
+
+  const handleNewPasswordChange = (value: string) => {
+    const isRTL = locale === 'fa';
+    setPasswordData((d) => ({ ...d, new_password: value }));
+    setPasswordFieldErrors((prev) => ({
+      ...prev,
+      new_password: passwordTooShortError(isRTL, value),
+      confirm_new_password:
+        passwordData.confirm_new_password && value !== passwordData.confirm_new_password
+          ? passwordMismatchError(isRTL)
+          : undefined,
+    }));
+  };
+
+  const handleConfirmNewPasswordChange = (value: string) => {
+    const isRTL = locale === 'fa';
+    setPasswordData((d) => ({ ...d, confirm_new_password: value }));
+    setPasswordFieldErrors((prev) => ({
+      ...prev,
+      confirm_new_password:
+        value && value !== passwordData.new_password ? passwordMismatchError(isRTL) : undefined,
+    }));
+  };
+
   const handlePasswordSave = async () => {
     if (!member) return;
+    const isRTL = locale === 'fa';
+    const pwError = passwordTooShortError(isRTL, passwordData.new_password);
+    if (pwError) {
+      setPasswordFieldErrors((prev) => ({ ...prev, new_password: pwError }));
+      return;
+    }
+    if (passwordData.new_password !== passwordData.confirm_new_password) {
+      setPasswordFieldErrors((prev) => ({ ...prev, confirm_new_password: passwordMismatchError(isRTL) }));
+      return;
+    }
     setPasswordSaving(true);
     setPasswordError(null);
+    setPasswordFieldErrors({});
     setPasswordSuccess(false);
     try {
       await membersAPI.changePassword(member.id, {
@@ -278,10 +372,16 @@ export default function ProfilePage() {
                   value={editData.full_name}
                   onChange={(e) => setEditData((d) => ({ ...d, full_name: e.target.value }))}
                   className={inputClass}
+                  maxLength={35}
                 />
-                {editFieldErrors.full_name && (
-                  <p className="text-xs text-[#ef4444] mt-1">{editFieldErrors.full_name}</p>
-                )}
+                <div className="flex items-start justify-between gap-2 mt-1">
+                  {editFieldErrors.full_name ? (
+                    <p className="text-xs text-[#ef4444]">{editFieldErrors.full_name}</p>
+                  ) : (
+                    <span />
+                  )}
+                  <p className="text-xs text-white/30 whitespace-nowrap">{editData.full_name.length}/35</p>
+                </div>
               </div>
 
               {/* Display name */}
@@ -292,10 +392,16 @@ export default function ProfilePage() {
                   value={editData.display_name}
                   onChange={(e) => setEditData((d) => ({ ...d, display_name: e.target.value }))}
                   className={inputClass}
+                  maxLength={20}
                 />
-                {editFieldErrors.display_name && (
-                  <p className="text-xs text-[#ef4444] mt-1">{editFieldErrors.display_name}</p>
-                )}
+                <div className="flex items-start justify-between gap-2 mt-1">
+                  {editFieldErrors.display_name ? (
+                    <p className="text-xs text-[#ef4444]">{editFieldErrors.display_name}</p>
+                  ) : (
+                    <span />
+                  )}
+                  <p className="text-xs text-white/30 whitespace-nowrap">{editData.display_name.length}/20</p>
+                </div>
               </div>
 
               {/* Email */}
@@ -304,12 +410,18 @@ export default function ProfilePage() {
                 <input
                   type="email"
                   value={editData.email}
-                  onChange={(e) => setEditData((d) => ({ ...d, email: e.target.value }))}
+                  onChange={(e) => handleEmailChange(e.target.value)}
                   className={inputClass}
+                  maxLength={EMAIL_MAX_LENGTH}
                 />
-                {editFieldErrors.email && (
-                  <p className="text-xs text-[#ef4444] mt-1">{editFieldErrors.email}</p>
-                )}
+                <div className="flex items-start justify-between gap-2 mt-1">
+                  {editFieldErrors.email ? (
+                    <p className="text-xs text-[#ef4444]">{editFieldErrors.email}</p>
+                  ) : (
+                    <span />
+                  )}
+                  <p className="text-xs text-white/30 whitespace-nowrap">{editData.email.length}/{EMAIL_MAX_LENGTH}</p>
+                </div>
               </div>
 
               {/* Phone */}
@@ -318,12 +430,19 @@ export default function ProfilePage() {
                 <input
                   type="tel"
                   value={editData.phone}
-                  onChange={(e) => setEditData((d) => ({ ...d, phone: e.target.value }))}
+                  onChange={(e) => handlePhoneChange(e.target.value)}
                   className={inputClass}
+                  placeholder={PHONE_PLACEHOLDER}
+                  maxLength={17}
                 />
-                {editFieldErrors.phone && (
-                  <p className="text-xs text-[#ef4444] mt-1">{editFieldErrors.phone}</p>
-                )}
+                <div className="flex items-start justify-between gap-2 mt-1">
+                  {editFieldErrors.phone ? (
+                    <p className="text-xs text-[#ef4444]">{editFieldErrors.phone}</p>
+                  ) : (
+                    <span />
+                  )}
+                  <p className="text-xs text-white/30 whitespace-nowrap">{editData.phone.length}/17</p>
+                </div>
               </div>
 
               {/* General error */}
@@ -395,6 +514,7 @@ export default function ProfilePage() {
               setShowPasswordSection((v) => !v);
               setPasswordSuccess(false);
               setPasswordError(null);
+              setPasswordFieldErrors({});
             }}
             className="w-full flex items-center justify-between"
           >
@@ -446,9 +566,7 @@ export default function ProfilePage() {
                   <input
                     type={showNewPw ? 'text' : 'password'}
                     value={passwordData.new_password}
-                    onChange={(e) =>
-                      setPasswordData((d) => ({ ...d, new_password: e.target.value }))
-                    }
+                    onChange={(e) => handleNewPasswordChange(e.target.value)}
                     className={inputClass + ' pr-11'}
                   />
                   <button
@@ -459,6 +577,9 @@ export default function ProfilePage() {
                     {showNewPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                {passwordFieldErrors.new_password && (
+                  <p className="text-xs text-[#ef4444] mt-1">{passwordFieldErrors.new_password}</p>
+                )}
               </div>
 
               {/* Confirm new password */}
@@ -470,9 +591,7 @@ export default function ProfilePage() {
                   <input
                     type={showConfirmPw ? 'text' : 'password'}
                     value={passwordData.confirm_new_password}
-                    onChange={(e) =>
-                      setPasswordData((d) => ({ ...d, confirm_new_password: e.target.value }))
-                    }
+                    onChange={(e) => handleConfirmNewPasswordChange(e.target.value)}
                     className={inputClass + ' pr-11'}
                   />
                   <button
@@ -483,6 +602,9 @@ export default function ProfilePage() {
                     {showConfirmPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                {passwordFieldErrors.confirm_new_password && (
+                  <p className="text-xs text-[#ef4444] mt-1">{passwordFieldErrors.confirm_new_password}</p>
+                )}
               </div>
 
               {/* General error */}
@@ -499,7 +621,9 @@ export default function ProfilePage() {
                 disabled={
                   passwordSaving ||
                   !passwordData.new_password ||
-                  !passwordData.confirm_new_password
+                  !passwordData.confirm_new_password ||
+                  !!passwordFieldErrors.new_password ||
+                  !!passwordFieldErrors.confirm_new_password
                 }
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{

@@ -165,7 +165,7 @@ export default function LandingPage() {
       if (tagline?.value) setHeroTagline(tagline.value);
     });
 
-    postsAPI.getList(1, '')
+    postsAPI.getList(1)
       .then((res) => setPosts((res.data as unknown as { results: PostSummary[] }).results.slice(0, 3)))
       .catch((err: unknown) => {
         const status = (err as { response?: { status?: number } })?.response?.status;

@@ -10,6 +10,7 @@ from core.log_utils import actor_display_for, target_display_for
 from core.models import DefaultSetting
 from core.pagination import paginate
 from core.utils import api_error, api_success
+from core.validators import safe_filter
 from fund.models import Contribution, Expense
 from fund.serializers import (
     ContributionAdminDetailSerializer,
@@ -69,13 +70,13 @@ class ContributionListView(APIView):
         date_from = request.query_params.get('date_from')
         date_to = request.query_params.get('date_to')
         if date_from:
-            qs = qs.filter(created_at__date__gte=date_from)
+            qs = safe_filter(qs, created_at__date__gte=date_from)
         if date_to:
-            qs = qs.filter(created_at__date__lte=date_to)
+            qs = safe_filter(qs, created_at__date__lte=date_to)
 
         contributor_id = request.query_params.get('contributor')
         if contributor_id:
-            qs = qs.filter(contributor__id=contributor_id)
+            qs = safe_filter(qs, contributor__id=contributor_id)
 
         search = request.query_params.get('search')
         if search:
@@ -234,20 +235,20 @@ class ExpenseListView(APIView):
         date_from = request.query_params.get('date_from')
         date_to = request.query_params.get('date_to')
         if date_from:
-            qs = qs.filter(expense_date__gte=date_from)
+            qs = safe_filter(qs, expense_date__gte=date_from)
         if date_to:
-            qs = qs.filter(expense_date__lte=date_to)
+            qs = safe_filter(qs, expense_date__lte=date_to)
 
         amount_min = request.query_params.get('amount_min')
         amount_max = request.query_params.get('amount_max')
         if amount_min:
-            qs = qs.filter(amount__gte=amount_min)
+            qs = safe_filter(qs, amount__gte=amount_min)
         if amount_max:
-            qs = qs.filter(amount__lte=amount_max)
+            qs = safe_filter(qs, amount__lte=amount_max)
 
         withdrawn_by = request.query_params.get('withdrawn_by')
         if withdrawn_by:
-            qs = qs.filter(withdrawn_by__id=withdrawn_by)
+            qs = safe_filter(qs, withdrawn_by__id=withdrawn_by)
 
         return paginate(qs, request, ExpenseSerializer)
 

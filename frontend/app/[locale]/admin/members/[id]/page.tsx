@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Save, KeyRound, ShieldCheck, Trash2, Power, MessageSquare, HandCoins, Mail, ScrollText, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Save, KeyRound, ShieldCheck, Trash2, Power, MessageSquare, HandCoins, Mail, ScrollText, ExternalLink, Hash } from 'lucide-react';
 import AdminBadge from '@/components/admin/AdminBadge';
 import AdminInput from '@/components/admin/fields/AdminInput';
 import AdminSelect from '@/components/admin/fields/AdminSelect';
@@ -21,6 +21,16 @@ import {
   ContactMessage,
   ActivityLogEntry,
 } from '@/lib/api';
+import {
+  isValidPhoneStrict,
+  isValidEmail,
+  phoneFormatError,
+  PHONE_PLACEHOLDER,
+  LONG_TEXT_ADMIN_MAX_LENGTH,
+  passwordTooShortError,
+  passwordMismatchError,
+  EMAIL_MAX_LENGTH,
+} from '@/lib/validation';
 
 export default function AdminMemberDetailPage() {
   const params = useParams();
@@ -49,6 +59,7 @@ export default function AdminMemberDetailPage() {
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [originalPhone, setOriginalPhone] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
 
   // Group change
@@ -59,6 +70,11 @@ export default function AdminMemberDetailPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
+  const [passwordFieldErrors, setPasswordFieldErrors] = useState<{ new_password?: string; confirm_password?: string }>({});
+
+  // Member number change (superuser-only, works even on superuser targets)
+  const [memberNumberInput, setMemberNumberInput] = useState('');
+  const [savingMemberNumber, setSavingMemberNumber] = useState(false);
 
   // Danger zone
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
@@ -83,6 +99,7 @@ export default function AdminMemberDetailPage() {
         setDisplayName(m.display_name);
         setEmail(m.email || '');
         setPhone(m.phone || '');
+        setOriginalPhone(m.phone || '');
         setComments(profile.comments);
         setContributions(profile.contributions);
         setContactMessages(profile.contact_messages);
@@ -114,10 +131,29 @@ export default function AdminMemberDetailPage() {
 
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
+    if (fullName.trim().length > 35) {
+      showToast('warning', isRTL ? 'نام کامل باید حداکثر ۳۵ نویسه باشد' : 'Full name must be 35 characters or fewer');
+      return;
+    }
+    if (displayName.trim().length > 20) {
+      showToast('warning', isRTL ? 'نام نمایشی باید حداکثر ۲۰ نویسه باشد' : 'Display name must be 20 characters or fewer');
+      return;
+    }
+    if (email.trim() && !isValidEmail(email)) {
+      showToast('warning', isRTL ? 'ایمیل وارد شده معتبر نیست' : 'Enter a valid email address');
+      return;
+    }
+    // Only enforce strict "00"-prefixed format if the phone is being changed,
+    // mirroring the backend (legacy numbers must not block unrelated edits).
+    if (phone.trim() && phone.trim() !== originalPhone && !isValidPhoneStrict(phone)) {
+      showToast('warning', phoneFormatError(isRTL));
+      return;
+    }
     setSavingProfile(true);
     try {
       const res = await membersAPI.updateProfile(id, { full_name: fullName, display_name: displayName, email, phone });
       setTarget(res.data as unknown as MemberDetail);
+      setOriginalPhone(phone.trim());
       showToast('success', isRTL ? 'پروفایل با موفقیت به‌روزرسانی شد' : 'Profile updated successfully');
     } catch {
       showToast('error', isRTL ? 'به‌روزرسانی پروفایل ناموفق بود' : 'Failed to update profile');
@@ -152,10 +188,33 @@ export default function AdminMemberDetailPage() {
     }
   }
 
+  function handleNewPasswordChange(value: string) {
+    setNewPassword(value);
+    setPasswordFieldErrors((prev) => ({
+      ...prev,
+      new_password: passwordTooShortError(isRTL, value),
+      confirm_password:
+        confirmPassword && value !== confirmPassword ? passwordMismatchError(isRTL) : undefined,
+    }));
+  }
+
+  function handleConfirmPasswordChange(value: string) {
+    setConfirmPassword(value);
+    setPasswordFieldErrors((prev) => ({
+      ...prev,
+      confirm_password: value && value !== newPassword ? passwordMismatchError(isRTL) : undefined,
+    }));
+  }
+
   async function savePassword(e: React.FormEvent) {
     e.preventDefault();
+    const lengthError = passwordTooShortError(isRTL, newPassword);
+    if (lengthError) {
+      showToast('warning', lengthError);
+      return;
+    }
     if (newPassword !== confirmPassword) {
-      showToast('warning', isRTL ? 'رمزهای عبور مطابقت ندارند' : 'Passwords do not match');
+      showToast('warning', passwordMismatchError(isRTL));
       return;
     }
     setSavingPassword(true);
@@ -164,10 +223,41 @@ export default function AdminMemberDetailPage() {
       showToast('success', isRTL ? 'رمز عبور با موفقیت تغییر کرد' : 'Password changed successfully');
       setNewPassword('');
       setConfirmPassword('');
+      setPasswordFieldErrors({});
     } catch {
       showToast('error', isRTL ? 'تغییر رمز عبور ناموفق بود' : 'Failed to change password');
     } finally {
       setSavingPassword(false);
+    }
+  }
+
+  async function saveMemberNumber(e: React.FormEvent) {
+    e.preventDefault();
+    const parsed = parseInt(memberNumberInput, 10);
+    if (!memberNumberInput.trim() || Number.isNaN(parsed)) {
+      showToast('warning', isRTL ? 'شماره عضویت باید عدد باشد' : 'Member number must be a number');
+      return;
+    }
+    if (parsed < 10000 || parsed > 99999) {
+      showToast('warning', isRTL ? 'شماره عضویت باید بین ۱۰۰۰۰ تا ۹۹۹۹۹ باشد' : 'Member number must be between 10000 and 99999');
+      return;
+    }
+    setSavingMemberNumber(true);
+    try {
+      const res = await membersAPI.updateMemberNumber(id, parsed);
+      setTarget(res.data as unknown as MemberDetail);
+      setMemberNumberInput('');
+      showToast('success', isRTL ? 'شماره عضویت با موفقیت تغییر کرد' : 'Member number updated successfully');
+    } catch (err: unknown) {
+      const data =
+        err && typeof err === 'object' && 'response' in err && err.response &&
+        typeof err.response === 'object' && 'data' in err.response
+          ? (err.response as { data?: { errors?: { member_number?: string[] } } }).data
+          : undefined;
+      const fieldError = data?.errors?.member_number?.[0];
+      showToast('error', fieldError || (isRTL ? 'تغییر شماره عضویت ناموفق بود' : 'Failed to update member number'));
+    } finally {
+      setSavingMemberNumber(false);
     }
   }
 
@@ -256,6 +346,36 @@ export default function AdminMemberDetailPage() {
         </div>
       </div>
 
+      {currentMember?.is_superuser && (
+        <form onSubmit={saveMemberNumber} className="admin-glass-card p-5 flex flex-col gap-4" style={{ border: '1px solid rgba(0,255,255,0.25)' }}>
+          <h2 className="text-sm font-semibold text-white/80 flex items-center gap-2">
+            <Hash className="w-4 h-4" style={{ color: '#00ffff' }} />
+            {isRTL ? 'شماره عضویت' : 'Member Number'}
+          </h2>
+          <p className="text-xs text-white/40">
+            {isRTL
+              ? 'تغییر این مقدار، پیشوند کد پیگیری تمام نظرات، مشارکت‌ها، پیام‌های تماس و پست‌های این عضو را نیز به‌روزرسانی می‌کند.'
+              : "Changing this also updates the tracking-code prefix on all of this member's comments, contributions, contact messages, and posts."}
+          </p>
+          <AdminInput
+            label={isRTL ? 'شماره عضویت جدید' : 'New Member Number'}
+            type="number"
+            value={memberNumberInput}
+            onChange={(e) => setMemberNumberInput(e.target.value)}
+            placeholder={String(target.member_number ?? '')}
+          />
+          <button
+            type="submit"
+            disabled={savingMemberNumber || !memberNumberInput.trim()}
+            className="self-start flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
+            style={{ backgroundColor: '#00ffff', color: '#0a0a0f', boxShadow: '0 0 16px rgba(0,255,255,0.3)' }}
+          >
+            <Save className="w-4 h-4" />
+            {savingMemberNumber ? (isRTL ? 'در حال ذخیره...' : 'Saving...') : (isRTL ? 'ذخیره' : 'Save')}
+          </button>
+        </form>
+      )}
+
       {canManage && target.is_superuser && (
         <div className="admin-glass-card p-5 flex items-center gap-3" style={{ border: '1px solid rgba(251,191,36,0.3)' }}>
           <ShieldCheck className="w-5 h-5 flex-shrink-0" style={{ color: '#fbbf24' }} />
@@ -272,10 +392,16 @@ export default function AdminMemberDetailPage() {
         {/* Profile form */}
         <form onSubmit={saveProfile} className="admin-glass-card p-5 flex flex-col gap-4">
           <h2 className="text-sm font-semibold text-white/80">{isRTL ? 'ویرایش پروفایل' : 'Edit Profile'}</h2>
-          <AdminInput label={isRTL ? 'نام کامل' : 'Full Name'} value={fullName} onChange={(e) => setFullName(e.target.value)} />
-          <AdminInput label={isRTL ? 'نام نمایشی' : 'Display Name'} value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
-          <AdminInput label={isRTL ? 'ایمیل' : 'Email'} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <AdminInput label={isRTL ? 'تلفن' : 'Phone'} value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <AdminInput label={isRTL ? 'نام کامل' : 'Full Name'} value={fullName} onChange={(e) => setFullName(e.target.value)} maxLength={35} />
+          <AdminInput label={isRTL ? 'نام نمایشی' : 'Display Name'} value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={20} />
+          <AdminInput label={isRTL ? 'ایمیل' : 'Email'} type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={EMAIL_MAX_LENGTH} />
+          <AdminInput
+            label={isRTL ? 'تلفن' : 'Phone'}
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder={PHONE_PLACEHOLDER}
+            maxLength={17}
+          />
           <button
             type="submit"
             disabled={savingProfile}
@@ -321,17 +447,22 @@ export default function AdminMemberDetailPage() {
                 label={isRTL ? 'رمز عبور جدید' : 'New Password'}
                 type="password"
                 value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
+                onChange={(e) => handleNewPasswordChange(e.target.value)}
+                error={passwordFieldErrors.new_password}
               />
               <AdminInput
                 label={isRTL ? 'تکرار رمز عبور' : 'Confirm Password'}
                 type="password"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={(e) => handleConfirmPasswordChange(e.target.value)}
+                error={passwordFieldErrors.confirm_password}
               />
               <button
                 type="submit"
-                disabled={savingPassword || !newPassword || !confirmPassword}
+                disabled={
+                  savingPassword || !newPassword || !confirmPassword ||
+                  !!passwordFieldErrors.new_password || !!passwordFieldErrors.confirm_password
+                }
                 className="self-start flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
                 style={{ border: '1px solid #fbbf24', color: '#fbbf24', backgroundColor: 'rgba(251,191,36,0.08)' }}
               >
@@ -565,6 +696,7 @@ export default function AdminMemberDetailPage() {
             value={deactivateReason}
             onChange={(e) => setDeactivateReason(e.target.value)}
             rows={3}
+            maxLength={LONG_TEXT_ADMIN_MAX_LENGTH}
           />
         )}
       </AdminConfirmDialog>

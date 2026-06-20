@@ -9,17 +9,27 @@ from core.tracking_codes import generate_tracking_code
 
 class Post(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    # System-assigned lookup code (never user-supplied), admin-panel-only —
+    # see save()/core/tracking_codes.py. Format matches Comment, Contribution
+    # and ContactMessage's tracking_code (letter 'P' for Post).
+    tracking_code = models.CharField(max_length=20, unique=True, editable=False, blank=True)
     author = models.ForeignKey(
         'accounts.Member', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='posts',
     )
     title = models.CharField(max_length=150)
-    body = models.TextField()
+    body = models.TextField(max_length=550)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        if not self.tracking_code:
+            member_number = self.author.member_number if self.author_id else None
+            self.tracking_code = generate_tracking_code(Post, 'P', member_number)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.title
@@ -58,13 +68,13 @@ class Comment(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.UUIDField()
     content_object = GenericForeignKey('content_type', 'object_id')
-    text = models.TextField()
+    text = models.TextField(max_length=550)
     rating = models.IntegerField(
         null=True, blank=True,
         validators=[MinValueValidator(1), MaxValueValidator(5)],
     )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
-    rejection_reason = models.TextField(blank=True)
+    rejection_reason = models.TextField(max_length=550, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

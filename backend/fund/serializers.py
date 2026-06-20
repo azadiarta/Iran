@@ -1,8 +1,15 @@
-from django.utils.html import strip_tags
 from rest_framework import serializers
 
 from core.models import DefaultSetting
 from core.serializers import RelativeImageField
+from core.validators import (
+    LONG_TEXT_ADMIN_MAX_LENGTH,
+    LONG_TEXT_PUBLIC_MAX_LENGTH,
+    SHORT_TEXT_ADMIN_MAX_LENGTH,
+    SHORT_TEXT_PUBLIC_MAX_LENGTH,
+    sanitize_and_limit,
+    validate_image_file,
+)
 from fund.models import Contribution, Expense
 
 
@@ -60,11 +67,17 @@ class ContributionCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Amount must be a positive number.')
         return value
 
+    def validate_guest_name(self, value):
+        return sanitize_and_limit(value, SHORT_TEXT_PUBLIC_MAX_LENGTH)
+
+    def validate_notes(self, value):
+        return sanitize_and_limit(value, LONG_TEXT_PUBLIC_MAX_LENGTH) if value else value
+
     def validate_message(self, value):
-        return strip_tags(value).strip()
+        return sanitize_and_limit(value, SHORT_TEXT_PUBLIC_MAX_LENGTH)
 
     def validate_public_display_name(self, value):
-        return strip_tags(value).strip()
+        return sanitize_and_limit(value, SHORT_TEXT_PUBLIC_MAX_LENGTH)
 
     def validate(self, data):
         request = self.context.get('request')
@@ -103,9 +116,13 @@ class ContributionManualCreateSerializer(serializers.ModelSerializer):
         return value
 
     def validate_guest_name(self, value):
+        value = sanitize_and_limit(value, 50)  # Contribution.guest_name DB column is capped at 50
         if not value:
             raise serializers.ValidationError('Contributor name is required.')
         return value
+
+    def validate_notes(self, value):
+        return sanitize_and_limit(value, LONG_TEXT_ADMIN_MAX_LENGTH) if value else value
 
     def create(self, validated_data):
         validated_data.setdefault('currency', 'GBP')
@@ -174,11 +191,20 @@ class ContributionAdminEditSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Amount must be a positive number.')
         return value
 
+    def validate_guest_name(self, value):
+        return sanitize_and_limit(value, 50)  # Contribution.guest_name DB column is capped at 50
+
+    def validate_notes(self, value):
+        return sanitize_and_limit(value, LONG_TEXT_ADMIN_MAX_LENGTH) if value else value
+
+    def validate_rejection_reason(self, value):
+        return sanitize_and_limit(value, LONG_TEXT_ADMIN_MAX_LENGTH) if value else value
+
     def validate_message(self, value):
-        return strip_tags(value).strip()
+        return sanitize_and_limit(value, SHORT_TEXT_ADMIN_MAX_LENGTH)
 
     def validate_public_display_name(self, value):
-        return strip_tags(value).strip()
+        return sanitize_and_limit(value, SHORT_TEXT_ADMIN_MAX_LENGTH)
 
 
 class MyContributionSerializer(serializers.ModelSerializer):
@@ -213,14 +239,18 @@ class ExpenseCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Amount must be a positive number.')
         return value
 
+    def validate_short_reason(self, value):
+        return sanitize_and_limit(value, SHORT_TEXT_ADMIN_MAX_LENGTH)
+
+    def validate_description(self, value):
+        return sanitize_and_limit(value, LONG_TEXT_ADMIN_MAX_LENGTH) if value else value
+
     def validate_receipt_image(self, value):
         if not value:
             return value
         setting = DefaultSetting.objects.filter(key='max_receipt_image_size_mb').first()
         max_mb = float(setting.value) if setting else 5.0
-        if value.size > max_mb * 1024 * 1024:
-            raise serializers.ValidationError(f'Image must be under {max_mb}MB.')
-        return value
+        return validate_image_file(value, max_mb)
 
     def create(self, validated_data):
         validated_data['withdrawn_by'] = self.context['request'].user

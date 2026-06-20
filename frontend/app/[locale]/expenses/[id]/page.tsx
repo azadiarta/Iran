@@ -7,6 +7,7 @@ import { User, Calendar, Star, Send, ChevronLeft } from 'lucide-react';
 import { fundAPI } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 import ImageLightbox from '@/components/common/ImageLightbox';
+import Turnstile from '@/components/common/Turnstile';
 import type { Expense, FundBalance, Comment } from '@/lib/api';
 
 // ─── Star Rating Selector ─────────────────────────────────────────────────────
@@ -150,6 +151,8 @@ export default function ExpenseDetailPage() {
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [commentSuccess, setCommentSuccess] = useState(false);
   const [commentError, setCommentError] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
 
   // Pre-fill name from auth
   useEffect(() => {
@@ -225,12 +228,17 @@ export default function ExpenseDetailPage() {
       setCommentError(t('comment_rating_required'));
       return;
     }
+    if (!captchaToken) {
+      setCommentError(tc('captcha_required_error'));
+      return;
+    }
 
     setCommentSubmitting(true);
     try {
-      const payload: { text: string; rating: number; guest_name?: string } = {
+      const payload: { text: string; rating: number; guest_name?: string; captcha_token: string } = {
         text: commentText.trim(),
         rating: commentRating,
+        captcha_token: captchaToken,
       };
       if (!isAuthenticated && commentName.trim()) {
         payload.guest_name = commentName.trim();
@@ -257,6 +265,8 @@ export default function ExpenseDetailPage() {
       } else {
         setCommentError(t('comment_submit_error'));
       }
+      setCaptchaToken('');
+      setCaptchaResetKey((k) => k + 1);
     } finally {
       setCommentSubmitting(false);
     }
@@ -522,6 +532,7 @@ export default function ExpenseDetailPage() {
                     readOnly={isAuthenticated}
                     disabled={commentSubmitting}
                     placeholder={isAuthenticated ? (member?.display_name || member?.full_name || '') : t('comment_name_placeholder')}
+                    maxLength={50}
                     className="w-full rounded-xl px-4 py-3 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50"
                     style={{
                       background: isAuthenticated
@@ -558,6 +569,7 @@ export default function ExpenseDetailPage() {
                     disabled={commentSubmitting}
                     placeholder={t('comment_text')}
                     rows={4}
+                    maxLength={250}
                     className="w-full rounded-xl px-4 py-3 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50 resize-y"
                     style={{
                       background: 'rgba(255,255,255,0.05)',
@@ -587,6 +599,15 @@ export default function ExpenseDetailPage() {
                   />
                 </div>
 
+                {/* CAPTCHA */}
+                <div className="flex justify-center">
+                  <Turnstile
+                    onVerify={setCaptchaToken}
+                    onExpire={() => setCaptchaToken('')}
+                    resetKey={captchaResetKey}
+                  />
+                </div>
+
                 {/* Error */}
                 {commentError && (
                   <p
@@ -605,7 +626,7 @@ export default function ExpenseDetailPage() {
                 {/* Submit */}
                 <button
                   type="submit"
-                  disabled={commentSubmitting}
+                  disabled={commentSubmitting || !captchaToken}
                   className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
                   style={{
                     background: 'rgba(0,255,255,0.1)',

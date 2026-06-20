@@ -201,10 +201,11 @@ export const authAPI = {
     email?: string;
     password: string;
     password_confirm: string;
+    captcha_token: string;
   }) => api.post<ApiResponse>('/api/auth/register/', data),
 
-  login: (credential: string, password: string) =>
-    api.post<ApiResponse>('/api/auth/login/', { credential, password }),
+  login: (credential: string, password: string, captcha_token: string) =>
+    api.post<ApiResponse>('/api/auth/login/', { credential, password, captcha_token }),
 
   logout: () => {
     const store = getAuthStore();
@@ -247,13 +248,21 @@ export interface PostDetail extends PostSummary {
   images: PostImage[];
 }
 
-// Admin-only — never present on the public Comment shape, only on CommentDetail
-// (returned by admin-gated endpoints). Carries member_number for admin lookup.
-export interface CommentAuthor {
+// Admin-only — never present on the public Post/Comment shape, only on
+// PostAdminDetail/CommentDetail (returned by admin-gated endpoints). Carries
+// member_number for admin lookup.
+export interface MemberAdminBrief {
   id: string;
   display_name: string | null;
   full_name: string;
   member_number: number;
+}
+
+// Admin-only — exposes tracking_code and the author's member_number, gated
+// by can_post. Returned only by the admin post search/filter endpoint.
+export interface PostAdminDetail extends Omit<PostDetail, 'author'> {
+  tracking_code: string;
+  author: MemberAdminBrief | null;
 }
 
 export type CommentStatus = 'pending' | 'approved' | 'rejected';
@@ -271,7 +280,7 @@ export interface Comment {
 export interface CommentDetail extends Comment {
   // Admin-only lookup code — never exposed to the comment's own author.
   tracking_code: string;
-  author: CommentAuthor | null;
+  author: MemberAdminBrief | null;
   rejection_reason: string;
   target_type: 'post' | 'expense';
   target_label: string | null;
@@ -301,10 +310,15 @@ export interface Paginated<T> {
 // Posts API
 // ═══════════════════════════════════════════════════════════════════════════════
 export const postsAPI = {
-  getList: (page = 1, search = '') => {
+  getList: (
+    page = 1,
+    filters: { search?: string; date_from?: string; date_to?: string } = {}
+  ) => {
     const params = new URLSearchParams();
     params.set('page', String(page));
-    if (search) params.set('search', search);
+    if (filters.search) params.set('search', filters.search);
+    if (filters.date_from) params.set('date_from', filters.date_from);
+    if (filters.date_to) params.set('date_to', filters.date_to);
     return api.get<ApiResponse>(`/api/posts/?${params.toString()}`);
   },
 
@@ -315,10 +329,23 @@ export const postsAPI = {
 
   createComment: (
     id: string,
-    data: { text: string; rating?: number; guest_name?: string }
+    data: { text: string; rating?: number; guest_name?: string; captcha_token: string }
   ) => api.post<ApiResponse>(`/api/posts/${id}/comments/create/`, data),
 
   // ── Admin ──────────────────────────────────────────────────────────────
+  getAdminList: (
+    page = 1,
+    filters: { search?: string; author?: string; date_from?: string; date_to?: string } = {}
+  ) => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    if (filters.search) params.set('search', filters.search);
+    if (filters.author) params.set('author', filters.author);
+    if (filters.date_from) params.set('date_from', filters.date_from);
+    if (filters.date_to) params.set('date_to', filters.date_to);
+    return api.get<ApiResponse>(`/api/posts/admin/?${params.toString()}`);
+  },
+
   create: (data: { title: string; body: string; images?: File[] }) => {
     const formData = new FormData();
     formData.append('title', data.title);
@@ -563,7 +590,7 @@ export const fundAPI = {
 
   createExpenseComment: (
     id: string,
-    data: { text: string; rating?: number; guest_name?: string }
+    data: { text: string; rating?: number; guest_name?: string; captcha_token: string }
   ) => api.post<ApiResponse>(`/api/fund/expenses/${id}/comments/create/`, data),
 };
 
@@ -582,6 +609,7 @@ export const paymentsAPI = {
     display_name_choice?: ContributionDisplayNameChoice;
     public_display_name?: string;
     message?: string;
+    captcha_token: string;
   }) => api.post<ApiResponse>('/api/payments/initiate/', data),
 
   uploadReceipt: (contributionId: string, file: File) => {
@@ -677,6 +705,9 @@ export const membersAPI = {
 
   changeGroup: (id: string, groupId: string) =>
     api.patch<ApiResponse>(`/api/members/${id}/group/`, { group_id: groupId }),
+
+  updateMemberNumber: (id: string, memberNumber: number) =>
+    api.patch<ApiResponse>(`/api/members/${id}/number/`, { member_number: memberNumber }),
 
   toggleActive: (id: string, reason?: string) =>
     api.patch<ApiResponse>(`/api/members/${id}/toggle-active/`, reason !== undefined ? { reason } : undefined),
@@ -891,7 +922,7 @@ export interface ContactMessage {
 }
 
 export const contactAPI = {
-  submit: (data: { name: string; contact_info: string; message: string }) =>
+  submit: (data: { name: string; contact_info: string; message: string; captcha_token: string }) =>
     api.post<ApiResponse>('/api/contact/submit/', data),
 
   // ── Admin ──────────────────────────────────────────────────────────────

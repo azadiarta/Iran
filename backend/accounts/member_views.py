@@ -5,7 +5,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
 from accounts.models import Member
-from accounts.permissions import HasGroupPermission
+from accounts.permissions import HasGroupPermission, IsSuperuser
 from accounts.serializers import (
     ChangePasswordSerializer,
     MemberCreateSerializer,
@@ -13,10 +13,13 @@ from accounts.serializers import (
     MemberListSerializer,
     MemberUpdateSerializer,
 )
+from rest_framework.exceptions import ValidationError as DRFValidationError
+
 from core.log_utils import actor_display_for, target_display_for
 from core.models import DefaultSetting
 from core.pagination import paginate
 from core.utils import api_error, api_success
+from core.validators import LONG_TEXT_ADMIN_MAX_LENGTH, safe_filter, sanitize_and_limit
 from logs.models import ActivityLog
 
 
@@ -77,7 +80,7 @@ class MemberListView(APIView):
 
         group_id = request.query_params.get('group')
         if group_id:
-            qs = qs.filter(group__id=group_id)
+            qs = safe_filter(qs, group__id=group_id)
 
         is_active = request.query_params.get('is_active')
         if is_active is not None:
@@ -250,6 +253,63 @@ class MemberChangeGroupView(APIView):
         return api_success(MemberDetailSerializer(member).data, message='Group updated.')
 
 
+class MemberChangeNumberView(APIView):
+    """Superuser-only: reassign a member's member_number. Unlike every other
+    member-mutating view here, this intentionally works even when the target
+    is a superuser — gating is solely on the *acting* admin's own is_superuser,
+    not on the target's. Cascades the new 5-digit prefix onto the tracking_code
+    of every Comment/Contribution/ContactMessage/Post already attributed to
+    this member, leaving each row's letter + random suffix untouched."""
+    permission_classes = [IsAuthenticated, IsSuperuser]
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        try:
+            member = Member.objects.get(pk=pk)
+        except Member.DoesNotExist:
+            return api_error('Member not found.', status_code=404)
+
+        try:
+            new_number = int(request.data.get('member_number'))
+        except (TypeError, ValueError):
+            return api_error('Validation failed.',
+                              errors={'member_number': ['Must be an integer.']})
+
+        if not (10000 <= new_number <= 99999):
+            return api_error('Validation failed.',
+                              errors={'member_number': ['Must be between 10000 and 99999.']})
+
+        if Member.objects.filter(member_number=new_number).exclude(pk=member.pk).exists():
+            return api_error('Validation failed.',
+                              errors={'member_number': ['This member number is already in use.']})
+
+        old_number = member.member_number
+        member.member_number = new_number
+        member.save(update_fields=['member_number'])
+
+        from core.models import ContactMessage
+        from fund.models import Contribution
+        from posts.models import Comment, Post
+
+        new_prefix = f'{new_number:05d}'
+        for model_cls, qs in (
+            (Comment, member.comments.all()),
+            (Contribution, member.contributions.all()),
+            (ContactMessage, member.contact_messages.all()),
+            (Post, member.posts.all()),
+        ):
+            rows = [row for row in qs if row.tracking_code]
+            for row in rows:
+                row.tracking_code = new_prefix + row.tracking_code[5:]
+            if rows:
+                model_cls.objects.bulk_update(rows, ['tracking_code'])
+
+        _log(request.user, 'member_number_changed', target=member,
+             extra_data={'old_number': old_number, 'new_number': new_number},
+             ip=_get_ip(request))
+        return api_success(MemberDetailSerializer(member).data, message='Member number updated.')
+
+
 class MemberToggleActiveView(APIView):
     permission_classes = [IsAuthenticated, HasGroupPermission('can_manage_permissions')]
 
@@ -270,7 +330,13 @@ class MemberToggleActiveView(APIView):
             member.deactivated_by = None
             update_fields = ['is_active', 'deactivation_reason', 'deactivated_by']
         else:
-            member.deactivation_reason = (request.data.get('reason') or '').strip()
+            try:
+                reason = sanitize_and_limit(request.data.get('reason') or '', LONG_TEXT_ADMIN_MAX_LENGTH)
+            except DRFValidationError as exc:
+                return api_error(str(exc.detail[0]) if isinstance(exc.detail, list) else str(exc.detail))
+            if not reason:
+                return api_error('A reason is required to deactivate a member.')
+            member.deactivation_reason = reason
             member.deactivated_by = request.user
             update_fields = ['is_active', 'deactivation_reason', 'deactivated_by']
 

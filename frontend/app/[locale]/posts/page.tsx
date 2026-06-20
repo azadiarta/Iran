@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { Search, MessageSquare, Calendar, User, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, MessageSquare, Calendar, User, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { postsAPI } from '@/lib/api';
 import type { PostSummary, Paginated } from '@/lib/api';
@@ -106,27 +106,39 @@ export default function PostsPage() {
   const [loginRequired, setLoginRequired] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [debouncedDateFrom, setDebouncedDateFrom] = useState('');
+  const [debouncedDateTo, setDebouncedDateTo] = useState('');
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [hasNext, setHasNext] = useState(false);
   const [hasPrev, setHasPrev] = useState(false);
   const pageSize = 5;
 
-  // Debounce search input
+  // Debounce search + advanced filters together, same 300ms convention used
+  // by every other site search input.
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
+      setDebouncedDateFrom(dateFrom);
+      setDebouncedDateTo(dateTo);
       setPage(1);
     }, 300);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, dateFrom, dateTo]);
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
     setError(null);
     setLoginRequired(false);
     try {
-      const res = await postsAPI.getList(page, debouncedSearch);
+      const res = await postsAPI.getList(page, {
+        search: debouncedSearch,
+        date_from: debouncedDateFrom,
+        date_to: debouncedDateTo,
+      });
       const data = res.data as unknown as Paginated<PostSummary>;
       setPosts(data.results);
       setTotalCount(data.count);
@@ -146,7 +158,7 @@ export default function PostsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, locale, t]);
+  }, [page, debouncedSearch, debouncedDateFrom, debouncedDateTo, locale, t]);
 
   useEffect(() => {
     fetchPosts();
@@ -181,32 +193,98 @@ export default function PostsPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.15 }}
         >
-          <div className="relative">
-            <Search
-              size={18}
-              className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
-              style={{ color: 'rgba(0,255,255,0.5)' }}
-            />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('search_placeholder')}
-              className="w-full rounded-xl pl-11 pr-4 py-3 text-white placeholder-white/30 outline-none transition-all duration-200"
+          <div className="relative flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search
+                size={18}
+                className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
+                style={{ color: 'rgba(0,255,255,0.5)' }}
+              />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t('search_placeholder')}
+                className="w-full rounded-xl pl-11 pr-4 py-3 text-white placeholder-white/30 outline-none transition-all duration-200"
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.border = '1px solid #00ffff';
+                  e.currentTarget.style.boxShadow = '0 0 15px rgba(0,255,255,0.15)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((v) => !v)}
+              aria-label={t('advanced_search')}
+              title={t('advanced_search')}
+              className="flex-shrink-0 rounded-xl p-3 transition-all duration-200"
               style={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
+                background: showAdvanced ? 'rgba(0,255,255,0.12)' : 'rgba(255,255,255,0.05)',
+                border: showAdvanced ? '1px solid #00ffff' : '1px solid rgba(255,255,255,0.1)',
+                color: showAdvanced ? '#00ffff' : 'rgba(255,255,255,0.6)',
               }}
-              onFocus={(e) => {
-                e.currentTarget.style.border = '1px solid #00ffff';
-                e.currentTarget.style.boxShadow = '0 0 15px rgba(0,255,255,0.15)';
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            />
+            >
+              <SlidersHorizontal size={18} />
+            </button>
           </div>
+
+          {showAdvanced && (
+            <motion.div
+              className="mt-3 flex flex-col sm:flex-row gap-3"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              transition={{ duration: 0.25 }}
+            >
+              <label className="flex-1 flex flex-col gap-1">
+                <span className="text-xs text-white/40">{t('date_from_label')}</span>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="w-full rounded-xl px-4 py-2.5 text-white outline-none transition-all duration-200"
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    colorScheme: 'dark',
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.border = '1px solid #00ffff';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
+                  }}
+                />
+              </label>
+              <label className="flex-1 flex flex-col gap-1">
+                <span className="text-xs text-white/40">{t('date_to_label')}</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="w-full rounded-xl px-4 py-2.5 text-white outline-none transition-all duration-200"
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    colorScheme: 'dark',
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.border = '1px solid #00ffff';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
+                  }}
+                />
+              </label>
+            </motion.div>
+          )}
         </motion.div>
 
         {/* Error */}

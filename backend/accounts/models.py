@@ -91,7 +91,7 @@ class Member(AbstractBaseUser):
     is_superuser = models.BooleanField(default=False)
     # Set when an admin deactivates this member (MemberToggleActiveView);
     # cleared again on reactivation. Shown to the member on the home page.
-    deactivation_reason = models.TextField(blank=True)
+    deactivation_reason = models.TextField(max_length=550, blank=True)
     deactivated_by = models.ForeignKey(
         'self', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='+',

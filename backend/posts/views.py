@@ -4,11 +4,15 @@ from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
+from rest_framework.exceptions import ValidationError as DRFValidationError
+
 from accounts.permissions import HasGroupPermission
+from core.captcha import verify_captcha
 from core.log_utils import actor_display_for, target_display_for
 from core.models import DefaultSetting
 from core.pagination import paginate
 from core.utils import api_error, api_success
+from core.validators import safe_filter, validate_image_file
 from fund.models import Expense
 from logs.models import ActivityLog
 from posts.models import Comment, Post, PostImage
@@ -20,6 +24,7 @@ from posts.serializers import (
     CommentSerializer,
     CommentStatusSerializer,
     MyCommentSerializer,
+    PostAdminDetailSerializer,
     PostCreateSerializer,
     PostImageSerializer,
     PostSerializer,
@@ -93,7 +98,58 @@ class PostListView(APIView):
         if not visible:
             return err
         qs = Post.objects.prefetch_related('images').select_related('author').order_by('-created_at')
+
+        date_from = request.query_params.get('date_from')
+        date_to = request.query_params.get('date_to')
+        if date_from:
+            qs = safe_filter(qs, created_at__date__gte=date_from)
+        if date_to:
+            qs = safe_filter(qs, created_at__date__lte=date_to)
+
+        # Searches the same fields visible on the public post card/detail
+        # (title, body, author name) — tracking_code stays admin-only, since
+        # PostSerializer never exposes it to the public.
+        search = request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                models.Q(title__icontains=search)
+                | models.Q(body__icontains=search)
+                | models.Q(author__full_name__icontains=search)
+                | models.Q(author__display_name__icontains=search)
+            )
+
         return paginate(qs, request, PostSerializer)
+
+
+class PostAdminListView(APIView):
+    """GET /api/posts/admin/ — paginated, filterable admin post list (search/author/date range)."""
+    permission_classes = [IsAuthenticated, HasGroupPermission('can_post')]
+
+    def get(self, request):
+        qs = Post.objects.prefetch_related('images').select_related('author').order_by('-created_at')
+
+        author_id = request.query_params.get('author')
+        if author_id:
+            qs = safe_filter(qs, author__id=author_id)
+
+        date_from = request.query_params.get('date_from')
+        date_to = request.query_params.get('date_to')
+        if date_from:
+            qs = safe_filter(qs, created_at__date__gte=date_from)
+        if date_to:
+            qs = safe_filter(qs, created_at__date__lte=date_to)
+
+        search = request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                models.Q(title__icontains=search)
+                | models.Q(body__icontains=search)
+                | models.Q(author__full_name__icontains=search)
+                | models.Q(author__display_name__icontains=search)
+                | models.Q(tracking_code__icontains=search)
+            )
+
+        return paginate(qs, request, PostAdminDetailSerializer)
 
 
 class PostDetailView(APIView):
@@ -133,8 +189,11 @@ class PostCreateView(APIView):
         max_mb = float(setting.value) if setting else 5.0
         images = request.FILES.getlist('images')
         for img in images:
-            if img.size > max_mb * 1024 * 1024:
-                return api_error(f'Image "{img.name}" exceeds {max_mb}MB limit.')
+            try:
+                validate_image_file(img, max_mb)
+            except DRFValidationError as exc:
+                detail = exc.detail[0] if isinstance(exc.detail, list) else exc.detail
+                return api_error(f'Image "{img.name}": {detail}')
 
         post = serializer.save()
         for img in images:
@@ -209,8 +268,11 @@ class PostImageUploadView(APIView):
 
         images = request.FILES.getlist('images')
         for img in images:
-            if img.size > max_mb * 1024 * 1024:
-                return api_error(f'Image "{img.name}" exceeds {max_mb}MB limit.')
+            try:
+                validate_image_file(img, max_mb)
+            except DRFValidationError as exc:
+                detail = exc.detail[0] if isinstance(exc.detail, list) else exc.detail
+                return api_error(f'Image "{img.name}": {detail}')
 
         created = []
         for img in images:
@@ -281,7 +343,7 @@ class CommentGlobalListView(APIView):
 
         author_id = request.query_params.get('author')
         if author_id:
-            qs = qs.filter(author_id=author_id)
+            qs = safe_filter(qs, author_id=author_id)
 
         search = request.query_params.get('search')
         if search:
@@ -311,8 +373,12 @@ class CommentListView(APIView):
 
 class CommentCreateView(APIView):
     permission_classes = [AllowAny]
+    throttle_scope = 'comment'
 
     def post(self, request, target_type, pk):
+        if not verify_captcha(request.data.get('captcha_token'), _get_ip(request)):
+            return api_error('Captcha verification failed.', status_code=400)
+
         ct, object_id, err = _resolve_comment_target(target_type, pk)
         if err:
             return err

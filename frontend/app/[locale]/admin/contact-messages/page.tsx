@@ -60,11 +60,13 @@ export default function AdminContactMessagesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canManage, page, appliedSearch, handledFilter, memberFilterId]);
 
-  function applySearch(e: React.FormEvent) {
-    e.preventDefault();
-    setPage(1);
-    setAppliedSearch(searchInput.trim());
-  }
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedSearch(searchInput.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   function clearMemberFilter() {
     setMemberFilterId('');
@@ -196,8 +198,8 @@ export default function AdminContactMessagesPage() {
         </div>
       )}
 
-      <form onSubmit={applySearch} className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-        <AdminInput label={isRTL ? 'جست‌وجو' : 'Search'} value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
+      <div className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+        <AdminInput label={isRTL ? 'جست‌وجو' : 'Search'} value={searchInput} onChange={(e) => setSearchInput(e.target.value)} maxLength={150} />
         <AdminSelect
           label={isRTL ? 'وضعیت' : 'Status'}
           value={handledFilter}
@@ -208,14 +210,7 @@ export default function AdminContactMessagesPage() {
             { value: 'true', label: isRTL ? 'رسیدگی‌شده' : 'Handled' },
           ]}
         />
-        <button
-          type="submit"
-          className="rounded-xl px-5 py-2.5 text-sm font-bold transition-all"
-          style={{ backgroundColor: '#00ffff', color: '#0a0a0f', boxShadow: '0 0 16px rgba(0,255,255,0.3)' }}
-        >
-          {isRTL ? 'جست‌وجو' : 'Search'}
-        </button>
-      </form>
+      </div>
 
       <AdminTable
         columns={columns}

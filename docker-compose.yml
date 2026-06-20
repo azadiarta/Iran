@@ -38,6 +38,10 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_HOST: db
       DB_PORT: "5432"
+      # Cloudflare Turnstile CAPTCHA secret key. Defaults (in settings.py) to
+      # Cloudflare's published "always passes" test key when unset, so the
+      # site works out of the box — set a real key before going public.
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-1x0000000000000000000000000000000AA}
     volumes:
       - media_data:/app/media
       - static_data:/app/staticfiles
@@ -55,6 +59,7 @@ services:
         NEXT_PUBLIC_API_URL: ${PUBLIC_URL}
         NEXT_PUBLIC_SITE_NAME: ${SITE_NAME:-Group Fund}
         NEXT_PUBLIC_MEDIA_URL: ""
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-1x00000000000000000000AA}
     restart: unless-stopped
     depends_on:
       backend:

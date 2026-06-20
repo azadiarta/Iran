@@ -10,7 +10,8 @@ import AdminTextarea from '@/components/admin/fields/AdminTextarea';
 import AdminFileUpload from '@/components/admin/fields/AdminFileUpload';
 import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
-import { postsAPI, PostSummary, PostDetail, Paginated } from '@/lib/api';
+import { postsAPI, PostAdminDetail, PostDetail, Paginated } from '@/lib/api';
+import { SHORT_TEXT_ADMIN_MAX_LENGTH } from '@/lib/validation';
 
 export default function AdminPostsPage() {
   const params = useParams();
@@ -21,12 +22,15 @@ export default function AdminPostsPage() {
 
   const canPost = !!currentMember?.is_superuser || hasPermission('can_post');
 
-  const [items, setItems] = useState<PostSummary[]>([]);
+  const [items, setItems] = useState<PostAdminDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const pageSize = 5;
+
+  const [searchInput, setSearchInput] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<PostDetail | null>(null);
@@ -35,16 +39,16 @@ export default function AdminPostsPage() {
   const [images, setImages] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
 
-  const [confirmDelete, setConfirmDelete] = useState<PostSummary | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<PostAdminDetail | null>(null);
   const [confirmDeleteImage, setConfirmDeleteImage] = useState<{ id: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   function load() {
     setLoading(true);
     postsAPI
-      .getList(page)
+      .getAdminList(page, { search: appliedSearch || undefined })
       .then((res) => {
-        const data = res.data as unknown as Paginated<PostSummary>;
+        const data = res.data as unknown as Paginated<PostAdminDetail>;
         setItems(data.results);
         setHasNext(!!data.next);
         setTotalCount(data.count);
@@ -57,7 +61,15 @@ export default function AdminPostsPage() {
     if (canPost) load();
     else setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canPost, page]);
+  }, [canPost, page, appliedSearch]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedSearch(searchInput.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   function openCreate() {
     setEditing(null);
@@ -67,7 +79,7 @@ export default function AdminPostsPage() {
     setModalOpen(true);
   }
 
-  async function openEdit(summary: PostSummary) {
+  async function openEdit(summary: PostAdminDetail) {
     try {
       const res = await postsAPI.getDetail(summary.id);
       const detail = (res.data as unknown as { post: PostDetail }).post;
@@ -142,8 +154,9 @@ export default function AdminPostsPage() {
     );
   }
 
-  const columns: AdminTableColumn<PostSummary>[] = [
+  const columns: AdminTableColumn<PostAdminDetail>[] = [
     { key: 'title', header: isRTL ? 'عنوان' : 'Title', render: (p) => <span className="text-white/80">{p.title}</span> },
+    { key: 'tracking_code', header: isRTL ? 'کد پیگیری' : 'Tracking Code', render: (p) => <span className="text-white/50 text-xs font-mono">{p.tracking_code}</span> },
     { key: 'author', header: isRTL ? 'نویسنده' : 'Author', render: (p) => <span className="text-white/60">{p.author?.display_name || p.author?.full_name || '—'}</span> },
     {
       key: 'images',
@@ -202,6 +215,16 @@ export default function AdminPostsPage() {
         </button>
       </div>
 
+      <div className="admin-glass-card p-4">
+        <AdminInput
+          label={isRTL ? 'جست‌وجو' : 'Search'}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder={isRTL ? 'عنوان، متن، نویسنده یا کد پیگیری...' : 'Title, body, author, or tracking code...'}
+          maxLength={150}
+        />
+      </div>
+
       <AdminTable
         columns={columns}
         data={items}
@@ -223,8 +246,8 @@ export default function AdminPostsPage() {
 
       <AdminModal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editing ? (isRTL ? 'ویرایش پست' : 'Edit Post') : (isRTL ? 'پست جدید' : 'New Post')} maxWidth="max-w-2xl">
         <form onSubmit={submit} className="flex flex-col gap-4">
-          <AdminInput label={isRTL ? 'عنوان' : 'Title'} value={title} onChange={(e) => setTitle(e.target.value)} required />
-          <AdminTextarea label={isRTL ? 'متن' : 'Body'} value={body} onChange={(e) => setBody(e.target.value)} rows={6} required />
+          <AdminInput label={isRTL ? 'عنوان' : 'Title'} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={SHORT_TEXT_ADMIN_MAX_LENGTH} />
+          <AdminTextarea label={isRTL ? 'متن' : 'Body'} value={body} onChange={(e) => setBody(e.target.value)} rows={6} required maxLength={550} />
 
           {editing && editing.images.length > 0 && (
             <div>

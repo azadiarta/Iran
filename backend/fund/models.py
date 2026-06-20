@@ -32,7 +32,7 @@ class Contribution(models.Model):
     currency = models.CharField(max_length=3, default='GBP')
     payment_method = models.CharField(max_length=20, choices=PaymentMethod.choices)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
-    notes = models.TextField(blank=True)
+    notes = models.TextField(max_length=550, blank=True)
     receipt_image = models.ImageField(upload_to='contribution_receipts/', blank=True)
 
     class DisplayNameChoice(models.TextChoices):
@@ -47,7 +47,7 @@ class Contribution(models.Model):
     )
     public_display_name = models.CharField(max_length=100, blank=True)
     message = models.CharField(max_length=150, blank=True)
-    rejection_reason = models.TextField(blank=True)
+    rejection_reason = models.TextField(max_length=550, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -78,7 +78,7 @@ class Expense(models.Model):
     )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     short_reason = models.CharField(max_length=100)
-    description = models.TextField(blank=True)
+    description = models.TextField(max_length=550, blank=True)
     receipt_image = models.ImageField(upload_to='receipts/', blank=True)
     expense_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
