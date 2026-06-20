@@ -405,6 +405,7 @@
     "deactivated_message": "حساب شما توسط مدیر غیرفعال شده است. برای اطلاعات بیشتر با مدیران تماس بگیرید.",
     "deactivated_reason_label": "دلیل",
     "deactivated_by_label": "غیرفعال‌کننده",
-    "deactivated_contact_link": "تماس با ما"
+    "deactivated_contact_link": "تماس با ما",
+    "captcha_required_error": "لطفاً کپچا را تکمیل کنید."
   }
 }

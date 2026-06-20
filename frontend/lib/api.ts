@@ -201,10 +201,11 @@ export const authAPI = {
     email?: string;
     password: string;
     password_confirm: string;
+    captcha_token: string;
   }) => api.post<ApiResponse>('/api/auth/register/', data),
 
-  login: (credential: string, password: string) =>
-    api.post<ApiResponse>('/api/auth/login/', { credential, password }),
+  login: (credential: string, password: string, captcha_token: string) =>
+    api.post<ApiResponse>('/api/auth/login/', { credential, password, captcha_token }),
 
   logout: () => {
     const store = getAuthStore();
@@ -328,7 +329,7 @@ export const postsAPI = {
 
   createComment: (
     id: string,
-    data: { text: string; rating?: number; guest_name?: string }
+    data: { text: string; rating?: number; guest_name?: string; captcha_token: string }
   ) => api.post<ApiResponse>(`/api/posts/${id}/comments/create/`, data),
 
   // ── Admin ──────────────────────────────────────────────────────────────
@@ -589,7 +590,7 @@ export const fundAPI = {
 
   createExpenseComment: (
     id: string,
-    data: { text: string; rating?: number; guest_name?: string }
+    data: { text: string; rating?: number; guest_name?: string; captcha_token: string }
   ) => api.post<ApiResponse>(`/api/fund/expenses/${id}/comments/create/`, data),
 };
 
@@ -608,6 +609,7 @@ export const paymentsAPI = {
     display_name_choice?: ContributionDisplayNameChoice;
     public_display_name?: string;
     message?: string;
+    captcha_token: string;
   }) => api.post<ApiResponse>('/api/payments/initiate/', data),
 
   uploadReceipt: (contributionId: string, file: File) => {
@@ -918,7 +920,7 @@ export interface ContactMessage {
 }
 
 export const contactAPI = {
-  submit: (data: { name: string; contact_info: string; message: string }) =>
+  submit: (data: { name: string; contact_info: string; message: string; captcha_token: string }) =>
     api.post<ApiResponse>('/api/contact/submit/', data),
 
   // ── Admin ──────────────────────────────────────────────────────────────

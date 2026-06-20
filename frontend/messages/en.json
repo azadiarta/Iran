@@ -405,6 +405,7 @@
     "deactivated_message": "Your account has been deactivated by an admin. Please contact the admins for more information.",
     "deactivated_reason_label": "Reason",
     "deactivated_by_label": "Deactivated by",
-    "deactivated_contact_link": "Contact Us"
+    "deactivated_contact_link": "Contact Us",
+    "captcha_required_error": "Please complete the CAPTCHA challenge."
   }
 }

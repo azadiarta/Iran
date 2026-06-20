@@ -10,6 +10,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from accounts.models import Member
 from accounts.serializers import LoginSerializer, MemberProfileSerializer, RegisterSerializer
+from core.captcha import verify_captcha
 from core.log_utils import actor_display_for
 from logs.models import ActivityLog
 
@@ -34,8 +35,13 @@ def _log(actor, actor_display, action, ip=None, extra=None):
 class RegisterView(APIView):
     """POST /api/auth/register/ — public"""
     permission_classes = [AllowAny]
+    throttle_scope = 'register'
 
     def post(self, request):
+        ip = _get_client_ip(request)
+        if not verify_captcha(request.data.get('captcha_token'), ip):
+            return Response({'message': 'Captcha verification failed.'}, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = RegisterSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -62,15 +68,19 @@ class RegisterView(APIView):
 class LoginView(APIView):
     """POST /api/auth/login/ — public"""
     permission_classes = [AllowAny]
+    throttle_scope = 'login'
 
     def post(self, request):
+        ip = _get_client_ip(request)
+        if not verify_captcha(request.data.get('captcha_token'), ip):
+            return Response({'message': 'Captcha verification failed.'}, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = LoginSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         credential = serializer.validated_data['credential']
         password = serializer.validated_data['password']
-        ip = _get_client_ip(request)
 
         member = authenticate(request, credential=credential, password=password)
 
