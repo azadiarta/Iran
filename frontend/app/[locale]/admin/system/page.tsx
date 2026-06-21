@@ -176,36 +176,42 @@ export default function AdminSystemStatusPage() {
             value={status.counts.members_total}
             icon={Users}
             color="#8b5cf6"
+            locale={locale}
           />
           <AdminStatCard
             title={isRTL ? 'اعضای فعال' : 'Active Members'}
             value={status.counts.members_active}
             icon={Users}
             color="#00ffff"
+            locale={locale}
           />
           <AdminStatCard
             title={isRTL ? 'پست‌ها' : 'Posts'}
             value={status.counts.posts}
             icon={Newspaper}
             color="#00ffff"
+            locale={locale}
           />
           <AdminStatCard
             title={isRTL ? 'مشارکت‌ها' : 'Contributions'}
             value={status.counts.contributions}
             icon={HandCoins}
             color="#10b981"
+            locale={locale}
           />
           <AdminStatCard
             title={isRTL ? 'هزینه‌ها' : 'Expenses'}
             value={status.counts.expenses}
             icon={Receipt}
             color="#ef4444"
+            locale={locale}
           />
           <AdminStatCard
             title={isRTL ? 'نظرات در انتظار تأیید' : 'Pending Comments'}
             value={status.counts.pending_comments}
             icon={MessageSquare}
             color="#fbbf24"
+            locale={locale}
           />
         </div>
       </div>

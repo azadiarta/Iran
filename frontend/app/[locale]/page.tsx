@@ -66,12 +66,14 @@ function StatCard({
   label,
   prefix = '',
   loading,
+  locale,
 }: {
   icon: React.ElementType;
   value: number | string;
   label: string;
   prefix?: string;
   loading: boolean;
+  locale: string;
 }) {
   const numericValue = typeof value === 'number' ? value : 0;
   const counted = useCountUp(numericValue, 1500, !loading && typeof value === 'number');
@@ -91,7 +93,7 @@ function StatCard({
           className="text-3xl font-bold"
           style={{ color: '#00ffff', textShadow: '0 0 10px #00ffff' }}
         >
-          {typeof value === 'string' ? value : `${prefix}${counted.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+          {typeof value === 'string' ? value : `${prefix}${counted.toLocaleString(locale === 'fa' ? 'fa-IR' : 'en-US', { maximumFractionDigits: 2 })}`}
         </p>
       )}
       <p className="text-white/60 text-sm text-center">{label}</p>
@@ -512,6 +514,7 @@ export default function LandingPage() {
               value={memberCount}
               label={t('landing.stats_members')}
               loading={memberCountLoading}
+              locale={locale}
             />
             <StatCard
               icon={TrendingUp}
@@ -519,6 +522,7 @@ export default function LandingPage() {
               prefix="£"
               label={t('landing.stats_contributions')}
               loading={balanceLoading}
+              locale={locale}
             />
             {canViewBalance && (
               <StatCard
@@ -527,6 +531,7 @@ export default function LandingPage() {
                 prefix="£"
                 label={t('landing.stats_balance')}
                 loading={balanceLoading}
+                locale={locale}
               />
             )}
           </div>

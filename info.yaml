@@ -89,6 +89,26 @@ project_conventions:
       authAPI/group-permission check every existing admin page already uses
       (see auth_permission_checks.frontend_auth) — never ship a new admin
       page that skips this gate "just for now".
+  locale_number_formatting:
+    rule: >
+      Every Number.prototype.toLocaleString/Date.prototype.toLocaleDateString/
+      toLocaleString/Intl.NumberFormat/Intl.DateTimeFormat call MUST resolve
+      its locale argument explicitly from the page's own `locale` (via
+      useParams()), e.g. `locale === 'fa' ? 'fa-IR' : 'en-US'` for numbers, or
+      `locale === 'fa' ? 'fa-IR' : 'en-GB'` for dates (the two established
+      patterns, used at ~36 call sites sitewide as of Phase 37) — NEVER call
+      any of these with `undefined`/no locale argument. `undefined` makes the
+      JS runtime fall back to the BROWSER/OS's own default Intl locale, which
+      is completely independent of this app's own `/en` vs `/fa` next-intl
+      route: a browser/OS set to Persian would render Persian-Indic digits
+      even while the app is actively serving its `/en` (English) route — this
+      exact bug shipped at 2 sites (frontend/app/[locale]/page.tsx's
+      StatCard, frontend/components/admin/AdminStatCard.tsx's CountUp) and
+      was fixed in Phase 37. If a SHARED component (not a page) needs
+      locale-aware formatting, it must accept `locale` as a prop from its
+      parent page rather than calling useParams() redundantly or, worse,
+      omitting the locale argument — see AdminStatCard.tsx's `locale?: string`
+      prop (default 'en') for the established pattern.
   theme_and_ui:
     rule: >
       Every screen on the site — public AND admin — shares ONE dark
@@ -789,7 +809,7 @@ ui_components:
           label: AdminStatCard — dashboard stat tile
           scope: frontend
           location: [frontend/components/admin/AdminStatCard.tsx]
-          notes: "Used on app/[locale]/admin/page.tsx, fed by dashboardAPI."
+          notes: "Used on app/[locale]/admin/page.tsx (fed by dashboardAPI) and app/[locale]/admin/system/page.tsx (fed by systemAPI). Phase 37 — gained an optional `locale?: string` prop (default 'en') threaded into its count-up animation's toLocaleString call, fixing a bug where it always called toLocaleString(undefined, ...) (browser/OS-default-locale-dependent) instead of resolving the app's own locale; see project_conventions.locale_number_formatting."
         - id: ui_AdminTable
           label: AdminTable — paginated data table
           scope: frontend
