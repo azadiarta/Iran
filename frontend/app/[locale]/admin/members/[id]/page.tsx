@@ -349,9 +349,7 @@ export default function AdminMemberDetailPage() {
   if (accessDenied) {
     return (
       <div className="admin-glass-card p-8 text-center text-white/50 text-sm">
-        {isRTL
-          ? 'این یک حساب سوپریوزر است. فقط خود سوپریوزر یا سوپریوزرهای دیگر می‌توانند این پروفایل را مشاهده کنند.'
-          : 'This is a superuser account. Only the superuser themselves or another superuser can view this profile.'}
+        {isRTL ? 'شما دسترسی مشاهده این پروفایل را ندارید.' : 'You do not have permission to view this profile.'}
       </div>
     );
   }
@@ -424,13 +422,13 @@ export default function AdminMemberDetailPage() {
         </form>
       )}
 
-      {canManage && target.is_superuser && !currentMember?.is_superuser && (
+      {target.is_superuser && !currentMember?.is_superuser && (
         <div className="admin-glass-card p-5 flex items-center gap-3" style={{ border: '1px solid rgba(251,191,36,0.3)' }}>
           <ShieldCheck className="w-5 h-5 flex-shrink-0" style={{ color: '#fbbf24' }} />
           <p className="text-sm text-white/70">
             {isRTL
-              ? 'این یک حساب سوپریوزر است. تنها خود سوپریوزر یا سوپریوزرهای دیگر می‌توانند این پروفایل را مشاهده یا ویرایش کنند.'
-              : 'This is a superuser account. Only the superuser themselves or another superuser can view or edit this profile.'}
+              ? 'این یک حساب سوپریوزر است. تنها خود سوپریوزر یا سوپریوزرهای دیگر می‌توانند این پروفایل را ویرایش کنند.'
+              : 'This is a superuser account. Only the superuser themselves or another superuser can edit this profile.'}
           </p>
         </div>
       )}

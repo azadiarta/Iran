@@ -4,11 +4,13 @@ import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { User, Calendar, ChevronLeft, ChevronRight, Wallet, Receipt, Search, X } from 'lucide-react';
+import { User, Calendar, ChevronLeft, ChevronRight, Wallet, Receipt } from 'lucide-react';
 import { fundAPI } from '@/lib/api';
 import type { FundBalance, Expense } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 import ImageLightbox from '@/components/common/ImageLightbox';
+import SiteSearchFilterCard, { SiteFilterField } from '@/components/common/SiteSearchFilterCard';
+import { SEARCH_TERM_MAX_LENGTH } from '@/lib/validation';
 
 interface ExpensesResponse {
   count: number;
@@ -203,79 +205,44 @@ export default function ExpensesPage() {
         )}
 
         {/* Search & filters */}
-        <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-5 mb-6">
-          <div className="relative">
-            <Search
-              size={18}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none"
-            />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('search_placeholder')}
-              className="w-full rounded-xl pl-11 pr-4 py-2.5 text-white placeholder-white/30 outline-none transition-colors"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-            <div>
-              <label className="block text-xs text-white/40 mb-1">{t('filter_date_from')}</label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full rounded-xl px-3 py-2 text-white outline-none transition-colors"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-white/40 mb-1">{t('filter_date_to')}</label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="w-full rounded-xl px-3 py-2 text-white outline-none transition-colors"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-white/40 mb-1">{t('filter_amount_min')}</label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={amountMin}
-                onChange={(e) => setAmountMin(e.target.value)}
-                className="w-full rounded-xl px-3 py-2 text-white placeholder-white/30 outline-none transition-colors"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-white/40 mb-1">{t('filter_amount_max')}</label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={amountMax}
-                onChange={(e) => setAmountMax(e.target.value)}
-                className="w-full rounded-xl px-3 py-2 text-white placeholder-white/30 outline-none transition-colors"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
-              />
-            </div>
-          </div>
-
-          {hasActiveFilters && (
-            <button
-              onClick={clearFilters}
-              className="mt-3 flex items-center gap-1.5 text-sm text-white/50 hover:text-white transition-colors"
-            >
-              <X className="w-3.5 h-3.5" />
-              {t('filters_clear')}
-            </button>
-          )}
-        </div>
+        <SiteSearchFilterCard
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder={t('search_placeholder')}
+          searchMaxLength={SEARCH_TERM_MAX_LENGTH}
+          hasActiveFilters={hasActiveFilters}
+          onClear={clearFilters}
+          clearLabel={t('filters_clear')}
+        >
+          <SiteFilterField
+            label={t('filter_date_from')}
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+          />
+          <SiteFilterField
+            label={t('filter_date_to')}
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+          />
+          <SiteFilterField
+            label={t('filter_amount_min')}
+            type="number"
+            min="0"
+            step="0.01"
+            value={amountMin}
+            onChange={(e) => setAmountMin(e.target.value)}
+          />
+          <SiteFilterField
+            label={t('filter_amount_max')}
+            type="number"
+            min="0"
+            step="0.01"
+            value={amountMax}
+            onChange={(e) => setAmountMax(e.target.value)}
+          />
+        </SiteSearchFilterCard>
 
         {/* Expenses list */}
         {loadingExpenses ? (

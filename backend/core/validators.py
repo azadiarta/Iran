@@ -194,6 +194,21 @@ def sanitize_and_limit(value, max_length):
     return validate_max_length(value, max_length)
 
 
+# Mirrors the maxLength on every search/filter input across the frontend
+# (admin AdminInput fields and the public Expenses/Posts search boxes).
+SEARCH_TERM_MAX_LENGTH = 150
+
+
+def safe_search_term(value, max_length=SEARCH_TERM_MAX_LENGTH):
+    """Sanitize a `?search=` query param: strip HTML, then silently truncate
+    instead of raising — a GET-based search box has no form to reject, so an
+    overlong value should just be capped rather than 400'd.
+    """
+    if not value:
+        return value
+    return sanitize_text(value)[:max_length]
+
+
 def validate_image_content(file_obj):
     """Verify the uploaded file is actually a real image, not just named like one."""
     try:

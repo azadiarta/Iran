@@ -6,7 +6,7 @@ project_summary:
     total_forms: 23
     total_action_buttons: 9
     total_search_inputs: 11
-    total_realtime_search_inputs: 9
+    total_realtime_search_inputs: 10
     total_api_endpoints: 69
     total_view_classes: 67
     total_models: 12
@@ -14,10 +14,10 @@ project_summary:
     total_url_patterns: 69
     total_admin_registrations: 12
     total_django_forms: 0
-    total_frontend_routes: 32
+    total_frontend_routes: 33
     total_frontend_api_modules: 13
     total_zustand_stores: 3
-    total_reusable_ui_components: 25
+    total_reusable_ui_components: 26
     total_phone_fields: 1
 
 project_conventions:
@@ -342,7 +342,7 @@ forms:
             - frontend/lib/api.ts
             - backend/accounts/member_views.py
             - backend/accounts/serializers.py
-          notes: "<form onSubmit>. Fields: fullName, displayName, email, phone. Calls membersAPI.updateProfile -> PATCH /api/members/{id}/update/ (MemberUpdateView + MemberUpdateSerializer). Same endpoint as the member's own profile edit form. Superuser-target gating (input-validation-security hardening pass): MemberUpdateView.patch and the page's own render gate now allow a superuser target to be edited ONLY by the member themself (is_owner) OR by another superuser (request.user.is_superuser) — `if member.is_superuser and not is_owner and not request.user.is_superuser: 403`. A non-superuser admin with can_manage_permissions can no longer view OR edit a superuser's profile at all (see auth_permission_checks and MemberDetailView/MemberFullProfileView below); the page itself now also guards the whole load with an accessDenied state that renders a plain 'cannot view this profile' message on a 403 instead of attempting to render with no data."
+          notes: "<form onSubmit>. Fields: fullName, displayName, email, phone. Calls membersAPI.updateProfile -> PATCH /api/members/{id}/update/ (MemberUpdateView + MemberUpdateSerializer). Same endpoint as the member's own profile edit form. Superuser-target EDIT gating (unchanged since Phase 33, see auth_permission_checks.auth_IsSuperuser): MemberUpdateView.patch and the page's own render gate (`canManage && (!target.is_superuser || currentMember?.is_superuser)`) allow a superuser target to be edited ONLY by the member themself (is_owner) OR by another superuser (request.user.is_superuser) — `if member.is_superuser and not is_owner and not request.user.is_superuser: 403`. Phase 34 course-corrected VIEW access, which Phase 33 had over-restricted: any admin with can_view_member_details/list access can now VIEW a superuser's profile page (the accessDenied state only fires when the viewer genuinely lacks view permission, not specifically because the target is a superuser); the access-group section stays excluded from the editable scope even for a superuser editor (`!target.is_superuser` render gate, see ep_member_change_group — unconditionally blocked for all actors regardless of who's editing)."
         - id: form_admin_member_change_group
           label: Admin — change member's access group form
           scope: frontend
@@ -550,27 +550,42 @@ action_buttons:
 search_inputs:
   scope: frontend
   total_count: 11
-  description: Every search box or filter input across the frontend, verified individually for real-time (debounced) vs absent behavior. As of Phase 28, ALL 8 search/filter inputs (public site + admin panel) were real-time — the manual-submit pattern had been fully retired. The admin posts page subsequently gained a real-time search input too (see search_admin_posts), bringing the total to 9.
+  description: Every search box or filter input across the frontend, verified individually for real-time (debounced) vs absent behavior. As of Phase 28, ALL 8 search/filter inputs (public site + admin panel) were real-time — the manual-submit pattern had been fully retired. The admin posts page subsequently gained a real-time search input too (see search_admin_posts), bringing the total to 9. Phase 34 converted the admin expenses page too (see search_admin_expenses), bringing the total to 10.
   subcategories:
     realtime_debounced:
-      count: 9
+      count: 10
       items:
         - id: search_posts
           label: Posts page search (real-time)
           scope: frontend
           location:
             - frontend/app/[locale]/posts/page.tsx
+            - frontend/components/common/SiteSearchFilterCard.tsx
             - frontend/lib/api.ts
+            - frontend/lib/validation.ts
             - backend/posts/views.py
-          notes: "300ms debounce (line ~120), triggers postsAPI.getList(page, {search, date_from, date_to}) -> GET /api/posts/?search=...&date_from=...&date_to=... (PostListView). Phase 30 — brought PostAdminListView's richer search/filtering to this public page: added a SlidersHorizontal-icon 'advanced search' toggle revealing dateFrom/dateTo date inputs (debounced together with the text search in the same 300ms timer), and the search itself now also matches author full_name/display_name server-side (NOT tracking_code, which stays admin-only)."
+            - backend/core/validators.py
+          notes: "300ms debounce, triggers postsAPI.getList(page, {search, date_from, date_to}) -> GET /api/posts/?search=...&date_from=...&date_to=... (PostListView). Phase 34 — replaced the earlier Phase-30 SlidersHorizontal 'advanced search' toggle with the new shared SiteSearchFilterCard/SiteFilterField component (see ui_components.common_and_animation_components.ui_SiteSearchFilterCard), also used by search_expenses; the dateFrom/dateTo SiteFilterFields are now always visible inside the card (no toggle). Search input capped at SEARCH_TERM_MAX_LENGTH=150 (frontend/lib/validation.ts) with a built-in live counter, mirrored server-side by core.validators.safe_search_term sanitizing/truncating the same value in PostListView. Search still also matches author full_name/display_name server-side (NOT tracking_code, which stays admin-only)."
         - id: search_expenses
           label: Expenses page search + filters (real-time)
           scope: frontend
           location:
             - frontend/app/[locale]/expenses/page.tsx
+            - frontend/components/common/SiteSearchFilterCard.tsx
+            - frontend/lib/api.ts
+            - frontend/lib/validation.ts
+            - backend/fund/views.py
+            - backend/core/validators.py
+          notes: "300ms debounce, combines 5 filters via the shared SiteSearchFilterCard/SiteFilterField component (search, dateFrom, dateTo, amountMin, amountMax) -> GET /api/fund/expenses/?... (ExpenseListView). Phase 34 — migrated off the page's old standalone inline Search/X-icon markup onto SiteSearchFilterCard (same component as search_posts); search input capped at SEARCH_TERM_MAX_LENGTH=150 (frontend/lib/validation.ts) with a built-in live counter, mirrored server-side by core.validators.safe_search_term in ExpenseListView."
+        - id: search_admin_expenses
+          label: "Admin expenses list search + filters (real-time, Phase 34 NEW)"
+          scope: frontend
+          location:
+            - frontend/app/[locale]/admin/expenses/page.tsx
             - frontend/lib/api.ts
             - backend/fund/views.py
-          notes: "300ms debounce (line ~58), combines 5 filters: search, dateFrom, dateTo, amountMin, amountMax -> GET /api/fund/expenses/?... (ExpenseListView)."
+            - backend/core/validators.py
+          notes: "NEW in Phase 34 — this admin page previously had zero search/filter inputs (see the now-removed no_search_input.search_admin_expenses_absent item). Added a 5-field admin-glass-card filter row built from AdminInput (search maxLength=150 with its built-in counter, date-from, date-to, min-amount, max-amount), one combined 300ms debounce -> fundAPI.getExpenses(page, filters), mirroring the admin/posts and admin/contributions filter-row pattern. Reuses ExpenseListView's existing search/date_from/date_to/amount filters (already exercised by the public expenses page, search_expenses); the search term passes through core.validators.safe_search_term same as every other search endpoint."
         - id: search_admin_members
           label: Admin members list search (real-time)
           scope: frontend
@@ -623,21 +638,15 @@ search_inputs:
             - backend/posts/urls.py
           notes: "Added alongside the new admin-gated post search/filter endpoint: 300ms debounce on searchInput -> appliedSearch, mirroring admin/comments/page.tsx's pattern. Calls postsAPI.getAdminList(page, {search}) -> GET /api/posts/admin/ (PostAdminListView, permission_classes=[IsAuthenticated, HasGroupPermission('can_post')]), which OR-matches title/body/author full_name/author display_name/tracking_code via icontains, plus author/date_from/date_to params wrapped in safe_filter (only search is currently wired to a frontend control). Also fixed a separate latent bug while building this: the PUBLIC PostListView (GET /api/posts/, no auth) previously accepted a search query param from postsAPI.getList() but silently ignored it server-side; it now actually filters by title/body icontains."
     no_search_input:
-      count: 2
+      count: 1
       items:
         - id: search_admin_groups_absent
           label: Admin groups page — no search/filter input exists
           scope: frontend
           location:
             - frontend/app/[locale]/admin/groups/page.tsx
-          notes: "Confirmed zero search or filter inputs on this page."
-        - id: search_admin_expenses_absent
-          label: Admin expenses page (admin panel) — no search/filter input exists
-          scope: frontend
-          location:
-            - frontend/app/[locale]/admin/expenses/page.tsx
-          notes: "Confirmed zero search or filter inputs on this admin page (distinct from the public expenses/page.tsx which DOES have real-time search — see search_expenses)."
-  notes_general: "There is still no shared debounce hook/utility anywhere in the frontend — each of the 9 real-time inputs implements its own inline 300ms setTimeout/debounce logic independently (one combined debounce per page when a page has multiple filter fields, per the expenses/page.tsx precedent). The admin posts page (search_admin_posts) was converted from absent to real-time after the input-validation-security pass added an admin post search/filter endpoint; the remaining 2 'absent' pages still have no search input at all (out of scope — no input exists to convert)."
+          notes: "Confirmed zero search or filter inputs on this page. This is now the ONLY page on the entire site with no search input at all — the admin expenses page (formerly listed here as search_admin_expenses_absent) gained one in Phase 34, see search_admin_expenses."
+  notes_general: "There is still no shared debounce hook/utility anywhere in the frontend — each of the 10 real-time inputs implements its own inline 300ms setTimeout/debounce logic independently (one combined debounce per page when a page has multiple filter fields, per the expenses/page.tsx precedent). The admin posts page (search_admin_posts) was converted from absent to real-time after the input-validation-security pass added an admin post search/filter endpoint; the admin expenses page (search_admin_expenses) was converted the same way in Phase 34, leaving admin/groups as the sole remaining 'absent' page (out of scope — no input exists to convert). Phase 34 also introduced the shared frontend/components/common/SiteSearchFilterCard.tsx component (search_posts, search_expenses) and a shared backend/core/validators.py.safe_search_term() helper now applied to EVERY backend search query param site-wide (members, contact messages, contributions, expenses, posts public/admin, comments) — see validation_logic.shared_validation_modules for the SEARCH_TERM_MAX_LENGTH=150 constant pair backing this."
 
 api_calls:
   scope: frontend
@@ -755,7 +764,7 @@ api_calls:
 
 ui_components:
   scope: frontend
-  total_count: 25
+  total_count: 26
   description: Reusable UI components under frontend/components — admin primitives, admin form fields, layout shells, and shared/animation components.
   subcategories:
     admin_primitives:
@@ -846,7 +855,7 @@ ui_components:
           label: AdminTopBar — admin panel top bar
           scope: frontend
           location: [frontend/components/layout/AdminTopBar.tsx]
-          notes: "Houses locale switcher and current-member display."
+          notes: "Houses locale switcher and current-member display. Phase 34 — fixed a bug in the profile dropdown's 'View Profile' link: it previously pointed to /${locale}/profile (the main-site profile page, outside AdminLayout), which kicked the admin out of the admin panel chrome entirely; it now points to /${locale}/admin/profile (see routes.admin_routes.route_admin_profile), a new self-contained page that sits under admin/layout.tsx so the sidebar/top bar persist."
         - id: ui_AuthSync
           label: AuthSync — hydrates auth state from storage on load
           scope: frontend
@@ -868,7 +877,7 @@ ui_components:
           location: [frontend/components/layout/Navbar.tsx]
           notes: "Locale switcher, auth-aware links (login vs profile), admin-panel link gated by hasAdminAccess()."
     common_and_animation_components:
-      count: 5
+      count: 6
       items:
         - id: ui_Turnstile
           label: "Turnstile — Cloudflare Turnstile CAPTCHA widget (Phase 31, NEW)"
@@ -895,6 +904,11 @@ ui_components:
           scope: frontend
           location: [frontend/components/animations/SplashScreen.tsx, frontend/components/animations/IranianSymbols.tsx]
           notes: "Shown on first load only; purely decorative, no API calls."
+        - id: ui_SiteSearchFilterCard
+          label: "SiteSearchFilterCard + SiteFilterField — shared search/filter card (Phase 34, NEW)"
+          scope: frontend
+          location: [frontend/components/common/SiteSearchFilterCard.tsx]
+          notes: "Unifies the public-site search+filter UI: an icon-prefixed search input with a built-in live maxLength counter, an optional filter-field grid via the named SiteFilterField export, and a conditional clear-filters button. Modeled on the Expenses page's pre-Phase-34 inline markup, now used by BOTH search_posts and search_expenses (see search_inputs) so the two pages share one implementation instead of each having its own. NOT used in the admin panel, which keeps its own AdminInput-based filter rows per project_conventions.consistency_principle (admin_panel and main_site are independently consistent domains, allowed to differ)."
 
 state_management:
   scope: frontend
@@ -1009,7 +1023,7 @@ routes:
           scope: frontend
           location: ["frontend/app/[locale]/profile/contact-messages/page.tsx"]
     admin_routes:
-      count: 14
+      count: 15
       items:
         - id: route_admin_dashboard
           label: "/admin — dashboard"
@@ -1067,7 +1081,12 @@ routes:
           label: "/admin/system — system status page"
           scope: frontend
           location: ["frontend/app/[locale]/admin/system/page.tsx"]
-      notes_subcategory: "All 14 admin routes are wrapped in AdminLayout and individually gated by hasAdminAccess()/isNavItemVisible() (frontend/lib/adminNav.ts) — a member whose group grants ONLY the 4 BASELINE_GROUP_PERMISSIONS (can_contribute, can_comment, can_view_balance, can_view_posts) has NO access to any /admin/* route."
+        - id: route_admin_profile
+          label: "/admin/profile — own-profile edit (Phase 34, NEW)"
+          scope: frontend
+          location: ["frontend/app/[locale]/admin/profile/page.tsx"]
+          notes: "Fixes the bug where AdminTopBar's 'View Profile' link sent an admin to the main-site /profile page, leaving the admin panel chrome entirely (see ui_components.ui_AdminTopBar). Self-contained page under admin/layout.tsx so the sidebar/top bar persist. Edits own full_name/display_name/email/phone via membersAPI.updateProfile and own password via membersAPI.changePassword; a superuser footer note directs to /admin/members for group/member-number changes (which still require opening one's own member row)."
+      notes_subcategory: "All 15 admin routes are wrapped in AdminLayout and individually gated by hasAdminAccess()/isNavItemVisible() (frontend/lib/adminNav.ts) — a member whose group grants ONLY the 4 BASELINE_GROUP_PERMISSIONS (can_contribute, can_comment, can_view_balance, can_view_posts) has NO access to any /admin/* route. route_admin_profile is reachable by any admin (it's just the self-service profile editor, gated only by having admin access at all, not by any specific permission)."
     special_routes:
       count: 3
       items:
@@ -1134,7 +1153,7 @@ api_endpoints:
           label: "GET /api/members/{pk}/"
           scope: backend
           location: [backend/accounts/member_urls.py, backend/accounts/member_views.py, backend/accounts/serializers.py]
-          notes: "MemberDetailView + MemberDetailSerializer/MemberProfileSerializer. Hardened (input-validation-security pass): `if member.is_superuser and not is_owner and not request.user.is_superuser: 403` now blocks any non-superuser viewer from fetching a superuser's record at all — previously this view had NO superuser-target restriction whatsoever (only the visibility-setting/group-based checks above it), so any authenticated member.is_authenticated request could read a superuser's full profile fields once the visibility setting allowed it."
+          notes: "MemberDetailView + MemberDetailSerializer/MemberProfileSerializer. Phase 33 added `if member.is_superuser and not is_owner and not request.user.is_superuser: 403`, blocking any non-superuser viewer from fetching a superuser's record at all. Phase 34 REMOVED that block — viewing a superuser's record now follows the same visibility-setting/group-based checks as any other member (is_owner or _can_view_member_details(request.user)); there is no superuser-target restriction left on this endpoint. (The underlying concern Phase 33 was guarding against — a superuser's profile being casually editable by a regular admin — is still fully satisfied by ep_member_update's unchanged self-or-superuser EDIT restriction; viewing was never the actual risk.)"
         - id: ep_member_update
           label: "PATCH /api/members/{pk}/update/"
           scope: backend
@@ -1164,7 +1183,7 @@ api_endpoints:
           label: "GET /api/members/{pk}/full-profile/"
           scope: backend
           location: [backend/accounts/member_urls.py, backend/accounts/member_views.py]
-          notes: "MemberFullProfileView. Aggregates member + comments + contributions + contact_messages + activity_logs in one response (requires can_view_member_details). Backs the admin member-detail page. Hardened identically to ep_member_detail: `if member.is_superuser and not is_owner and not request.user.is_superuser: 403` added right after fetching the member, before any of the comments/contributions/contact-messages/activity-log queries run — this was the literal bug being fixed, since this is the endpoint the admin member-detail page actually calls, and it previously had NO superuser-target restriction at all (any admin with can_manage_permissions or can_view_member_details could view a superuser's entire aggregated profile). The frontend page also now catches this 403 and renders a plain access-denied message via a new accessDenied state, instead of attempting to render the page with no `target` data."
+          notes: "MemberFullProfileView. Aggregates member + comments + contributions + contact_messages + activity_logs in one response (requires can_view_member_details). Backs the admin member-detail page. Phase 33 added `if member.is_superuser and not is_owner and not request.user.is_superuser: 403` right after fetching the member, before any of the comments/contributions/contact-messages/activity-log queries run. Phase 34 REMOVED that block — viewing a superuser's full aggregated profile now only requires the normal can_view_member_details permission (or being the owner), same as any other member's full profile. The frontend page's accessDenied state (added in Phase 33 for the 403 case) is kept but its wording was generalized from superuser-specific text to a plain 'You do not have permission to view this profile' / 'شما دسترسی مشاهده این پروفایل را ندارید' — it now only fires when the viewer genuinely lacks can_view_member_details, not specifically because the target is a superuser."
         - id: ep_member_change_number
           label: "PATCH /api/members/{pk}/number/"
           scope: backend
@@ -1888,7 +1907,7 @@ auth_permission_checks:
           label: IsSuperuser permission class
           scope: backend
           location: [backend/accounts/permissions.py]
-          notes: "Passes ONLY for is_superuser. Superuser bypasses ALL permission checks project-wide. No API endpoint can create a superuser, and no member regardless of permissions can delete one — only via `manage.py createsuperuser` or Railway env vars (DJANGO_SUPERUSER_EMAIL/PASSWORD, see backend/scripts/prepare.sh). One narrow exception exists for modification: MemberChangeNumberView (ep_member_change_number) lets a superuser reassign ANY member's member_number, including another superuser's — gating is solely on the ACTING admin's own is_superuser via this same IsSuperuser class, not on the target's. Superuser-target profile lockdown (input-validation-security hardening pass, summarized here as the canonical cross-reference — see ep_member_detail/ep_member_full_profile/ep_member_update/ep_member_change_password/ep_member_change_group above for the per-endpoint detail): a superuser's profile can be VIEWED or EDITED only by themself or by another superuser; a non-superuser admin — regardless of can_manage_permissions/can_view_member_details — gets 403 from every one of those endpoints when the target is a superuser, full stop, with exactly ONE carve-out: a superuser's access GROUP can never be changed by anyone (not even another superuser) via MemberChangeGroupView, and deactivation (MemberToggleActiveView) and deletion (MemberDeleteView) remain unconditionally blocked for ALL actors on a superuser target same as before this pass — those two were intentionally left at their pre-existing, strictest behavior since the request scoped this change to 'profile' view/edit, not danger-zone actions. The members list page (admin/members/page.tsx) also hides the per-row 'View' button (replacing it with a plain 'Restricted'/'محدود شده' label) for any row where `m.is_superuser && !currentMember?.is_superuser`, so a non-superuser admin is never even offered a clickable path to a 403."
+          notes: "Passes ONLY for is_superuser. Superuser bypasses ALL permission checks project-wide. No API endpoint can create a superuser, and no member regardless of permissions can delete one — only via `manage.py createsuperuser` or Railway env vars (DJANGO_SUPERUSER_EMAIL/PASSWORD, see backend/scripts/prepare.sh). One narrow exception exists for modification: MemberChangeNumberView (ep_member_change_number) lets a superuser reassign ANY member's member_number, including another superuser's — gating is solely on the ACTING admin's own is_superuser via this same IsSuperuser class, not on the target's. Superuser-target profile rules (summarized here as the canonical cross-reference — see ep_member_detail/ep_member_full_profile/ep_member_update/ep_member_change_password/ep_member_change_group above for the per-endpoint detail), course-corrected in Phase 34 after Phase 33 had over-tightened VIEW access: a superuser's profile can now be VIEWED by ANY admin who otherwise has view permission (can_view_member_details, or the normal visibility-setting checks on MemberDetailView) — Phase 33's blanket 403-for-non-superuser-viewers was removed, since it blocked legitimate admin work (e.g. an admin needing to look up a superuser's contact info) with no basis in the original request. EDITING a superuser's profile (MemberUpdateView, ChangePasswordView) remains restricted to themself or another superuser — `if member.is_superuser and not is_owner and not request.user.is_superuser: 403` — unchanged since Phase 33. Both pre-existing carve-outs are also unchanged: a superuser's access GROUP can never be changed by anyone (not even another superuser) via MemberChangeGroupView, and deactivation (MemberToggleActiveView) and deletion (MemberDeleteView) remain unconditionally blocked for ALL actors on a superuser target. The members list page (admin/members/page.tsx) no longer hides the per-row 'View' button for superuser rows either — Phase 33's 'Restricted'/'محدود شده' label was removed in Phase 34, so every admin with list access can open any member's row, including a superuser's (the row will simply show a generic, non-superuser-specific access-denied message if the viewer somehow still lacks view permission)."
         - id: auth_HasGroupPermission
           label: HasGroupPermission(codename) — permission factory
           scope: backend
@@ -1958,12 +1977,12 @@ validation_logic:
           label: "backend/core/validators.py — canonical server-side validation module"
           scope: backend
           location: [backend/core/validators.py]
-          notes: "Exports PHONE_REGEX, LENIENT_PHONE_REGEX, SHORT_TEXT_PUBLIC_MAX_LENGTH=50, SHORT_TEXT_ADMIN_MAX_LENGTH=100 (Phase 32 split a single SHORT_TEXT_MAX_LENGTH=150 into this two-tier pair — admin-panel single-line inputs cap at 100, main-site single-line inputs cap at 50), LONG_TEXT_PUBLIC_MAX_LENGTH, LONG_TEXT_ADMIN_MAX_LENGTH, EMAIL_MAX_LENGTH (Phase 30, =75), PASSWORD_MIN_LENGTH=8, MEMBER_NUMBER_LENGTH=5/MEMBER_NUMBER_MIN=10000/MEMBER_NUMBER_MAX=99999 (input-validation-security hardening pass, NEW — previously these existed only as inline magic numbers in MemberChangeNumberView with no named constant and no frontend mirror; see account_and_admin_security.validate_member_number below), ALLOWED_IMAGE_FORMATS, and functions validate_phone_format, validate_phone_lenient, validate_email_format, validate_phone_or_email, _password_strength_errors/validate_password_strength/PasswordStrengthValidator (Phase 32, see account_and_admin_security.validate_password_strength), sanitize_text (strip_tags+strip), validate_max_length, sanitize_and_limit (combo), validate_image_content (Pillow-based real content/format verification, rejects SVG and mislabeled files), validate_pdf_content (magic-byte check), validate_image_file, validate_receipt_file. Used by accounts/core/posts/fund/payments serializers and views instead of ad-hoc inline strip_tags()/length checks. Phase 28 added safe_filter(queryset, **lookups): wraps a .filter() call in try/except (ValueError, TypeError, django.core.exceptions.ValidationError), returning queryset.none() instead of raising — used everywhere a GET list view builds a filter straight from a query param against a typed field (UUID FK exact-match, DateField range, DecimalField range) so malformed/attacker-controlled query params degrade to an empty result instead of an uncaught 500 (there is still no global DRF exception handler in this project). Phase 30 — added EMAIL_MAX_LENGTH=75 (Django's EmailField model default is 254, but real addresses never get remotely close, so this caps the field sane everywhere it's entered) and wired it into validate_email_format (length check BEFORE the Django email-format check) and validate_phone_or_email's email branch; validate_email_format itself was previously unused by any serializer despite existing — RegisterSerializer/MemberUpdateSerializer had zero email format validation until this phase wired it in (see validate_accounts below)."
+          notes: "Exports PHONE_REGEX, LENIENT_PHONE_REGEX, SHORT_TEXT_PUBLIC_MAX_LENGTH=50, SHORT_TEXT_ADMIN_MAX_LENGTH=100 (Phase 32 split a single SHORT_TEXT_MAX_LENGTH=150 into this two-tier pair — admin-panel single-line inputs cap at 100, main-site single-line inputs cap at 50), LONG_TEXT_PUBLIC_MAX_LENGTH, LONG_TEXT_ADMIN_MAX_LENGTH, EMAIL_MAX_LENGTH (Phase 30, =75), PASSWORD_MIN_LENGTH=8, MEMBER_NUMBER_LENGTH=5/MEMBER_NUMBER_MIN=10000/MEMBER_NUMBER_MAX=99999 (input-validation-security hardening pass, NEW — previously these existed only as inline magic numbers in MemberChangeNumberView with no named constant and no frontend mirror; see account_and_admin_security.validate_member_number below), ALLOWED_IMAGE_FORMATS, and functions validate_phone_format, validate_phone_lenient, validate_email_format, validate_phone_or_email, _password_strength_errors/validate_password_strength/PasswordStrengthValidator (Phase 32, see account_and_admin_security.validate_password_strength), sanitize_text (strip_tags+strip), validate_max_length, sanitize_and_limit (combo), validate_image_content (Pillow-based real content/format verification, rejects SVG and mislabeled files), validate_pdf_content (magic-byte check), validate_image_file, validate_receipt_file. Used by accounts/core/posts/fund/payments serializers and views instead of ad-hoc inline strip_tags()/length checks. Phase 34 added SEARCH_TERM_MAX_LENGTH=150 and safe_search_term(value, max_length=SEARCH_TERM_MAX_LENGTH): sanitizes (strips HTML via sanitize_text) and silently truncates a GET ?search= query param with no exception raised (a search box has no form to reject against) — applied to every backend list view that accepts a search param (members, contact messages, contributions, expenses, posts public/admin, comments), see search_inputs.notes_general. Phase 28 added safe_filter(queryset, **lookups): wraps a .filter() call in try/except (ValueError, TypeError, django.core.exceptions.ValidationError), returning queryset.none() instead of raising — used everywhere a GET list view builds a filter straight from a query param against a typed field (UUID FK exact-match, DateField range, DecimalField range) so malformed/attacker-controlled query params degrade to an empty result instead of an uncaught 500 (there is still no global DRF exception handler in this project). Phase 30 — added EMAIL_MAX_LENGTH=75 (Django's EmailField model default is 254, but real addresses never get remotely close, so this caps the field sane everywhere it's entered) and wired it into validate_email_format (length check BEFORE the Django email-format check) and validate_phone_or_email's email branch; validate_email_format itself was previously unused by any serializer despite existing — RegisterSerializer/MemberUpdateSerializer had zero email format validation until this phase wired it in (see validate_accounts below)."
         - id: validate_shared_frontend
           label: "frontend/lib/validation.ts — canonical client-side validation module"
           scope: frontend
           location: ["frontend/lib/validation.ts"]
-          notes: "Exports SHORT_TEXT_PUBLIC_MAX_LENGTH=50, SHORT_TEXT_ADMIN_MAX_LENGTH=100 (Phase 32, mirrors the backend two-tier split — replaces the old single SHORT_TEXT_MAX_LENGTH=150), LONG_TEXT_PUBLIC_MAX_LENGTH=250, LONG_TEXT_ADMIN_MAX_LENGTH=550, EMAIL_MAX_LENGTH=75 (Phase 30, mirrors the backend constant), MEMBER_NUMBER_LENGTH=5/MEMBER_NUMBER_MIN=10000/MEMBER_NUMBER_MAX=99999 (input-validation-security hardening pass, NEW, mirrors the backend constants) plus memberNumberFormatError(isRTL) (bilingual message helper), PHONE_PLACEHOLDER='00447700900000', isValidPhoneStrict, isValidPhoneLenient, isValidEmail, isValidPhoneOrEmail, detectCredentialKind (Phase 30 — classifies a combined phone-or-email input by its first character for the login page's real-time hint ONLY; never gates submission, see validate_frontend_pattern below), passwordStrengthError (Phase 32 — mirrors backend PasswordStrengthValidator: length>=PASSWORD_MIN_LENGTH(8), letter+digit mix, >=1 uppercase, >=1 special character, checked in that exact order so the first client-side error always matches what the server would reject with; wired into register/profile/admin-members-create/admin-members-edit), phoneHint/phoneFormatError/phoneOrEmailFormatError/phoneLenientFormatError (Phase 30, new — lenient '00 or +' format message for the login credential box)/emailFormatError/maxLengthError/passwordMismatchError/requiredFieldError (bilingual message helpers). Used by register, login, profile, contact, contribute pages and all admin/* pages (which use the bilingual helpers directly since admin pages use the inline isRTL pattern rather than next-intl)."
+          notes: "Exports SHORT_TEXT_PUBLIC_MAX_LENGTH=50, SHORT_TEXT_ADMIN_MAX_LENGTH=100 (Phase 32, mirrors the backend two-tier split — replaces the old single SHORT_TEXT_MAX_LENGTH=150), LONG_TEXT_PUBLIC_MAX_LENGTH=250, LONG_TEXT_ADMIN_MAX_LENGTH=550, EMAIL_MAX_LENGTH=75 (Phase 30, mirrors the backend constant), MEMBER_NUMBER_LENGTH=5/MEMBER_NUMBER_MIN=10000/MEMBER_NUMBER_MAX=99999 (input-validation-security hardening pass, NEW, mirrors the backend constants) plus memberNumberFormatError(isRTL) (bilingual message helper), PHONE_PLACEHOLDER='00447700900000', isValidPhoneStrict, isValidPhoneLenient, isValidEmail, isValidPhoneOrEmail, detectCredentialKind (Phase 30 — classifies a combined phone-or-email input by its first character for the login page's real-time hint ONLY; never gates submission, see validate_frontend_pattern below), passwordStrengthError (Phase 32 — mirrors backend PasswordStrengthValidator: length>=PASSWORD_MIN_LENGTH(8), letter+digit mix, >=1 uppercase, >=1 special character, checked in that exact order so the first client-side error always matches what the server would reject with; wired into register/profile/admin-members-create/admin-members-edit), phoneHint/phoneFormatError/phoneOrEmailFormatError/phoneLenientFormatError (Phase 30, new — lenient '00 or +' format message for the login credential box)/emailFormatError/maxLengthError/passwordMismatchError/requiredFieldError (bilingual message helpers). Phase 34 added SEARCH_TERM_MAX_LENGTH=150, mirroring the backend constant, used as the maxLength on every site-wide search input (see search_inputs and ui_components.ui_SiteSearchFilterCard). Used by register, login, profile, contact, contribute pages and all admin/* pages (which use the bilingual helpers directly since admin pages use the inline isRTL pattern rather than next-intl)."
     backend_serializer_validators:
       count: 5
       items:

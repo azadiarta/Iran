@@ -10,7 +10,7 @@ from core.log_utils import actor_display_for, target_display_for
 from core.models import DefaultSetting
 from core.pagination import paginate
 from core.utils import api_error, api_success
-from core.validators import safe_filter
+from core.validators import safe_filter, safe_search_term
 from fund.models import Contribution, Expense
 from fund.serializers import (
     ContributionAdminDetailSerializer,
@@ -78,7 +78,7 @@ class ContributionListView(APIView):
         if contributor_id:
             qs = safe_filter(qs, contributor__id=contributor_id)
 
-        search = request.query_params.get('search')
+        search = safe_search_term(request.query_params.get('search'))
         if search:
             qs = qs.filter(
                 Q(guest_name__icontains=search)
@@ -228,7 +228,7 @@ class ExpenseListView(APIView):
     def get(self, request):
         qs = Expense.objects.select_related('withdrawn_by').order_by('-expense_date')
 
-        search = request.query_params.get('search')
+        search = safe_search_term(request.query_params.get('search'))
         if search:
             qs = qs.filter(Q(short_reason__icontains=search) | Q(description__icontains=search))
 

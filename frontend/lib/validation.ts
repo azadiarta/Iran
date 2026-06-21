@@ -24,6 +24,10 @@ export const MEMBER_NUMBER_MAX = 99999;
 // never get remotely close to Django's default 254-char field limit.
 export const EMAIL_MAX_LENGTH = 75;
 
+// Mirrors backend SEARCH_TERM_MAX_LENGTH (core/validators.py) — caps every
+// `?search=` query box across the site (admin and public alike).
+export const SEARCH_TERM_MAX_LENGTH = 150;
+
 // Strict format required for new phone entries: "00" prefix (never "+"),
 // then 6-15 digits, e.g. 00447700900000.
 const PHONE_REGEX = /^00\d{6,15}$/;

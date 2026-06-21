@@ -12,7 +12,7 @@ from core.log_utils import actor_display_for, target_display_for
 from core.models import DefaultSetting
 from core.pagination import paginate
 from core.utils import api_error, api_success
-from core.validators import safe_filter, validate_image_file
+from core.validators import safe_filter, safe_search_term, validate_image_file
 from fund.models import Expense
 from logs.models import ActivityLog
 from posts.models import Comment, Post, PostImage
@@ -109,7 +109,7 @@ class PostListView(APIView):
         # Searches the same fields visible on the public post card/detail
         # (title, body, author name) — tracking_code stays admin-only, since
         # PostSerializer never exposes it to the public.
-        search = request.query_params.get('search')
+        search = safe_search_term(request.query_params.get('search'))
         if search:
             qs = qs.filter(
                 models.Q(title__icontains=search)
@@ -139,7 +139,7 @@ class PostAdminListView(APIView):
         if date_to:
             qs = safe_filter(qs, created_at__date__lte=date_to)
 
-        search = request.query_params.get('search')
+        search = safe_search_term(request.query_params.get('search'))
         if search:
             qs = qs.filter(
                 models.Q(title__icontains=search)
@@ -345,7 +345,7 @@ class CommentGlobalListView(APIView):
         if author_id:
             qs = safe_filter(qs, author_id=author_id)
 
-        search = request.query_params.get('search')
+        search = safe_search_term(request.query_params.get('search'))
         if search:
             qs = qs.filter(
                 models.Q(text__icontains=search)

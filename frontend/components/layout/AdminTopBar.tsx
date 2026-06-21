@@ -200,7 +200,7 @@ export default function AdminTopBar({ locale, onToggleSidebar, pendingCommentCou
                     <p className="text-sm font-medium text-white truncate">{member.display_name || member.full_name}</p>
                   </div>
                   <Link
-                    href={`/${locale}/profile`}
+                    href={`/${locale}/admin/profile`}
                     onClick={() => setDropOpen(false)}
                     className="flex items-center gap-2 px-4 py-2.5 text-sm transition-colors duration-150"
                     style={{ color: 'rgba(255,255,255,0.7)' }}

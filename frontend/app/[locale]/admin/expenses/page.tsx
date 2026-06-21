@@ -30,6 +30,13 @@ export default function AdminExpensesPage() {
   const [totalCount, setTotalCount] = useState(0);
   const pageSize = 5;
 
+  const [searchInput, setSearchInput] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [amountMin, setAmountMin] = useState('');
+  const [amountMax, setAmountMax] = useState('');
+
   const [modalOpen, setModalOpen] = useState(false);
   const [amount, setAmount] = useState('');
   const [shortReason, setShortReason] = useState('');
@@ -43,8 +50,14 @@ export default function AdminExpensesPage() {
 
   function load() {
     setLoading(true);
+    const filters: { search?: string; date_from?: string; date_to?: string; amount_min?: string; amount_max?: string } = {};
+    if (appliedSearch) filters.search = appliedSearch;
+    if (dateFrom) filters.date_from = dateFrom;
+    if (dateTo) filters.date_to = dateTo;
+    if (amountMin) filters.amount_min = amountMin;
+    if (amountMax) filters.amount_max = amountMax;
     fundAPI
-      .getExpenses(page)
+      .getExpenses(page, filters)
       .then((res) => {
         const data = res.data as unknown as Paginated<Expense>;
         setItems(data.results);
@@ -59,7 +72,15 @@ export default function AdminExpensesPage() {
     if (canView) load();
     else setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canView, page]);
+  }, [canView, page, dateFrom, dateTo, amountMin, amountMax, appliedSearch]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedSearch(searchInput.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   function openCreate() {
     setAmount('');
@@ -181,6 +202,43 @@ export default function AdminExpensesPage() {
             {isRTL ? 'ثبت هزینه' : 'Add Expense'}
           </button>
         )}
+      </div>
+
+      <div className="admin-glass-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 items-end">
+        <AdminInput
+          label={isRTL ? 'جست‌وجو (علت یا توضیحات)' : 'Search (reason or description)'}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          maxLength={150}
+        />
+        <AdminInput
+          label={isRTL ? 'از تاریخ' : 'From date'}
+          type="date"
+          value={dateFrom}
+          onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+        />
+        <AdminInput
+          label={isRTL ? 'تا تاریخ' : 'To date'}
+          type="date"
+          value={dateTo}
+          onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+        />
+        <AdminInput
+          label={isRTL ? 'حداقل مبلغ' : 'Min amount'}
+          type="number"
+          min="0"
+          step="0.01"
+          value={amountMin}
+          onChange={(e) => { setAmountMin(e.target.value); setPage(1); }}
+        />
+        <AdminInput
+          label={isRTL ? 'حداکثر مبلغ' : 'Max amount'}
+          type="number"
+          min="0"
+          step="0.01"
+          value={amountMax}
+          onChange={(e) => { setAmountMax(e.target.value); setPage(1); }}
+        />
       </div>
 
       <AdminTable

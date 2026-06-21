@@ -25,6 +25,7 @@ from core.validators import (
     MEMBER_NUMBER_MAX,
     MEMBER_NUMBER_MIN,
     safe_filter,
+    safe_search_term,
     sanitize_and_limit,
 )
 from logs.models import ActivityLog
@@ -85,7 +86,7 @@ class MemberListView(APIView):
         if is_active is not None:
             qs = qs.filter(is_active=is_active.lower() == 'true')
 
-        search = request.query_params.get('search')
+        search = safe_search_term(request.query_params.get('search'))
         if search:
             q = (
                 Q(full_name__icontains=search)
@@ -137,9 +138,6 @@ class MemberDetailView(APIView):
             return api_error('Member not found.', status_code=404)
 
         is_owner = request.user.pk == member.pk
-        if member.is_superuser and not is_owner and not request.user.is_superuser:
-            return api_error('Cannot view superuser profile.', status_code=403)
-
         if is_owner or _can_view_member_details(request.user):
             return api_success(MemberDetailSerializer(member).data)
         return api_success(MemberListSerializer(member).data)
@@ -159,10 +157,6 @@ class MemberFullProfileView(APIView):
             member = Member.objects.select_related('group').get(pk=pk)
         except Member.DoesNotExist:
             return api_error('Member not found.', status_code=404)
-
-        is_owner = request.user.pk == member.pk
-        if member.is_superuser and not is_owner and not request.user.is_superuser:
-            return api_error('Cannot view superuser profile.', status_code=403)
 
         from core.models import ContactMessage
         from core.serializers import ContactMessageSerializer

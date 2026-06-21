@@ -61,9 +61,9 @@
   "posts": {
     "title": "Posts",
     "search_placeholder": "Search by title, body, or author...",
-    "advanced_search": "Advanced Search",
     "date_from_label": "From",
     "date_to_label": "To",
+    "filters_clear": "Clear filters",
     "no_posts": "No posts found",
     "read_more": "Read More",
     "comments_title": "Comments",

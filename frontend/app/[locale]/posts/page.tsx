@@ -3,10 +3,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { Search, MessageSquare, Calendar, User, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
+import { MessageSquare, Calendar, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { postsAPI } from '@/lib/api';
 import type { PostSummary, Paginated } from '@/lib/api';
+import SiteSearchFilterCard, { SiteFilterField } from '@/components/common/SiteSearchFilterCard';
+import { SEARCH_TERM_MAX_LENGTH } from '@/lib/validation';
 
 // ─── Skeleton card ────────────────────────────────────────────────────────────
 
@@ -106,7 +108,6 @@ export default function PostsPage() {
   const [loginRequired, setLoginRequired] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [debouncedDateFrom, setDebouncedDateFrom] = useState('');
@@ -128,6 +129,13 @@ export default function PostsPage() {
     }, 300);
     return () => clearTimeout(timer);
   }, [search, dateFrom, dateTo]);
+
+  const hasActiveFilters = !!(search || dateFrom || dateTo);
+  const clearFilters = () => {
+    setSearch('');
+    setDateFrom('');
+    setDateTo('');
+  };
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
@@ -186,105 +194,36 @@ export default function PostsPage() {
           </h1>
         </motion.div>
 
-        {/* Search bar */}
+        {/* Search & filters — same look as the Expenses page */}
         <motion.div
           className="mb-8 max-w-xl mx-auto"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.15 }}
         >
-          <div className="relative flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search
-                size={18}
-                className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
-                style={{ color: 'rgba(0,255,255,0.5)' }}
-              />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={t('search_placeholder')}
-                className="w-full rounded-xl pl-11 pr-4 py-3 text-white placeholder-white/30 outline-none transition-all duration-200"
-                style={{
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.border = '1px solid #00ffff';
-                  e.currentTarget.style.boxShadow = '0 0 15px rgba(0,255,255,0.15)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowAdvanced((v) => !v)}
-              aria-label={t('advanced_search')}
-              title={t('advanced_search')}
-              className="flex-shrink-0 rounded-xl p-3 transition-all duration-200"
-              style={{
-                background: showAdvanced ? 'rgba(0,255,255,0.12)' : 'rgba(255,255,255,0.05)',
-                border: showAdvanced ? '1px solid #00ffff' : '1px solid rgba(255,255,255,0.1)',
-                color: showAdvanced ? '#00ffff' : 'rgba(255,255,255,0.6)',
-              }}
-            >
-              <SlidersHorizontal size={18} />
-            </button>
-          </div>
-
-          {showAdvanced && (
-            <motion.div
-              className="mt-3 flex flex-col sm:flex-row gap-3"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              transition={{ duration: 0.25 }}
-            >
-              <label className="flex-1 flex flex-col gap-1">
-                <span className="text-xs text-white/40">{t('date_from_label')}</span>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-full rounded-xl px-4 py-2.5 text-white outline-none transition-all duration-200"
-                  style={{
-                    background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    colorScheme: 'dark',
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.border = '1px solid #00ffff';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
-                  }}
-                />
-              </label>
-              <label className="flex-1 flex flex-col gap-1">
-                <span className="text-xs text-white/40">{t('date_to_label')}</span>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="w-full rounded-xl px-4 py-2.5 text-white outline-none transition-all duration-200"
-                  style={{
-                    background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    colorScheme: 'dark',
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.border = '1px solid #00ffff';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
-                  }}
-                />
-              </label>
-            </motion.div>
-          )}
+          <SiteSearchFilterCard
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder={t('search_placeholder')}
+            searchMaxLength={SEARCH_TERM_MAX_LENGTH}
+            hasActiveFilters={hasActiveFilters}
+            onClear={clearFilters}
+            clearLabel={t('filters_clear')}
+            filtersClassName="grid grid-cols-2 gap-3 mt-2"
+          >
+            <SiteFilterField
+              label={t('date_from_label')}
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+            />
+            <SiteFilterField
+              label={t('date_to_label')}
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+            />
+          </SiteSearchFilterCard>
         </motion.div>
 
         {/* Error */}
