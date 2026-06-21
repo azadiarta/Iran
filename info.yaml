@@ -1,5 +1,5 @@
 project_summary:
-  generated_at: "2026-06-20"
+  generated_at: "2026-06-21"
   source_files_read: 167
   categories_found: 22
   quick_stats:
@@ -17,7 +17,7 @@ project_summary:
     total_frontend_routes: 32
     total_frontend_api_modules: 13
     total_zustand_stores: 3
-    total_reusable_ui_components: 25
+    total_reusable_ui_components: 26
     total_phone_fields: 1
 
 project_conventions:
@@ -111,7 +111,16 @@ project_conventions:
       glow logic by hand. Icons are lucide-react throughout — do not add a
       second icon library. A new component must reuse one of these existing
       visual conventions, not introduce a new color, a new border-radius
-      scale, or a new font treatment.
+      scale, or a new font treatment. Sitewide watermark (added on top of
+      this base theme, not a replacement for it): a single fixed,
+      low-opacity (0.07) background image (the Iranian Political
+      Association Birmingham emblem, frontend/public/branding/), mounted
+      once by SiteBackground.tsx in the root layout, visible behind every
+      page — public AND admin — because the page background is otherwise
+      fully opaque (#0a0a0f on the public site's per-page wrappers, the
+      admin shell's --admin-bg). See all.yaml's roadmap.add_sitewide_watermark
+      for the exact mechanism before touching any page-level or admin-shell
+      background color/opacity.
   technology_stack:
     rule: >
       Backend: Django + Django REST Framework, PostgreSQL (SQLite fallback
@@ -755,7 +764,7 @@ api_calls:
 
 ui_components:
   scope: frontend
-  total_count: 25
+  total_count: 26
   description: Reusable UI components under frontend/components — admin primitives, admin form fields, layout shells, and shared/animation components.
   subcategories:
     admin_primitives:
@@ -830,8 +839,13 @@ ui_components:
           location: [frontend/components/admin/fields/AdminToggle.tsx]
           notes: "Used for show_in_public_list and instant settings toggles in admin/payments and admin/settings."
     layout_components:
-      count: 7
+      count: 8
       items:
+        - id: ui_SiteBackground
+          label: "SiteBackground — sitewide watermark (Phase 35, NEW)"
+          scope: frontend
+          location: [frontend/components/layout/SiteBackground.tsx]
+          notes: "Mounted once by app/[locale]/layout.tsx as the first child inside <body> — the single shared root layout for every route, public and admin alike — so it doesn't need to be added per-page. Fixed, aria-hidden, pointer-events-none div with backgroundImage url(/branding/ipa-birmingham.jpg), backgroundSize 'contain' (no stretch/crop), opacity 0.07, zIndex -1 (paints behind in-flow content, in front of <body>'s own background-color). Required removing 18 pages' redundant opaque bg-[#0a0a0f] wrapper backgrounds (public site) and loosening admin.css's --admin-bg to a semi-transparent rgba (admin shell) — see all.yaml roadmap.add_sitewide_watermark for the full list/mechanism."
         - id: ui_AdminLayout
           label: AdminLayout — admin panel page shell
           scope: frontend
@@ -945,6 +959,7 @@ routes:
           label: "/ — landing page"
           scope: frontend
           location: ["frontend/app/[locale]/page.tsx"]
+          notes: "Phase 35 — Hero CTA's 'Contribute Now' button replaced with a language-switch button (toggles locale en<->fa, router.push() to the equivalent path); landing.cta_contribute removed from messages/*.json. See ui_SiteBackground / all.yaml roadmap.add_sitewide_watermark for this page's other Phase 35 change (dropped its outer wrapper's hardcoded background color so the new sitewide watermark shows through)."
         - id: route_posts_list
           label: "/posts — public posts list"
           scope: frontend

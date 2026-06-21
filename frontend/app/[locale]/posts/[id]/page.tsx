@@ -261,7 +261,7 @@ export default function PostDetailPage() {
   // Loading state
   if (postLoading) {
     return (
-      <div className="min-h-screen px-4 py-12" style={{ background: '#0a0a0f' }}>
+      <div className="min-h-screen px-4 py-12">
         <div className="max-w-3xl mx-auto space-y-6">
           <div className="h-8 w-24 rounded-lg bg-white/10 animate-pulse" />
           <div className="rounded-2xl border border-white/10 bg-white/5 p-8 space-y-4">
@@ -282,7 +282,7 @@ export default function PostDetailPage() {
   // Login required state
   if (postLoginRequired) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: '#0a0a0f' }}>
+      <div className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center space-y-4">
           <p className="text-white/40 text-xl">{t('login_required_detail')}</p>
           <Link
@@ -304,7 +304,7 @@ export default function PostDetailPage() {
   // Error state
   if (postError) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: '#0a0a0f' }}>
+      <div className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center space-y-4">
           <p style={{ color: '#ef4444' }} className="text-xl">{postError}</p>
           <button
@@ -322,7 +322,7 @@ export default function PostDetailPage() {
   if (!post) return null;
 
   return (
-    <div className="min-h-screen px-4 py-12" style={{ background: '#0a0a0f' }}>
+    <div className="min-h-screen px-4 py-12">
       <div className="max-w-3xl mx-auto space-y-8">
 
         {/* Back button */}

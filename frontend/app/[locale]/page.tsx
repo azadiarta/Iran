@@ -2,9 +2,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, usePathname, useRouter } from 'next/navigation';
 import { motion, useInView } from 'framer-motion';
-import { Users, TrendingUp, Wallet, ArrowRight, CheckCircle, UserCheck, User } from 'lucide-react';
+import { Users, TrendingUp, Wallet, ArrowRight, CheckCircle, UserCheck, User, Languages } from 'lucide-react';
+import useLangStore from '@/store/langStore';
 import {
   LionAndSun,
   GeometricPattern,
@@ -118,6 +119,16 @@ export default function LandingPage() {
   const params = useParams();
   const locale = params?.locale as string || 'en';
   const { hasPermission, isAuthenticated, member } = useAuthStore();
+  const pathname = usePathname();
+  const router = useRouter();
+  const { setLocale } = useLangStore();
+
+  function handleLanguageSwitch() {
+    const newLocale = locale === 'en' ? 'fa' : 'en';
+    setLocale(newLocale);
+    const newPath = pathname.replace(`/${locale}`, `/${newLocale}`);
+    router.push(newPath);
+  }
 
   const [balance, setBalance] = useState<FundBalance | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(true);
@@ -197,7 +208,7 @@ export default function LandingPage() {
   }
 
   return (
-    <div style={{ background: '#0a0a0f', minHeight: '100vh' }}>
+    <div style={{ minHeight: '100vh' }}>
 
       {/* ─── Deactivated account banner ───────────────────────────────────── */}
       {mounted && member?.is_active === false && (
@@ -360,8 +371,8 @@ export default function LandingPage() {
               </Link>
             )}
 
-            <Link
-              href={`/${locale}/contribute`}
+            <button
+              onClick={handleLanguageSwitch}
               className="inline-flex items-center gap-2 px-8 py-3 rounded-xl font-semibold text-lg transition-all duration-200"
               style={{
                 border: '1.5px solid #10b981',
@@ -369,17 +380,18 @@ export default function LandingPage() {
                 color: '#6ee7b7',
               }}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(16,185,129,0.3)';
-                (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 0 20px rgba(16,185,129,0.5)';
+                (e.currentTarget as HTMLButtonElement).style.background = 'rgba(16,185,129,0.3)';
+                (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 20px rgba(16,185,129,0.5)';
               }}
               onMouseLeave={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(16,185,129,0.15)';
-                (e.currentTarget as HTMLAnchorElement).style.boxShadow = 'none';
+                (e.currentTarget as HTMLButtonElement).style.background = 'rgba(16,185,129,0.15)';
+                (e.currentTarget as HTMLButtonElement).style.boxShadow = 'none';
               }}
+              aria-label="Switch language"
             >
-              {t('landing.cta_contribute')}
-              <TrendingUp size={18} />
-            </Link>
+              {locale === 'en' ? 'فارسی' : 'English'}
+              <Languages size={18} />
+            </button>
           </motion.div>
         </div>
 

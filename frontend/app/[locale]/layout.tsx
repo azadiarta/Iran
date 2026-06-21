@@ -4,6 +4,7 @@ import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import '@/styles/globals.css';
 import ClientLayout from './ClientLayout';
+import SiteBackground from '@/components/layout/SiteBackground';
 
 const locales = ['en', 'fa'];
 
@@ -27,6 +28,7 @@ export default async function LocaleLayout({
   return (
     <html lang={locale} dir={dir}>
       <body className="bg-[#0a0a0f] text-white antialiased min-h-screen flex flex-col">
+        <SiteBackground />
         <NextIntlClientProvider messages={messages} locale={locale}>
           <ClientLayout locale={locale as 'en' | 'fa'}>
             {children}

@@ -94,7 +94,7 @@ export default function ContactPage() {
     'w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/20 outline-none focus:border-[#00ffff] focus:ring-1 focus:ring-[#00ffff]/30 transition-all';
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white flex items-center justify-center px-4 py-10">
+    <div className="min-h-screen text-white flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-lg">
         <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-8">
           {/* Deactivated account banner */}

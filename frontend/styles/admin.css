@@ -1,6 +1,9 @@
 /* ─── Admin Design System — extends globals.css with a darker theme ───────── */
 :root {
-  --admin-bg: #05050a;
+  /* Slightly transparent (not opaque #05050a) so the sitewide watermark
+     (rendered behind <body> by SiteBackground) shows through the admin
+     canvas too — see roadmap.add_sitewide_watermark. */
+  --admin-bg: rgba(5, 5, 10, 0.93);
   --admin-surface: #0d0d14;
   --admin-surface-2: #13131e;
   --admin-sidebar-width: 260px;
