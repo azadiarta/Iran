@@ -55,6 +55,12 @@ def _validate_value(key, value):
     elif key in ('max_receipt_image_size_mb', 'auth_sync_interval_seconds'):
         if not value.isdigit() or int(value) <= 0:
             return 'Must be a positive integer.'
+    elif key in ('landing_headline_en', 'landing_headline_fa'):
+        if len(value) > 150:
+            return 'Must be at most 150 characters.'
+    elif key in ('landing_tagline_en', 'landing_tagline_fa'):
+        if len(value) > 300:
+            return 'Must be at most 300 characters.'
     elif key in _CHOICES:
         if value not in _CHOICES[key]:
             return f"Must be one of: {', '.join(_CHOICES[key])}."
@@ -88,7 +94,10 @@ class DefaultSettingListView(APIView):
 
 # Settings safe to expose to anyone, including guests (e.g. for the public
 # Contact Us page) — deliberately a tiny allowlist, never the full settings list.
-PUBLIC_SETTING_KEYS = ['contact_email', 'contact_phone', 'auth_sync_interval_seconds']
+PUBLIC_SETTING_KEYS = [
+    'contact_email', 'contact_phone', 'auth_sync_interval_seconds',
+    'landing_headline_en', 'landing_headline_fa', 'landing_tagline_en', 'landing_tagline_fa',
+]
 
 
 class PublicSettingListView(APIView):

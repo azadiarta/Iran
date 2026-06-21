@@ -165,6 +165,38 @@ export const SETTINGS_META: Record<string, SettingMeta> = {
     },
     type: 'number',
   },
+  landing_headline_en: {
+    label: { en: 'Homepage Headline (English)', fa: 'تیتر صفحه اصلی (انگلیسی)' },
+    description: {
+      en: 'Main headline shown at the top of the homepage, in English.',
+      fa: 'تیتر اصلی که در بالای صفحه اصلی سایت، به زبان انگلیسی نمایش داده می‌شود.',
+    },
+    type: 'text',
+  },
+  landing_headline_fa: {
+    label: { en: 'Homepage Headline (Farsi)', fa: 'تیتر صفحه اصلی (فارسی)' },
+    description: {
+      en: 'Main headline shown at the top of the homepage, in Farsi.',
+      fa: 'تیتر اصلی که در بالای صفحه اصلی سایت، به زبان فارسی نمایش داده می‌شود.',
+    },
+    type: 'text',
+  },
+  landing_tagline_en: {
+    label: { en: 'Homepage Tagline (English)', fa: 'شعار صفحه اصلی (انگلیسی)' },
+    description: {
+      en: 'Short tagline shown below the homepage headline, in English.',
+      fa: 'شعار کوتاهی که زیر تیتر صفحه اصلی، به زبان انگلیسی نمایش داده می‌شود.',
+    },
+    type: 'text',
+  },
+  landing_tagline_fa: {
+    label: { en: 'Homepage Tagline (Farsi)', fa: 'شعار صفحه اصلی (فارسی)' },
+    description: {
+      en: 'Short tagline shown below the homepage headline, in Farsi.',
+      fa: 'شعار کوتاهی که زیر تیتر صفحه اصلی، به زبان فارسی نمایش داده می‌شود.',
+    },
+    type: 'text',
+  },
 };
 
 // Bilingual metadata for the payment settings rendered on /admin/payments.
