@@ -43,6 +43,14 @@ LONG_TEXT_ADMIN_MAX_LENGTH = 550
 # entered (registration, profile edit, admin member create/edit, login).
 EMAIL_MAX_LENGTH = 75
 
+# Mirrors frontend/lib/validation.ts PASSWORD_MIN_LENGTH — single source of
+# truth for the password-strength rule enforced on every password-setting
+# path in the project (API registration, API password-change, Django-admin
+# password-change forms, and `createsuperuser`/`changepassword` management
+# commands — the last two via AUTH_PASSWORD_VALIDATORS in settings.py, which
+# wraps the same check through PasswordStrengthValidator below).
+PASSWORD_MIN_LENGTH = 8
+
 ALLOWED_IMAGE_FORMATS = {'JPEG', 'PNG'}
 MAX_UPLOAD_FILENAME_LENGTH = 255
 
@@ -102,6 +110,58 @@ def validate_phone_or_email(value):
     raise drf_serializers.ValidationError(
         "Enter a valid email address or phone number (starting with 00, e.g. 00447700900000)."
     )
+
+
+def _password_strength_errors(value):
+    """Returns a list of unmet password-strength rule messages (empty list
+    means the password passes). Shared by the DRF-facing validator below and
+    by PasswordStrengthValidator (the Django auth-framework adapter
+    registered in AUTH_PASSWORD_VALIDATORS), so there is exactly one rule
+    definition no matter which entry point sets the password.
+    """
+    value = value or ''
+    errors = []
+    if len(value) < PASSWORD_MIN_LENGTH:
+        errors.append(f"Password must be at least {PASSWORD_MIN_LENGTH} characters.")
+    if not re.search(r'[A-Za-z]', value) or not re.search(r'\d', value):
+        errors.append("Password must contain a mix of letters and numbers.")
+    if not re.search(r'[A-Z]', value):
+        errors.append("Password must contain at least one uppercase letter.")
+    if not re.search(r'[^A-Za-z0-9]', value):
+        errors.append("Password must contain at least one special character.")
+    return errors
+
+
+def validate_password_strength(value):
+    """DRF-facing password-strength check: length + letter/digit mix + an
+    uppercase letter + a special character. Used by RegisterSerializer and
+    ChangePasswordSerializer (and anything inheriting from them).
+    """
+    errors = _password_strength_errors(value)
+    if errors:
+        raise drf_serializers.ValidationError(errors)
+    return value
+
+
+class PasswordStrengthValidator:
+    """Adapter exposing the same rule to Django's AUTH_PASSWORD_VALIDATORS
+    framework, so password-change forms outside the DRF API (Django admin's
+    own "change password" form, `createsuperuser`/`changepassword` CLI
+    commands) enforce the identical rule instead of Django's unrelated
+    built-in defaults.
+    """
+
+    def validate(self, password, user=None):
+        errors = _password_strength_errors(password)
+        if errors:
+            raise DjangoValidationError(errors)
+
+    def get_help_text(self):
+        return (
+            f"Your password must be at least {PASSWORD_MIN_LENGTH} characters long and contain "
+            "a mix of letters and numbers, including at least one uppercase letter and at least "
+            "one special character."
+        )
 
 
 def sanitize_text(value):

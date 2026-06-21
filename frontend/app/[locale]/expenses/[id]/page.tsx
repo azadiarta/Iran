@@ -552,6 +552,7 @@ export default function ExpenseDetailPage() {
                       e.currentTarget.style.boxShadow = 'none';
                     }}
                   />
+                  <p className="text-xs text-white/30 text-right">{commentName.length}/50</p>
                 </div>
 
                 {/* Text */}
@@ -585,6 +586,7 @@ export default function ExpenseDetailPage() {
                       e.currentTarget.style.boxShadow = 'none';
                     }}
                   />
+                  <p className="text-xs text-white/30 text-right">{commentText.length}/250</p>
                 </div>
 
                 {/* Rating */}
@@ -626,7 +628,7 @@ export default function ExpenseDetailPage() {
                 {/* Submit */}
                 <button
                   type="submit"
-                  disabled={commentSubmitting || !captchaToken}
+                  disabled={commentSubmitting || !captchaToken || commentRating === 0}
                   className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
                   style={{
                     background: 'rgba(0,255,255,0.1)',

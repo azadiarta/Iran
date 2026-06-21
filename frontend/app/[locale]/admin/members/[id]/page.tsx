@@ -27,7 +27,7 @@ import {
   phoneFormatError,
   PHONE_PLACEHOLDER,
   LONG_TEXT_ADMIN_MAX_LENGTH,
-  passwordTooShortError,
+  passwordStrengthError,
   passwordMismatchError,
   EMAIL_MAX_LENGTH,
 } from '@/lib/validation';
@@ -192,7 +192,7 @@ export default function AdminMemberDetailPage() {
     setNewPassword(value);
     setPasswordFieldErrors((prev) => ({
       ...prev,
-      new_password: passwordTooShortError(isRTL, value),
+      new_password: passwordStrengthError(isRTL, value),
       confirm_password:
         confirmPassword && value !== confirmPassword ? passwordMismatchError(isRTL) : undefined,
     }));
@@ -208,7 +208,7 @@ export default function AdminMemberDetailPage() {
 
   async function savePassword(e: React.FormEvent) {
     e.preventDefault();
-    const lengthError = passwordTooShortError(isRTL, newPassword);
+    const lengthError = passwordStrengthError(isRTL, newPassword);
     if (lengthError) {
       showToast('warning', lengthError);
       return;
@@ -449,6 +449,11 @@ export default function AdminMemberDetailPage() {
                 value={newPassword}
                 onChange={(e) => handleNewPasswordChange(e.target.value)}
                 error={passwordFieldErrors.new_password}
+                hint={
+                  isRTL
+                    ? 'حداقل ۸ نویسه، ترکیبی از حروف و اعداد، شامل حداقل یک حرف بزرگ و یک کاراکتر خاص.'
+                    : 'At least 8 characters, with letters and numbers, including one uppercase letter and one special character.'
+                }
               />
               <AdminInput
                 label={isRTL ? 'تکرار رمز عبور' : 'Confirm Password'}

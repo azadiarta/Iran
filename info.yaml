@@ -1,7 +1,7 @@
 project_summary:
   generated_at: "2026-06-20"
   source_files_read: 167
-  categories_found: 20
+  categories_found: 22
   quick_stats:
     total_forms: 23
     total_action_buttons: 9
@@ -19,6 +19,164 @@ project_summary:
     total_zustand_stores: 3
     total_reusable_ui_components: 25
     total_phone_fields: 1
+
+project_conventions:
+  scope: project-wide
+  description: >
+    READ THIS SECTION FIRST, before building or modifying anything on this
+    project. It is the project's standing rulebook, distilled from real
+    patterns already enforced across the codebase — not aspirational, not
+    theoretical. all.yaml (the detailed, file-by-file intelligence map) plus
+    this file (info.yaml, the curated, rule-oriented distillation) are meant
+    to be sufficient ON THEIR OWN for any future session to fully understand
+    this project and build new features the exact same way the rest of the
+    project already works, with no further explanation needed from the user.
+    If you are about to add a field, a page, a form, or a component and
+    you're unsure what limit/style/pattern to use, the answer is almost
+    always: "copy whatever the most similar existing thing already does" —
+    never invent a new convention when an existing one already covers the
+    case.
+  consistency_principle:
+    rule: >
+      Two separate consistency domains exist in this project. Each MUST be
+      internally consistent within itself, but the two domains are NOT
+      required to match each other:
+        (1) admin_panel domain — everything under frontend/app/[locale]/admin/**
+            in the frontend, plus the Django admin site at /admin/ itself.
+            Every rule, limit, component, and visual convention used by ONE
+            admin-panel screen must match every OTHER admin-panel screen.
+        (2) main_site domain — every public-facing page and the
+            member-facing frontend/app/[locale]/profile/** pages (everything
+            that is NOT under admin/**). Every rule, limit, component, and
+            visual convention used by ONE main-site screen must match every
+            OTHER main-site screen.
+      The two domains MAY legitimately differ from each other — this is
+      intentional, not a bug or an inconsistency to "fix". Example: the
+      admin-panel short-text cap is SHORT_TEXT_ADMIN_MAX_LENGTH=100 while the
+      main-site short-text cap is SHORT_TEXT_PUBLIC_MAX_LENGTH=50, because
+      admin users are trusted staff entering structured data while main-site
+      fields are public/guest-facing. When building something new: first
+      decide which domain it belongs to, then go find an existing
+      screen/component already in THAT SAME domain that does something
+      similar, and copy its limits/styling/structure — do not average the
+      two domains together, and do not invent a third convention.
+    example_pattern: >
+      The character-counter rule is ONE illustrative example of this
+      principle, not the only one — see
+      validation_logic.frontend_manual_validation.validate_character_counter_rule
+      for the full rule (every maxLength input, in EITHER domain, must show a
+      live "{value.length}/{max_length}" counter — zero exceptions). The same
+      "find what every other item in your domain already does, then copy it"
+      principle applies equally to, at minimum: error-message styling and
+      placement, button styles and hover states, spacing/padding scales,
+      loading-skeleton patterns, empty-state copy/iconography, and
+      CAPTCHA/rate-limit placement on data-entry endpoints — see
+      theme_and_ui below and security_rules for the specifics of those.
+  pages_and_routing:
+    rule: >
+      Next.js App Router + next-intl: every route lives under
+      frontend/app/[locale]/**, so every page is locale-prefixed (/en/... or
+      /fa/...) automatically by the routing structure itself — never build a
+      page outside this directory or hardcode a locale prefix by hand. There
+      are exactly 2 locales, en and fa, with fa rendered right-to-left. A new
+      page MUST: (1) live under app/[locale]/ like every existing page, (2)
+      read the locale via useParams() and compute `const isRTL = locale ===
+      'fa'` the exact same way every existing page does — never invent a
+      second way to detect direction, (3) add any new user-facing string to
+      BOTH locale message files (see i18n in all.yaml) instead of hardcoding
+      English or Persian text inline in a component, (4) if it's an admin
+      page, live under app/[locale]/admin/** and be gated by the same
+      authAPI/group-permission check every existing admin page already uses
+      (see auth_permission_checks.frontend_auth) — never ship a new admin
+      page that skips this gate "just for now".
+  theme_and_ui:
+    rule: >
+      Every screen on the site — public AND admin — shares ONE dark
+      glassmorphism visual language; never introduce a second visual style.
+      Concretely, and observable on literally every existing page: page
+      background is #0a0a0f (near-black); card surfaces are
+      rounded-xl/rounded-2xl with a border-white/10 border and a
+      bg-white/5 backdrop-blur-xl fill; the accent color is cyan #00ffff,
+      used for headings, focus rings, and primary actions (often paired with
+      a cyan textShadow/boxShadow glow); errors are #ef4444 text on a
+      rgba(239,68,68,0.1) tinted background; positive/success states use
+      #10b981; pending/warning states use #fbbf24. Inputs share one focus
+      treatment: a plain rgba(255,255,255,0.1) border at rest, switching on
+      focus to a 1px solid #00ffff border plus a soft cyan box-shadow glow
+      — implemented by hand via onFocus/onBlur on raw <input>/<textarea>
+      elements where no shared component exists yet, or automatically via
+      the shared AdminInput/AdminTextarea (admin domain) or a page's local
+      Field component (main-site domain, see register/page.tsx) where one
+      does exist; prefer reusing one of those over re-implementing the same
+      glow logic by hand. Icons are lucide-react throughout — do not add a
+      second icon library. A new component must reuse one of these existing
+      visual conventions, not introduce a new color, a new border-radius
+      scale, or a new font treatment.
+  technology_stack:
+    rule: >
+      Backend: Django + Django REST Framework, PostgreSQL (SQLite fallback
+      only for local/no-DB-configured environments), JWT auth via simplejwt,
+      and ZERO Django Forms / ViewSets / routers anywhere — every endpoint is
+      a plain DRF APIView subclass (see the methodology note below and
+      api_endpoints). Frontend: Next.js App Router + React + TypeScript,
+      next-intl for i18n, Zustand for client state (state_management),
+      Tailwind utility classes for ALL styling — no CSS modules, no
+      styled-components, no extra .css files beyond Tailwind's own global
+      stylesheet; inline `style={{...}}` props are used ONLY for the dynamic
+      glassmorphism color/glow values described above that Tailwind's static
+      class scanner can't express, never as a general substitute for
+      Tailwind classes that already exist. frontend/lib/api.ts's shared axios
+      instance is the ONLY HTTP client in the frontend — never instantiate a
+      second one. A new feature must use this exact stack: do not introduce
+      a new state-management library, a new CSS approach, a new HTTP client,
+      a new icon set, or a new auth mechanism, even if it would technically
+      work — consistency with the rest of the project outranks personal
+      preference or "best practice in general."
+  validation_and_limits_consistency:
+    rule: >
+      All shared length/format/strength limits are centralized in exactly
+      two files that must always mirror each other 1:1:
+      backend/core/validators.py (server-side, authoritative) and
+      frontend/lib/validation.ts (client-side, advisory/UX-only — see
+      sec_server_authoritative in security_rules). Never hardcode a length
+      limit, a phone/email regex, or a password rule inline in a
+      serializer/view/component — import the shared constant/function from
+      one of these two files instead. If a limit genuinely needs to change,
+      change it in BOTH files in the same commit and update every call site;
+      see validation_logic below for the canonical current values and every
+      file that currently consumes them.
+
+security_rules:
+  scope: project-wide
+  description: >
+    Every form, input box, or other data-entry surface anywhere in the
+    project — public site, member-authenticated pages, AND the Django admin
+    panel — must carry this full security baseline. None of these are
+    optional polish; they are the project's non-negotiable floor for
+    anything that accepts user input. Before considering a new form/input
+    "done", check this list and confirm each item that applies to it is
+    actually wired up, not just planned.
+  baseline:
+    - id: sec_server_authoritative
+      rule: "Every validation rule enforced client-side MUST also be enforced server-side, and the server-side check is the one that's actually authoritative — client-side checks exist only to give the user a fast, friendly error before a round-trip, never as the only line of defense. (See validation_and_limits_consistency above.)"
+    - id: sec_sanitize_and_cap
+      rule: "Every free-text field accepted from a user, in either domain, is run through core.validators.sanitize_and_limit (or validate_max_length) server-side: HTML-stripped via strip_tags AND length-capped, never trusted raw. There is no 'admin-only, so it's fine to skip this' exception — admin accounts can also be compromised or socially engineered."
+    - id: sec_captcha_everywhere_unauthenticated
+      rule: "Every endpoint that lets an UNAUTHENTICATED actor create or submit data is gated by a Cloudflare Turnstile CAPTCHA check (core.captcha.verify_captcha, fail-closed on any error) before any other logic runs: login, register, contact, post/expense comments, contribution/payment initiate, AND — as of Phase 32 — the Django admin login form itself (core/admin_forms.py:CaptchaAdminAuthenticationForm). The admin login is a distinct attack surface served by django.contrib.admin, not DRF, and must never be assumed to inherit DRF-level CAPTCHA wiring just because the rest of the API has it. A new unauthenticated write endpoint must call verify_captcha() at the top of its view before adding anything else."
+    - id: sec_rate_limit_unauthenticated
+      rule: "Every one of those same unauthenticated-write endpoints also carries a DRF throttle_scope resolved against core.throttles.SessionAwareScopedRateThrottle — never the plain rest_framework.throttling.ScopedRateThrottle. Anonymous requests are keyed on session+IP together, not IP alone, specifically because IP rotation alone must never be enough to reset a rate-limit counter on a site that organizes real-world political activity and is therefore a realistic targeted-abuse target. A new unauthenticated write endpoint must add a throttle_scope class attribute plus a matching DEFAULT_THROTTLE_RATES entry in settings.py — never rely on the global anon/user fallback rate alone for a sensitive write path."
+    - id: sec_password_strength
+      rule: "Every password a member can set — registration, profile password-change, and admin-created or admin-reset member passwords — is checked by core.validators.PasswordStrengthValidator server-side (also wired into AUTH_PASSWORD_VALIDATORS so it covers Django's own admin password-change form and the createsuperuser/changepassword CLI commands too, automatically) and mirrored by frontend/lib/validation.ts:passwordStrengthError client-side — both in the exact same order: length>=PASSWORD_MIN_LENGTH(8), a letter+digit mix, at least one uppercase letter, at least one special character."
+    - id: sec_file_content_verification
+      rule: "Every file upload (post images, expense receipts, payment/contribution receipts) is verified by its real file CONTENT — Pillow Image.open()+verify() against an explicit format allowlist, or a %PDF- magic-byte check for PDFs — via core.validators.validate_image_file/validate_receipt_file. Never trust a file's extension or a client-supplied Content-Type alone; this is what blocks SVG-stored-XSS and mislabeled-file attacks. A new upload entry point must reuse one of these two validators, not write a new extension/MIME check."
+    - id: sec_jwt_bearer_only
+      rule: "The DRF API is JWT-bearer-only (simplejwt, access+refresh tokens, rotation+blacklist enabled); CORS_ALLOW_CREDENTIALS is never enabled, and no DRF endpoint should be changed to rely on cookie/session auth. Only the separate, server-rendered Django admin site uses Django's own session/cookie auth, out of necessity — do not blur this line when adding new backend surface area."
+    - id: sec_permission_classes
+      rule: "Every authenticated DRF view declares an explicit permission_class appropriate to who may actually call it — IsActiveMember / IsSuperuser / HasGroupPermission(<perm>), see auth_permission_checks.backend_auth. Never leave a view on the bare global default (IsAuthenticated) when it should be restricted further, and never write a new ad-hoc permission check inline in a view body when one of these three reusable classes already covers the case."
+    - id: sec_required_field_never_silently_optional
+      rule: "A field the business logic genuinely requires — e.g. a comment's star rating, which the backend already rejects if null/zero — must ALSO be enforced as a disabled/blocked submit button client-side, not left to silently no-op until the server rejects it after a round-trip. The server-side check per sec_server_authoritative remains the authoritative one either way; the client-side block is a UX courtesy, not a substitute."
+    - id: sec_secrets_never_hardcoded
+      rule: "All API keys/secrets (TURNSTILE_SECRET_KEY, TURNSTILE_SITE_KEY, SECRET_KEY, payment-provider keys, DB credentials) are read from environment variables with safe non-production defaults where one exists (e.g. Cloudflare's published always-passes Turnstile test keys) — never commit a real secret as a literal value in source, only the documented public test defaults."
 
 # ============================================================
 # NOTE ON METHODOLOGY
@@ -64,7 +222,7 @@ forms:
             - frontend/lib/api.ts
             - backend/accounts/views.py
             - backend/accounts/backends.py
-          notes: "Fields: credential (email or phone), password. Calls authAPI.login -> POST /api/auth/login/ (LoginView). noValidate, manual required checks only. credential routed to email-or-phone lookup in MemberAuthBackend.authenticate(). Phase 31 — gated by a Cloudflare Turnstile CAPTCHA widget (frontend/components/common/Turnstile.tsx); submit disabled until a token is issued, and captcha_token is sent with every request. LoginView now sets throttle_scope='login' (10/hour, ScopedRateThrottle) and rejects the request with 400 if core.captcha.verify_captcha(captcha_token, ip) fails, BEFORE the credential/password check — this is the ONLY login form in the project (shared by ordinary members and admins/superusers alike), so gating it here satisfies CAPTCHA-on-entry-point for the admin panel too, without ever putting a CAPTCHA inside the authenticated admin UI itself."
+          notes: "Fields: credential (email or phone), password. Calls authAPI.login -> POST /api/auth/login/ (LoginView). noValidate, manual required checks only. credential routed to email-or-phone lookup in MemberAuthBackend.authenticate(). Phase 31 — gated by a Cloudflare Turnstile CAPTCHA widget (frontend/components/common/Turnstile.tsx); submit disabled until a token is issued, and captcha_token is sent with every request. LoginView now sets throttle_scope='login' (6/hour as of Phase 32's tightening, resolved against core.throttles.SessionAwareScopedRateThrottle — was 10/hour, plain ScopedRateThrottle, in Phase 31) and rejects the request with 400 if core.captcha.verify_captcha(captcha_token, ip) fails, BEFORE the credential/password check — this is the ONLY login form in the project (shared by ordinary members and admins/superusers alike), so gating it here satisfies CAPTCHA-on-entry-point for the admin panel too, without ever putting a CAPTCHA inside the authenticated admin UI itself."
         - id: form_register
           label: Registration form
           scope: frontend
@@ -73,7 +231,7 @@ forms:
             - frontend/lib/api.ts
             - backend/accounts/views.py
             - backend/accounts/serializers.py
-          notes: "Fields: full_name, display_name, phone, email, password, confirm_password. Calls authAPI.register -> POST /api/auth/register/ (RegisterView + RegisterSerializer). Client: full_name required (max 35), display_name optional (max 20), phone-or-email required (phone must match strict '00<countrycode><number>' format via frontend/lib/validation.ts isValidPhoneStrict; email format-checked), password min 8 chars, password===confirm_password. Server re-validates via backend/core/validators.py (validate_phone_format, validate_email_format, sanitize_and_limit) in RegisterSerializer.validate_full_name/validate_display_name/validate_phone and validate(). Phase 31 — same Turnstile CAPTCHA gate as form_login (submit disabled until verified, captcha_token included in the payload); RegisterView sets throttle_scope='register' (5/hour) and checks verify_captcha() before touching RegisterSerializer at all."
+          notes: "Fields: full_name, display_name, phone, email, password, confirm_password. Calls authAPI.register -> POST /api/auth/register/ (RegisterView + RegisterSerializer). Client: full_name required (max 35), display_name optional (max 20), phone-or-email required (phone must match strict '00<countrycode><number>' format via frontend/lib/validation.ts isValidPhoneStrict; email format-checked), password checked by passwordStrengthError (Phase 32 — min 8 chars, letter+digit mix, >=1 uppercase, >=1 special character; was a bare min-8 check before Phase 32), password===confirm_password. Server re-validates via backend/core/validators.py (validate_phone_format, validate_email_format, sanitize_and_limit, validate_password_strength) in RegisterSerializer.validate_full_name/validate_display_name/validate_phone and validate(). Phase 31 — same Turnstile CAPTCHA gate as form_login (submit disabled until verified, captcha_token included in the payload); RegisterView sets throttle_scope='register' (4/hour as of Phase 32's tightening, SessionAwareScopedRateThrottle — was 5/hour, plain ScopedRateThrottle) and checks verify_captcha() before touching RegisterSerializer at all."
         - id: form_profile_edit
           label: Own profile edit form
           scope: frontend
@@ -110,7 +268,7 @@ forms:
             - backend/core/contact_views.py
             - backend/core/serializers.py
             - backend/core/models.py
-          notes: "<form onSubmit>. Fields: name (prefilled/disabled if logged in), contact (free text, NOT phone-specific), message. Calls contactAPI.submit -> POST /api/contact/submit/ (ContactMessageCreateView + ContactMessageCreateSerializer). HTML5 required attrs (no noValidate). Special UI handling for HTTP 429 (AnonRateThrottle: 100/hour; Phase 31 also added throttle_scope='contact', 5/hour via ScopedRateThrottle, layered on top of the existing global anon rate). Generates a tracking_code (see tracking_code_scheme category). Phase 31 — gated by the same Turnstile CAPTCHA widget as form_login; the widget AND its token are reset (setCaptchaToken/captchaResetKey) both on submit failure and on the post-success 'send another' action, since the form's Turnstile instance unmounts/remounts across that transition and a stale token must never be left able to enable the submit button."
+          notes: "<form onSubmit>. Fields: name (prefilled/disabled if logged in), contact (free text, NOT phone-specific), message. Calls contactAPI.submit -> POST /api/contact/submit/ (ContactMessageCreateView + ContactMessageCreateSerializer). HTML5 required attrs (no noValidate). Special UI handling for HTTP 429 (AnonRateThrottle: 100/hour; Phase 31 also added throttle_scope='contact', tightened to 4/hour via core.throttles.SessionAwareScopedRateThrottle in Phase 32 (was 5/hour, plain ScopedRateThrottle), layered on top of the existing global anon rate). Generates a tracking_code (see tracking_code_scheme category). Phase 31 — gated by the same Turnstile CAPTCHA widget as form_login; the widget AND its token are reset (setCaptchaToken/captchaResetKey) both on submit failure and on the post-success 'send another' action, since the form's Turnstile instance unmounts/remounts across that transition and a stale token must never be left able to enable the submit button."
         - id: form_contribute_initiate
           label: Contribute wizard step 1 — initiate contribution
           scope: frontend
@@ -119,7 +277,7 @@ forms:
             - frontend/lib/api.ts
             - backend/payments/views.py
             - backend/payments/serializers.py
-          notes: "No <form> tag, multi-step wizard. Fields: amount, guestName (if unauthenticated), selectedMethod, showInPublicList, displayNameChoice, customDisplayName (if custom), message. Calls paymentsAPI.initiate -> POST /api/payments/initiate/ (PaymentInitiateView + PaymentInitiateSerializer). Client gate: amount>0 matching regex /^\\d{0,9}(\\.\\d{0,2})?$/, method selected, guest name required if unauth, custom name required if that choice selected. Creates a Contribution row + a tracking_code. Phase 31 — `canProceed` additionally requires a verified Turnstile CAPTCHA token (!!captchaToken); PaymentInitiateView sets throttle_scope='contribution' (15/hour) and checks verify_captcha() inside the existing @transaction.atomic post(), before the serializer runs."
+          notes: "No <form> tag, multi-step wizard. Fields: amount, guestName (if unauthenticated), selectedMethod, showInPublicList, displayNameChoice, customDisplayName (if custom), message. Calls paymentsAPI.initiate -> POST /api/payments/initiate/ (PaymentInitiateView + PaymentInitiateSerializer). Client gate: amount>0 matching regex /^\\d{0,9}(\\.\\d{0,2})?$/, method selected, guest name required if unauth, custom name required if that choice selected. Creates a Contribution row + a tracking_code. Phase 31 — `canProceed` additionally requires a verified Turnstile CAPTCHA token (!!captchaToken); PaymentInitiateView sets throttle_scope='contribution' (8/hour as of Phase 32's tightening, SessionAwareScopedRateThrottle — was 15/hour, plain ScopedRateThrottle) and checks verify_captcha() inside the existing @transaction.atomic post(), before the serializer runs."
         - id: form_contribute_upload_receipt
           label: Contribute wizard step 3 — upload payment receipt
           scope: frontend
@@ -138,7 +296,7 @@ forms:
             - backend/posts/views.py
             - backend/posts/serializers.py
             - backend/posts/models.py
-          notes: "<form onSubmit noValidate>. Fields: commentName (readOnly if authenticated), commentText, commentRating (1-5). Calls postsAPI.createComment -> POST /api/posts/{pk}/comments/create/ (CommentCreateView with kwargs target_type='post', + CommentCreateSerializer). Manual checks: text required, guest name required if not authenticated, rating must be non-zero. Comment is generic (GenericForeignKey via content_type/object_id), shared with expense comments. Phase 31 — same Turnstile CAPTCHA gate as form_login, wired identically on BOTH this page and the expense-comment form on frontend/app/[locale]/expenses/[id]/page.tsx (which calls fundAPI.createExpenseComment against the same CommentCreateView, just target_type='expense'); CommentCreateView itself sets throttle_scope='comment' (20/hour) and checks verify_captcha() before resolving the comment target, so the gate applies uniformly to both post and expense comments from one code path."
+          notes: "<form onSubmit noValidate>. Fields: commentName (readOnly if authenticated), commentText, commentRating (1-5). Calls postsAPI.createComment -> POST /api/posts/{pk}/comments/create/ (CommentCreateView with kwargs target_type='post', + CommentCreateSerializer). Manual checks: text required, guest name required if not authenticated, rating must be non-zero. Comment is generic (GenericForeignKey via content_type/object_id), shared with expense comments. Phase 31 — same Turnstile CAPTCHA gate as form_login, wired identically on BOTH this page and the expense-comment form on frontend/app/[locale]/expenses/[id]/page.tsx (which calls fundAPI.createExpenseComment against the same CommentCreateView, just target_type='expense'); CommentCreateView itself sets throttle_scope='comment' (12/hour as of Phase 32's tightening, SessionAwareScopedRateThrottle — was 20/hour, plain ScopedRateThrottle) and checks verify_captcha() before resolving the comment target, so the gate applies uniformly to both post and expense comments from one code path."
     admin_data_entry_forms:
       count: 14
       items:
@@ -150,7 +308,7 @@ forms:
             - frontend/lib/api.ts
             - backend/accounts/member_views.py
             - backend/accounts/serializers.py
-          notes: "<form onSubmit> in AdminModal. Fields: fullName, displayName, phone, email, newGroupId, password, passwordConfirm. Calls membersAPI.create -> POST /api/members/create/ (MemberCreateView + MemberCreateSerializer). Toast-based validation: phone-or-email required, password===passwordConfirm, length>=8. Requires can_manage_permissions or superuser (see auth_permission_checks)."
+          notes: "<form onSubmit> in AdminModal. Fields: fullName, displayName, phone, email, newGroupId, password, passwordConfirm. Calls membersAPI.create -> POST /api/members/create/ (MemberCreateView + MemberCreateSerializer). Toast-based validation: phone-or-email required, password===passwordConfirm, plus Phase 32's passwordStrengthError (length>=8, letter+digit mix, >=1 uppercase, >=1 special character — mirrors backend PasswordStrengthValidator, see validation_logic.account_and_admin_security). Requires can_manage_permissions or superuser (see auth_permission_checks)."
         - id: form_admin_member_edit_profile
           label: Admin — member profile edit form
           scope: frontend
@@ -224,7 +382,7 @@ forms:
             - frontend/lib/api.ts
             - backend/fund/views.py
             - backend/fund/serializers.py
-          notes: "No <form> tag. Fields: editAmount, editCurrency, editGuestName, editPaymentMethod, editNotes, editShowInPublicList, editDisplayNameChoice, editPublicDisplayName, editMessage (max 150 chars). Calls fundAPI.updateContribution -> PATCH /api/fund/contributions/{pk}/edit/ (ContributionAdminEditView + ContributionAdminEditSerializer). Client check: amount>0."
+          notes: "No <form> tag. Fields: editAmount, editCurrency, editGuestName, editPaymentMethod, editNotes, editShowInPublicList, editDisplayNameChoice, editPublicDisplayName, editMessage (max 100 chars — corrected from a previously-mismatched frontend cap of 150; the backend's actual admin short-text cap is SHORT_TEXT_ADMIN_MAX_LENGTH=100, see validation_logic). Calls fundAPI.updateContribution -> PATCH /api/fund/contributions/{pk}/edit/ (ContributionAdminEditView + ContributionAdminEditSerializer). Client check: amount>0."
         - id: form_admin_expense_create
           label: Admin — create expense modal form
           scope: frontend
@@ -911,12 +1069,12 @@ api_endpoints:
           label: "POST /api/auth/register/"
           scope: backend
           location: [backend/accounts/urls.py, backend/accounts/views.py, backend/accounts/serializers.py]
-          notes: "RegisterView + RegisterSerializer. AllowAny. Creates Member, auto-assigns default AccessGroup, issues JWT pair. Phase 31 — throttle_scope='register' (5/hour, ScopedRateThrottle); rejects with 400 if core.captcha.verify_captcha(request.data['captcha_token'], ip) fails, checked before RegisterSerializer even runs."
+          notes: "RegisterView + RegisterSerializer. AllowAny. Creates Member, auto-assigns default AccessGroup, issues JWT pair. Phase 31 — throttle_scope='register' (tightened to 4/hour in Phase 32, SessionAwareScopedRateThrottle — was 5/hour, plain ScopedRateThrottle); rejects with 400 if core.captcha.verify_captcha(request.data['captcha_token'], ip) fails, checked before RegisterSerializer even runs. RegisterSerializer's password field is checked by validate_password_strength (Phase 32) in addition to the pre-existing min-length check."
         - id: ep_auth_login
           label: "POST /api/auth/login/"
           scope: backend
           location: [backend/accounts/urls.py, backend/accounts/views.py, backend/accounts/backends.py, backend/accounts/serializers.py, backend/core/captcha.py]
-          notes: "LoginView + LoginSerializer. AllowAny. Delegates to MemberAuthBackend.authenticate() (phone-or-email lookup via '@' in credential). Phase 31 — throttle_scope='login' (10/hour); rejects with 400 if verify_captcha() fails, checked before the credential/password check. Since this is the project's ONLY login endpoint (members and admins/superusers alike), this single gate covers CAPTCHA-on-entry-point for the admin panel without ever exposing a CAPTCHA inside the authenticated admin UI."
+          notes: "LoginView + LoginSerializer. AllowAny. Delegates to MemberAuthBackend.authenticate() (phone-or-email lookup via '@' in credential). Phase 31 — throttle_scope='login' (tightened to 6/hour in Phase 32, resolved against core.throttles.SessionAwareScopedRateThrottle — was 10/hour, plain ScopedRateThrottle); rejects with 400 if verify_captcha() fails, checked before the credential/password check. Since this is the project's ONLY login endpoint (members and admins/superusers alike), this single gate covers CAPTCHA-on-entry-point for the admin panel without ever exposing a CAPTCHA inside the authenticated admin UI. Phase 32 separately added an entirely distinct CAPTCHA gate (core/admin_forms.py:CaptchaAdminAuthenticationForm) on the Django admin's OWN /admin/ login view, which does not go through LoginView/LoginSerializer at all — see validation_logic.account_and_admin_security.validate_admin_panel_captcha."
         - id: ep_auth_logout
           label: "POST /api/auth/logout/"
           scope: backend
@@ -1139,7 +1297,7 @@ api_endpoints:
           label: "POST /api/posts/{pk}/comments/create/ (target_type=post)"
           scope: backend
           location: [backend/posts/urls.py, backend/posts/views.py, backend/posts/serializers.py]
-          notes: "CommentCreateView with kwargs={'target_type':'post'} + CommentCreateSerializer. Supports guest_name for unauthenticated commenters. Generates a tracking_code (see tracking_code_scheme). Phase 31 — throttle_scope='comment' (20/hour); rejects with 400 if core.captcha.verify_captcha() fails, checked before resolving the comment target — applies equally to the target_type='expense' mount below."
+          notes: "CommentCreateView with kwargs={'target_type':'post'} + CommentCreateSerializer. Supports guest_name for unauthenticated commenters. Generates a tracking_code (see tracking_code_scheme). Phase 31 — throttle_scope='comment' (tightened to 12/hour in Phase 32, SessionAwareScopedRateThrottle — was 20/hour, plain ScopedRateThrottle); rejects with 400 if core.captcha.verify_captcha() fails, checked before resolving the comment target — applies equally to the target_type='expense' mount below. Phase 32 — the frontend comment-submit button on both posts/[id]/page.tsx and expenses/[id]/page.tsx is also proactively disabled while commentRating===0, in addition to the pre-existing server-side rejection of a null/zero rating."
         - id: ep_comment_list_expense
           label: "GET /api/fund/expenses/{pk}/comments/ (target_type=expense)"
           scope: backend
@@ -1205,7 +1363,7 @@ api_endpoints:
           label: "POST /api/payments/initiate/"
           scope: backend
           location: [backend/payments/urls.py, backend/payments/views.py, backend/payments/serializers.py]
-          notes: "PaymentInitiateView + PaymentInitiateSerializer. Creates a pending Contribution + tracking_code. Self-service contribution flow step 1. Phase 31 — throttle_scope='contribution' (15/hour); rejects with 400 if core.captcha.verify_captcha() fails, checked inside the existing @transaction.atomic post(), before the serializer runs."
+          notes: "PaymentInitiateView + PaymentInitiateSerializer. Creates a pending Contribution + tracking_code. Self-service contribution flow step 1. Phase 31 — throttle_scope='contribution' (tightened to 8/hour in Phase 32, SessionAwareScopedRateThrottle — was 15/hour, plain ScopedRateThrottle); rejects with 400 if core.captcha.verify_captcha() fails, checked inside the existing @transaction.atomic post(), before the serializer runs."
         - id: ep_payment_receipt_upload
           label: "POST /api/payments/{pk}/receipt/"
           scope: backend
@@ -1223,7 +1381,7 @@ api_endpoints:
           label: "POST /api/contact/submit/"
           scope: backend
           location: [backend/core/contact_urls.py, backend/core/contact_views.py, backend/core/serializers.py]
-          notes: "ContactMessageCreateView + ContactMessageCreateSerializer. AnonRateThrottle (100/hour). Generates tracking_code. Phase 31 — additionally sets throttle_scope='contact' (5/hour, ScopedRateThrottle, layered on top of the existing global anon rate) and rejects with 400 if core.captcha.verify_captcha() fails, checked before the MAX_PENDING_MESSAGES pending-message count."
+          notes: "ContactMessageCreateView + ContactMessageCreateSerializer. AnonRateThrottle (100/hour). Generates tracking_code. Phase 31 — additionally sets throttle_scope='contact' (tightened to 4/hour in Phase 32, core.throttles.SessionAwareScopedRateThrottle — was 5/hour, plain ScopedRateThrottle, layered on top of the existing global anon rate) and rejects with 400 if core.captcha.verify_captcha() fails, checked before the MAX_PENDING_MESSAGES pending-message count."
         - id: ep_contact_mine
           label: "GET /api/contact/mine/"
           scope: backend
@@ -1735,24 +1893,36 @@ auth_permission_checks:
 
 validation_logic:
   scope: both
-  total_count: 9
+  total_count: 13
   description: >
     Client-side and server-side validation. Both stacks now have a shared, canonical
     validation/sanitization module (added during the input-validation-security hardening
     pass): backend/core/validators.py (server) and frontend/lib/validation.ts (client),
     mirroring the same rules — phone must be strict "00<countrycode><number>" format
     (PHONE_REGEX = ^00\d{6,15}$), email format check, combined phone-or-email check,
-    SHORT_TEXT_MAX_LENGTH=150 (single-line inputs), LONG_TEXT_PUBLIC_MAX_LENGTH=250
-    (public-site textareas), LONG_TEXT_ADMIN_MAX_LENGTH=550 (admin-panel textareas/long
-    fields). Every user-submitted text field across both the public site and the admin
-    panel is now capped and sanitized (HTML-stripped) on the backend via
-    sanitize_and_limit()/validate_max_length(), in addition to a matching maxLength prop
-    and pre-submit check on the frontend — so no input can rely on only one layer.
-    Phase 31 added a second, distinct line of defense — anti-abuse rather than
-    data-shape validation — covering the 5 public unauthenticated write endpoints
-    (login, register, contact, comment, contribution): a Cloudflare Turnstile CAPTCHA
-    check (see anti_abuse_protections.validate_captcha_backend) and a per-view
-    ScopedRateThrottle rate cap (see anti_abuse_protections.validate_rate_limiting).
+    a TWO-TIER short-text cap split by domain (SHORT_TEXT_PUBLIC_MAX_LENGTH=50 for
+    main-site single-line inputs, SHORT_TEXT_ADMIN_MAX_LENGTH=100 for admin-panel
+    single-line inputs — intentionally different per the consistency_principle in
+    project_conventions; this replaced an earlier single SHORT_TEXT_MAX_LENGTH=150
+    constant), LONG_TEXT_PUBLIC_MAX_LENGTH=250 (public-site textareas),
+    LONG_TEXT_ADMIN_MAX_LENGTH=550 (admin-panel textareas/long fields), and
+    PASSWORD_MIN_LENGTH=8 plus a full password-strength rule (Phase 32, see
+    account_and_admin_security.validate_password_strength). Every user-submitted text
+    field across both the public site and the admin panel is now capped and sanitized
+    (HTML-stripped) on the backend via sanitize_and_limit()/validate_max_length(), in
+    addition to a matching maxLength prop, a live character counter, and a pre-submit
+    check on the frontend — so no input can rely on only one layer (see
+    frontend_manual_validation.validate_character_counter_rule). Phase 31 added a second,
+    distinct line of defense — anti-abuse rather than data-shape validation — covering
+    the 5 public unauthenticated write endpoints (login, register, contact, comment,
+    contribution): a Cloudflare Turnstile CAPTCHA check (see
+    anti_abuse_protections.validate_captcha_backend) and a per-view rate cap (see
+    anti_abuse_protections.validate_rate_limiting). Phase 32 extended both of these
+    anti-abuse layers further: the rate-limit cache key now also folds in the
+    anonymous session (not just IP), the rates were tightened, AND the CAPTCHA was
+    extended to cover the Django admin's own login form, which had neither protection
+    before (see account_and_admin_security.validate_admin_panel_captcha) — see
+    security_rules for the full, domain-spanning security baseline this all belongs to.
   subcategories:
     shared_validation_modules:
       count: 2
@@ -1761,12 +1931,12 @@ validation_logic:
           label: "backend/core/validators.py — canonical server-side validation module"
           scope: backend
           location: [backend/core/validators.py]
-          notes: "Exports PHONE_REGEX, LENIENT_PHONE_REGEX, SHORT_TEXT_MAX_LENGTH, LONG_TEXT_PUBLIC_MAX_LENGTH, LONG_TEXT_ADMIN_MAX_LENGTH, EMAIL_MAX_LENGTH (Phase 30, =75), ALLOWED_IMAGE_FORMATS, and functions validate_phone_format, validate_phone_lenient, validate_email_format, validate_phone_or_email, sanitize_text (strip_tags+strip), validate_max_length, sanitize_and_limit (combo), validate_image_content (Pillow-based real content/format verification, rejects SVG and mislabeled files), validate_pdf_content (magic-byte check), validate_image_file, validate_receipt_file. Used by accounts/core/posts/fund/payments serializers and views instead of ad-hoc inline strip_tags()/length checks. Phase 28 added safe_filter(queryset, **lookups): wraps a .filter() call in try/except (ValueError, TypeError, django.core.exceptions.ValidationError), returning queryset.none() instead of raising — used everywhere a GET list view builds a filter straight from a query param against a typed field (UUID FK exact-match, DateField range, DecimalField range) so malformed/attacker-controlled query params degrade to an empty result instead of an uncaught 500 (there is still no global DRF exception handler in this project). Phase 30 — added EMAIL_MAX_LENGTH=75 (Django's EmailField model default is 254, but real addresses never get remotely close, so this caps the field sane everywhere it's entered) and wired it into validate_email_format (length check BEFORE the Django email-format check) and validate_phone_or_email's email branch; validate_email_format itself was previously unused by any serializer despite existing — RegisterSerializer/MemberUpdateSerializer had zero email format validation until this phase wired it in (see validate_accounts below)."
+          notes: "Exports PHONE_REGEX, LENIENT_PHONE_REGEX, SHORT_TEXT_PUBLIC_MAX_LENGTH=50, SHORT_TEXT_ADMIN_MAX_LENGTH=100 (Phase 32 split a single SHORT_TEXT_MAX_LENGTH=150 into this two-tier pair — admin-panel single-line inputs cap at 100, main-site single-line inputs cap at 50), LONG_TEXT_PUBLIC_MAX_LENGTH, LONG_TEXT_ADMIN_MAX_LENGTH, EMAIL_MAX_LENGTH (Phase 30, =75), PASSWORD_MIN_LENGTH=8, ALLOWED_IMAGE_FORMATS, and functions validate_phone_format, validate_phone_lenient, validate_email_format, validate_phone_or_email, _password_strength_errors/validate_password_strength/PasswordStrengthValidator (Phase 32, see account_and_admin_security.validate_password_strength), sanitize_text (strip_tags+strip), validate_max_length, sanitize_and_limit (combo), validate_image_content (Pillow-based real content/format verification, rejects SVG and mislabeled files), validate_pdf_content (magic-byte check), validate_image_file, validate_receipt_file. Used by accounts/core/posts/fund/payments serializers and views instead of ad-hoc inline strip_tags()/length checks. Phase 28 added safe_filter(queryset, **lookups): wraps a .filter() call in try/except (ValueError, TypeError, django.core.exceptions.ValidationError), returning queryset.none() instead of raising — used everywhere a GET list view builds a filter straight from a query param against a typed field (UUID FK exact-match, DateField range, DecimalField range) so malformed/attacker-controlled query params degrade to an empty result instead of an uncaught 500 (there is still no global DRF exception handler in this project). Phase 30 — added EMAIL_MAX_LENGTH=75 (Django's EmailField model default is 254, but real addresses never get remotely close, so this caps the field sane everywhere it's entered) and wired it into validate_email_format (length check BEFORE the Django email-format check) and validate_phone_or_email's email branch; validate_email_format itself was previously unused by any serializer despite existing — RegisterSerializer/MemberUpdateSerializer had zero email format validation until this phase wired it in (see validate_accounts below)."
         - id: validate_shared_frontend
           label: "frontend/lib/validation.ts — canonical client-side validation module"
           scope: frontend
           location: ["frontend/lib/validation.ts"]
-          notes: "Exports SHORT_TEXT_MAX_LENGTH=150, LONG_TEXT_PUBLIC_MAX_LENGTH=250, LONG_TEXT_ADMIN_MAX_LENGTH=550, EMAIL_MAX_LENGTH=75 (Phase 30, mirrors the backend constant), PHONE_PLACEHOLDER='00447700900000', isValidPhoneStrict, isValidPhoneLenient, isValidEmail, isValidPhoneOrEmail, detectCredentialKind (Phase 30 — classifies a combined phone-or-email input by its first character for the login page's real-time hint ONLY; never gates submission, see validate_frontend_pattern below), phoneHint/phoneFormatError/phoneOrEmailFormatError/phoneLenientFormatError (Phase 30, new — lenient '00 or +' format message for the login credential box)/emailFormatError/maxLengthError (bilingual message helpers). Used by register, login, profile, contact, contribute pages and all admin/* pages (which use the bilingual helpers directly since admin pages use the inline isRTL pattern rather than next-intl)."
+          notes: "Exports SHORT_TEXT_PUBLIC_MAX_LENGTH=50, SHORT_TEXT_ADMIN_MAX_LENGTH=100 (Phase 32, mirrors the backend two-tier split — replaces the old single SHORT_TEXT_MAX_LENGTH=150), LONG_TEXT_PUBLIC_MAX_LENGTH=250, LONG_TEXT_ADMIN_MAX_LENGTH=550, EMAIL_MAX_LENGTH=75 (Phase 30, mirrors the backend constant), PHONE_PLACEHOLDER='00447700900000', isValidPhoneStrict, isValidPhoneLenient, isValidEmail, isValidPhoneOrEmail, detectCredentialKind (Phase 30 — classifies a combined phone-or-email input by its first character for the login page's real-time hint ONLY; never gates submission, see validate_frontend_pattern below), passwordStrengthError (Phase 32 — mirrors backend PasswordStrengthValidator: length>=PASSWORD_MIN_LENGTH(8), letter+digit mix, >=1 uppercase, >=1 special character, checked in that exact order so the first client-side error always matches what the server would reject with; wired into register/profile/admin-members-create/admin-members-edit), phoneHint/phoneFormatError/phoneOrEmailFormatError/phoneLenientFormatError (Phase 30, new — lenient '00 or +' format message for the login credential box)/emailFormatError/maxLengthError/passwordMismatchError/requiredFieldError (bilingual message helpers). Used by register, login, profile, contact, contribute pages and all admin/* pages (which use the bilingual helpers directly since admin pages use the inline isRTL pattern rather than next-intl)."
     backend_serializer_validators:
       count: 5
       items:
@@ -1774,12 +1944,12 @@ validation_logic:
           label: accounts/serializers.py validators
           scope: backend
           location: [backend/accounts/serializers.py]
-          notes: "RegisterSerializer: validate_full_name (sanitize_and_limit 35), validate_display_name (sanitize_and_limit 20), validate_phone (validate_phone_format — strict '00' prefix), validate_email (Phase 30 — validate_email_format: length ≤ EMAIL_MAX_LENGTH=75 + Django email-format check; previously had NO email validation at all), validate() for phone-or-email + uniqueness. MemberUpdateSerializer: same full_name/display_name checks, validate_phone only enforces strict format when the new value differs from the existing instance value (changed-value-only); validate_email (Phase 30 — same validate_email_format call, same changed-value-only gating as phone, for the same legacy-data reason). LoginSerializer.credential's max_length lowered 254→EMAIL_MAX_LENGTH=75 (Phase 30) and validate_credential calls validate_phone_or_email (unchanged — this lenient OR-check, not the email-kind-detection on the frontend, is the sole authority for what's a valid login credential). ChangePasswordSerializer.validate() (new/confirm match, min_length=8). AccessGroupCreateSerializer/AccessGroupUpdateSerializer: validate_name (20), validate_description (350)."
+          notes: "RegisterSerializer: validate_full_name (sanitize_and_limit 35), validate_display_name (sanitize_and_limit 20), validate_phone (validate_phone_format — strict '00' prefix), validate_email (Phase 30 — validate_email_format: length ≤ EMAIL_MAX_LENGTH=75 + Django email-format check; previously had NO email validation at all), validate() for phone-or-email + uniqueness. MemberUpdateSerializer: same full_name/display_name checks, validate_phone only enforces strict format when the new value differs from the existing instance value (changed-value-only); validate_email (Phase 30 — same validate_email_format call, same changed-value-only gating as phone, for the same legacy-data reason). LoginSerializer.credential's max_length lowered 254→EMAIL_MAX_LENGTH=75 (Phase 30) and validate_credential calls validate_phone_or_email (unchanged — this lenient OR-check, not the email-kind-detection on the frontend, is the sole authority for what's a valid login credential). ChangePasswordSerializer.validate() (new/confirm match, plus Phase 32's validate_password_strength — see account_and_admin_security below). AccessGroupCreateSerializer/AccessGroupUpdateSerializer: validate_name (20), validate_description (350)."
         - id: validate_core
           label: core/serializers.py validators
           scope: backend
           location: [backend/core/serializers.py]
-          notes: "ContactMessageCreateSerializer.validate_name/validate_contact_info/validate_message use sanitize_and_limit (100/150/250). DefaultSettingSerializer.validate_value uses sanitize_and_limit(value, LONG_TEXT_ADMIN_MAX_LENGTH=550)."
+          notes: "ContactMessageCreateSerializer.validate_name/validate_contact_info/validate_message use sanitize_and_limit (50/50/250, both via SHORT_TEXT_PUBLIC_MAX_LENGTH and LONG_TEXT_PUBLIC_MAX_LENGTH respectively — corrected from a previously-stale '100/150/250'; this form is public-facing only). DefaultSettingSerializer.validate_value uses sanitize_and_limit(value, LONG_TEXT_ADMIN_MAX_LENGTH=550)."
         - id: validate_fund
           label: fund/serializers.py validators
           scope: backend
@@ -1789,12 +1959,12 @@ validation_logic:
           label: posts/serializers.py validators
           scope: backend
           location: [backend/posts/serializers.py]
-          notes: "validate() + validate_rating in CommentCreateSerializer (rating must be 1-5 or null, guest_name required if unauthenticated, validate_guest_name 50, validate_text 250); validate_rating repeated in CommentAdminEditSerializer (validate_text/validate_rejection_reason 550)/CommentOwnerEditSerializer (validate_text 250); validate_status in CommentStatusSerializer; PostCreateSerializer/PostUpdateSerializer validate_title (150)/validate_body (550)."
+          notes: "validate() + validate_rating in CommentCreateSerializer (rating must be 1-5 or null, guest_name required if unauthenticated, validate_guest_name 50, validate_text 250); validate_rating repeated in CommentAdminEditSerializer (validate_text/validate_rejection_reason 550)/CommentOwnerEditSerializer (validate_text 250); validate_status in CommentStatusSerializer; PostCreateSerializer/PostUpdateSerializer validate_title (SHORT_TEXT_ADMIN_MAX_LENGTH=100, corrected from a previously-stale 150 — posts have no public-facing creation form, so the title field always uses the admin-tier cap)/validate_body (550)."
         - id: validate_payments
           label: payments/serializers.py validators
           scope: backend
           location: [backend/payments/serializers.py]
-          notes: "validate_amount, validate_message/validate_public_display_name (sanitize_and_limit 150/100), validate_guest_name (50), notes field capped at LONG_TEXT_PUBLIC_MAX_LENGTH with validate_notes (250), validate() in PaymentInitiateSerializer (mirrors fund's ContributionCreateSerializer checks); validate_receipt_image in ReceiptUploadSerializer delegates to core.validators.validate_receipt_file (content-verified file type, not extension-only)."
+          notes: "validate_amount, validate_message/validate_public_display_name (sanitize_and_limit, both SHORT_TEXT_PUBLIC_MAX_LENGTH=50 — corrected from a previously-stale '150/100'; this file is public/guest-facing only, with no admin-tier variant, so every short-text field here uses the public cap), validate_guest_name (50), notes field capped at LONG_TEXT_PUBLIC_MAX_LENGTH with validate_notes (250), validate() in PaymentInitiateSerializer (mirrors fund's ContributionCreateSerializer checks); validate_receipt_image in ReceiptUploadSerializer delegates to core.validators.validate_receipt_file (content-verified file type, not extension-only)."
     anti_abuse_protections:
       count: 2
       items:
@@ -1804,18 +1974,36 @@ validation_logic:
           location: [backend/core/captcha.py, backend/groupfund/settings.py]
           notes: "verify_captcha(token, remote_ip=None) posts the frontend-supplied token + settings.TURNSTILE_SECRET_KEY + remote_ip to Cloudflare's https://challenges.cloudflare.com/turnstile/v0/siteverify via stdlib urllib (no new pip dependency), returns bool(result['success']). Fails closed: a missing token, a network error, or any other exception during the verify request (caught broadly, logged via logger.exception) all return False rather than raising — so a captcha-service outage blocks the gated form instead of silently bypassing it. settings.TURNSTILE_SECRET_KEY defaults to Cloudflare's published 'always passes' test secret (1x0000000000000000000000000000000AA) when the env var is unset, so every CAPTCHA-gated endpoint works out of the box in dev with zero signup. Called directly inside the view (no DRF permission class) at the very top of RegisterView/LoginView/ContactMessageCreateView/CommentCreateView/PaymentInitiateView's post(), before any serializer or business logic runs."
         - id: validate_rate_limiting
-          label: "Per-view rate limiting — DRF ScopedRateThrottle (Phase 31, NEW)"
+          label: "Per-view rate limiting — session-aware DRF throttle (Phase 31, tightened Phase 32)"
           scope: backend
-          location: [backend/groupfund/settings.py, backend/accounts/views.py, backend/core/contact_views.py, backend/posts/views.py, backend/payments/views.py]
-          notes: "REST_FRAMEWORK.DEFAULT_THROTTLE_CLASSES gained rest_framework.throttling.ScopedRateThrottle (additive — layers on top of the pre-existing global AnonRateThrottle/UserRateThrottle, anon 100/hour + user 1000/hour, from the Phase-11 hardening pass; a view with no throttle_scope set is unaffected). DEFAULT_THROTTLE_RATES gained 5 named scopes: login=10/hour, register=5/hour, contact=5/hour, comment=20/hour, contribution=15/hour. Each scope is opted into by setting throttle_scope='<name>' as a class attribute on the corresponding view (LoginView, RegisterView, ContactMessageCreateView, CommentCreateView — shared by both post- and expense-comment routes, PaymentInitiateView) — the same 5 endpoints gated by validate_captcha_backend above, so every public unauthenticated write path now has BOTH a per-IP request-rate ceiling and a CAPTCHA challenge, rather than relying on either alone."
+          location: [backend/groupfund/settings.py, backend/core/throttles.py, backend/accounts/views.py, backend/core/contact_views.py, backend/posts/views.py, backend/payments/views.py]
+          notes: "REST_FRAMEWORK.DEFAULT_THROTTLE_CLASSES carries core.throttles.SessionAwareScopedRateThrottle (Phase 32 — swapped in for the Phase-31 plain rest_framework.throttling.ScopedRateThrottle; additive on top of the pre-existing global AnonRateThrottle/UserRateThrottle, anon 100/hour + user 1000/hour, from the Phase-11 hardening pass; a view with no throttle_scope set is unaffected). For anonymous requests, SessionAwareScopedRateThrottle folds the Django session key into the cache identity instead of IP alone (forcing request.session.save() if no session key exists yet) — so an attacker must rotate BOTH IP and session cookie to reset the counter, not just IP, which matters because this site organizes real-world political activity and is a realistic targeted-abuse target; authenticated requests behave exactly like the parent class (keyed on user id). DEFAULT_THROTTLE_RATES' 5 named scopes were tightened in Phase 32: login 10→6/hour, register 5→4/hour, contact 5→4/hour, comment 20→12/hour, contribution 15→8/hour. Each scope is opted into by setting throttle_scope='<name>' as a class attribute on the corresponding view (LoginView, RegisterView, ContactMessageCreateView, CommentCreateView — shared by both post- and expense-comment routes, PaymentInitiateView) — the same 5 endpoints gated by validate_captcha_backend above, so every public unauthenticated write path has BOTH a session+IP-aware request-rate ceiling and a CAPTCHA challenge, rather than relying on either alone."
+    account_and_admin_security:
+      count: 2
+      items:
+        - id: validate_password_strength
+          label: "Password strength rule — backend PasswordStrengthValidator + frontend passwordStrengthError (Phase 32, NEW)"
+          scope: both
+          location: [backend/core/validators.py, backend/groupfund/settings.py, frontend/lib/validation.ts]
+          notes: "Backend: _password_strength_errors(password)/validate_password_strength(password) run 4 ordered checks — length>=PASSWORD_MIN_LENGTH(8), letter+digit mix present, >=1 uppercase letter, >=1 special/non-alphanumeric character — and PasswordStrengthValidator (validate()/get_help_text()) wraps them as a class wired into settings.py AUTH_PASSWORD_VALIDATORS=[{'NAME':'core.validators.PasswordStrengthValidator'}], so the rule is enforced automatically on Django's own admin password-change form and the createsuperuser/changepassword CLI commands, in addition to ChangePasswordSerializer/RegisterSerializer/MemberCreateSerializer on the DRF API. Frontend: passwordStrengthError(password, isRTL) in frontend/lib/validation.ts runs the SAME 4 checks in the SAME order (so the first error a user sees client-side always matches what the server would reject with), wired into register/page.tsx, profile/page.tsx (password-change), admin/members/page.tsx (create-member modal), admin/members/[id]/page.tsx (edit/reset password)."
+        - id: validate_admin_panel_captcha
+          label: "Django admin login CAPTCHA — CaptchaAdminAuthenticationForm (Phase 32, NEW)"
+          scope: backend
+          location: [backend/core/admin_forms.py, backend/core/admin.py, backend/core/context_processors.py, backend/templates/admin/login.html, backend/groupfund/settings.py]
+          notes: "The Django admin's own login page (django.contrib.admin's server-rendered, session/cookie-based auth view — shared by ordinary members AND staff/superusers, since this project has only one login form/entry point for the whole site) had no CAPTCHA and no rate limiting at all before Phase 32, despite being a public, internet-facing, credential-guessing attack surface distinct from the JWT API. core/admin_forms.py:CaptchaAdminAuthenticationForm(AdminAuthenticationForm) overrides clean() to call the existing core.captcha.verify_captcha(token, ip) (the same fail-closed Cloudflare Turnstile helper Phase 31 added for the 5 public DRF endpoints — reused as-is, not duplicated) and raises ValidationError(code='captcha_invalid') on failure; wired via admin.site.login_form = CaptchaAdminAuthenticationForm in core/admin.py. core/context_processors.py:turnstile(request) exposes settings.TURNSTILE_SITE_KEY to Django-rendered templates (registered in settings.py TEMPLATES[0]['OPTIONS']['context_processors']). templates/admin/login.html extends 'admin/login.html' and injects the Turnstile widget into the extrahead block via vanilla JS DOM manipulation (targets '.login-card-body form', does not duplicate jazzmin's own form markup) — only takes effect because settings.py TEMPLATES[0]['DIRS']=[BASE_DIR/'templates'] makes Django's filesystem template loader (tried before app_directories on every lookup) prefer this override over both jazzmin's and django.contrib.admin's built-in admin/login.html."
     frontend_manual_validation:
-      count: 1
+      count: 2
       items:
         - id: validate_frontend_pattern
           label: Per-component validation, built on the shared frontend/lib/validation.ts helpers
           scope: frontend
           location: ["frontend/lib/validation.ts", "UNKNOWN — consumers pervasive, see notes"]
-          notes: "Every form in the forms category still calls its own validation from its page.tsx/component file (presence checks, regex for amounts, password-match checks, toast-based error display via toastStore), but phone/email/length checks now route through the shared frontend/lib/validation.ts helpers rather than ad-hoc per-file regexes. All single-line text inputs carry maxLength={150} (or a tighter field-specific cap, e.g. full_name 35, display_name 20, email EMAIL_MAX_LENGTH=75), public-site textareas maxLength={250}, admin-panel textareas maxLength={550} — enforced via the native HTML maxLength attribute AND re-checked by the backend serializer, so neither layer can be bypassed alone. There is still no Yup/Zod schema or React Hook Form resolver anywhere in the frontend — validation.ts is a plain function-based utility, not a schema library. Phase 30 — extended real-time (per-keystroke) validation, previously limited to password-strength on register, to phone AND email on register/login/profile: register/profile gained handlePhoneChange/handleEmailChange (update form state + field-error state together on every change); login's single combined 'credential' box gained handleCredentialChange, built on the new detectCredentialKind() classifier (first-char heuristic: digit/'+' → phone, else → email) to choose which inline hint to show — but this classification is PURELY ADVISORY for the cosmetic hint. Login's actual submit-time gate is untouched: it still calls the unconditional isValidPhoneOrEmail(credential) OR-check (valid email format OR lenient phone format), so a misdetected 'kind' can never block a credential that is genuinely valid as the other type — the explicit safety requirement driving this design was that a phone-typing user must never be blocked by email-format validation, and vice versa. Also fixed a pre-existing register-page bug where the phone field's hint and the email field's hint could cross-contaminate (typing in one box flipped the other box's hint) — root cause was an asymmetric condition on the phone hint that consulted email's state in its negative branch; restructured to check phone's own value first, falling back to email's state only when phone is itself empty."
+          notes: "Every form in the forms category still calls its own validation from its page.tsx/component file (presence checks, regex for amounts, password-match checks, toast-based error display via toastStore), but phone/email/length checks now route through the shared frontend/lib/validation.ts helpers rather than ad-hoc per-file regexes. Single-line text inputs carry maxLength={50} on the main site or maxLength={100} in the admin panel (the Phase-32 two-tier split — or a tighter field-specific cap, e.g. full_name 35, display_name 20, email EMAIL_MAX_LENGTH=75), public-site textareas maxLength={250}, admin-panel textareas maxLength={550} — enforced via the native HTML maxLength attribute AND re-checked by the backend serializer, so neither layer can be bypassed alone. There is still no Yup/Zod schema or React Hook Form resolver anywhere in the frontend — validation.ts is a plain function-based utility, not a schema library. Phase 30 — extended real-time (per-keystroke) validation, previously limited to password-strength on register, to phone AND email on register/login/profile: register/profile gained handlePhoneChange/handleEmailChange (update form state + field-error state together on every change); login's single combined 'credential' box gained handleCredentialChange, built on the new detectCredentialKind() classifier (first-char heuristic: digit/'+' → phone, else → email) to choose which inline hint to show — but this classification is PURELY ADVISORY for the cosmetic hint. Login's actual submit-time gate is untouched: it still calls the unconditional isValidPhoneOrEmail(credential) OR-check (valid email format OR lenient phone format), so a misdetected 'kind' can never block a credential that is genuinely valid as the other type — the explicit safety requirement driving this design was that a phone-typing user must never be blocked by email-format validation, and vice versa. Also fixed a pre-existing register-page bug where the phone field's hint and the email field's hint could cross-contaminate (typing in one box flipped the other box's hint) — root cause was an asymmetric condition on the phone hint that consulted email's state in its negative branch; restructured to check phone's own value first, falling back to email's state only when phone is itself empty."
+        - id: validate_character_counter_rule
+          label: "Character-counter UI rule — every maxLength input shows a live counter, both domains, no exceptions (Phase 32, completed)"
+          scope: frontend
+          location: ["frontend/components/admin/AdminInput.tsx", "frontend/components/admin/AdminTextarea.tsx", "frontend/app/[locale]/register/page.tsx", "frontend/app/[locale]/login/page.tsx", "frontend/app/[locale]/posts/[id]/page.tsx", "frontend/app/[locale]/expenses/[id]/page.tsx", "frontend/app/[locale]/profile/comments/page.tsx"]
+          notes: "Standing project rule (see project_conventions.consistency_principle.example_pattern): every text input or textarea anywhere on the site that carries a maxLength must show a live '{value.length}/{maxLength}' counter next to it, in a flex row with the field's error/hint message on the opposite side — zero exceptions, admin panel AND main site alike. Admin panel: AdminInput/AdminTextarea implement this generically via a `typeof props.maxLength === 'number'` check, so every admin page that uses these shared components gets the counter automatically with no per-page code. Main site: register/page.tsx's local Field component implements the same pattern and was the template copied everywhere else; raw (non-componentized) inputs on login/page.tsx (credential field), posts/[id]/page.tsx and expenses/[id]/page.tsx (guest-name + comment-text fields on the comment form), and profile/comments/page.tsx (inline comment-edit textarea) each had the counter added by hand in Phase 32, closing the last remaining gaps — at the time of writing there is no known maxLength input anywhere on the site without a counter."
 
 file_upload_handlers:
   scope: both

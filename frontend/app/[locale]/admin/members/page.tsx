@@ -10,7 +10,7 @@ import AdminSelect from '@/components/admin/fields/AdminSelect';
 import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
 import { membersAPI, groupsAPI, MemberListItem, AccessGroup, Paginated } from '@/lib/api';
-import { isValidPhoneStrict, isValidEmail, phoneFormatError, PHONE_PLACEHOLDER, EMAIL_MAX_LENGTH } from '@/lib/validation';
+import { isValidPhoneStrict, isValidEmail, phoneFormatError, passwordStrengthError, PHONE_PLACEHOLDER, EMAIL_MAX_LENGTH } from '@/lib/validation';
 
 export default function AdminMembersPage() {
   const params = useParams();
@@ -125,8 +125,9 @@ export default function AdminMembersPage() {
       showToast('warning', isRTL ? 'رمزهای عبور مطابقت ندارند' : 'Passwords do not match');
       return;
     }
-    if (password.length < 8) {
-      showToast('warning', isRTL ? 'رمز عبور باید حداقل ۸ کاراکتر باشد' : 'Password must be at least 8 characters');
+    const passwordError = passwordStrengthError(isRTL, password);
+    if (passwordError) {
+      showToast('warning', passwordError);
       return;
     }
     setSaving(true);
@@ -279,7 +280,18 @@ export default function AdminMembersPage() {
             options={groups.map((g) => ({ value: g.id, label: g.name }))}
             placeholder={isRTL ? 'پیش‌فرض' : 'Default'}
           />
-          <AdminInput label={isRTL ? 'رمز عبور' : 'Password'} type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <AdminInput
+            label={isRTL ? 'رمز عبور' : 'Password'}
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            hint={
+              isRTL
+                ? 'حداقل ۸ نویسه، ترکیبی از حروف و اعداد، شامل حداقل یک حرف بزرگ و یک کاراکتر خاص.'
+                : 'At least 8 characters, with letters and numbers, including one uppercase letter and one special character.'
+            }
+          />
           <AdminInput label={isRTL ? 'تکرار رمز عبور' : 'Confirm Password'} type="password" value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)} required />
           <div className="flex items-center gap-3 mt-1">
             <button

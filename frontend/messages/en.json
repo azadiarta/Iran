@@ -41,6 +41,7 @@
     "register_title": "Create Account",
     "credential_label": "Phone or Email",
     "password_label": "Password",
+    "password_hint": "At least 8 characters, with letters and numbers, including one uppercase letter and one special character.",
     "confirm_password_label": "Confirm Password",
     "full_name_label": "Full Name",
     "display_name_label": "Display Name (optional)",

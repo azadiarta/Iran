@@ -41,6 +41,7 @@
     "register_title": "ایجاد حساب کاربری",
     "credential_label": "شماره تلفن یا ایمیل",
     "password_label": "رمز عبور",
+    "password_hint": "حداقل ۸ نویسه، ترکیبی از حروف و اعداد، شامل حداقل یک حرف بزرگ و یک کاراکتر خاص.",
     "confirm_password_label": "تأیید رمز عبور",
     "full_name_label": "نام کامل",
     "display_name_label": "نام نمایشی (اختیاری)",

@@ -89,13 +89,34 @@ export function maxLengthError(isRTL: boolean, max: number): string {
   return isRTL ? `حداکثر ${max} نویسه مجاز است.` : `Must be ${max} characters or fewer.`;
 }
 
-// Real-time password-strength check, used as the user types (not just on submit).
-// Returns the error reason, or undefined if the password already satisfies the rule.
-export function passwordTooShortError(isRTL: boolean, value: string): string | undefined {
-  if (!value || value.length >= PASSWORD_MIN_LENGTH) return undefined;
-  return isRTL
-    ? `رمز عبور باید حداقل ${PASSWORD_MIN_LENGTH} نویسه باشد. (${value.length}/${PASSWORD_MIN_LENGTH})`
-    : `Password must be at least ${PASSWORD_MIN_LENGTH} characters. (${value.length}/${PASSWORD_MIN_LENGTH})`;
+// Real-time password-strength check, used as the user types (not just on
+// submit). Mirrors backend/core/validators.py _password_strength_errors —
+// same 4 rules, checked in the same order, so the first error a user sees
+// here is always the same one the server would reject with. Returns the
+// error reason, or undefined if the password already satisfies every rule.
+export function passwordStrengthError(isRTL: boolean, value: string): string | undefined {
+  if (!value) return undefined;
+  if (value.length < PASSWORD_MIN_LENGTH) {
+    return isRTL
+      ? `رمز عبور باید حداقل ${PASSWORD_MIN_LENGTH} نویسه باشد. (${value.length}/${PASSWORD_MIN_LENGTH})`
+      : `Password must be at least ${PASSWORD_MIN_LENGTH} characters. (${value.length}/${PASSWORD_MIN_LENGTH})`;
+  }
+  if (!/[A-Za-z]/.test(value) || !/\d/.test(value)) {
+    return isRTL
+      ? 'رمز عبور باید ترکیبی از حروف و اعداد باشد.'
+      : 'Password must contain a mix of letters and numbers.';
+  }
+  if (!/[A-Z]/.test(value)) {
+    return isRTL
+      ? 'رمز عبور باید حداقل یک حرف بزرگ داشته باشد.'
+      : 'Password must contain at least one uppercase letter.';
+  }
+  if (!/[^A-Za-z0-9]/.test(value)) {
+    return isRTL
+      ? 'رمز عبور باید حداقل یک کاراکتر خاص داشته باشد.'
+      : 'Password must contain at least one special character.';
+  }
+  return undefined;
 }
 
 export function passwordMismatchError(isRTL: boolean): string {

@@ -12,7 +12,7 @@ import {
   isValidPhoneStrict,
   isValidEmail,
   maxLengthError,
-  passwordTooShortError,
+  passwordStrengthError,
   passwordMismatchError,
   requiredFieldError,
   emailFormatError,
@@ -182,7 +182,7 @@ export default function RegisterPage() {
     setForm((prev) => ({ ...prev, password: value }));
     setFieldErrors((prev) => ({
       ...prev,
-      password: passwordTooShortError(isRTL, value),
+      password: passwordStrengthError(isRTL, value),
       confirm_password:
         form.confirm_password && value !== form.confirm_password
           ? passwordMismatchError(isRTL)
@@ -243,7 +243,7 @@ export default function RegisterPage() {
     if (!form.password) {
       errors.password = requiredFieldError(isRTL);
     } else {
-      const pwError = passwordTooShortError(isRTL, form.password);
+      const pwError = passwordStrengthError(isRTL, form.password);
       if (pwError) errors.password = pwError;
     }
 
@@ -473,9 +473,13 @@ export default function RegisterPage() {
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
-            {fieldErrors.password && (
+            {fieldErrors.password ? (
               <p className="text-xs" style={{ color: '#ef4444' }} role="alert">
                 {fieldErrors.password}
+              </p>
+            ) : (
+              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                {t('password_hint')}
               </p>
             )}
           </div>

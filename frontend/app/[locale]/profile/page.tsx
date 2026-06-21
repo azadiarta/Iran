@@ -13,7 +13,7 @@ import {
   phoneFormatError,
   maxLengthError,
   emailFormatError,
-  passwordTooShortError,
+  passwordStrengthError,
   passwordMismatchError,
   PHONE_PLACEHOLDER,
   EMAIL_MAX_LENGTH,
@@ -216,7 +216,7 @@ export default function ProfilePage() {
     setPasswordData((d) => ({ ...d, new_password: value }));
     setPasswordFieldErrors((prev) => ({
       ...prev,
-      new_password: passwordTooShortError(isRTL, value),
+      new_password: passwordStrengthError(isRTL, value),
       confirm_new_password:
         passwordData.confirm_new_password && value !== passwordData.confirm_new_password
           ? passwordMismatchError(isRTL)
@@ -237,7 +237,7 @@ export default function ProfilePage() {
   const handlePasswordSave = async () => {
     if (!member) return;
     const isRTL = locale === 'fa';
-    const pwError = passwordTooShortError(isRTL, passwordData.new_password);
+    const pwError = passwordStrengthError(isRTL, passwordData.new_password);
     if (pwError) {
       setPasswordFieldErrors((prev) => ({ ...prev, new_password: pwError }));
       return;
@@ -577,8 +577,10 @@ export default function ProfilePage() {
                     {showNewPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                {passwordFieldErrors.new_password && (
+                {passwordFieldErrors.new_password ? (
                   <p className="text-xs text-[#ef4444] mt-1">{passwordFieldErrors.new_password}</p>
+                ) : (
+                  <p className="text-xs text-white/30 mt-1">{t('password_hint')}</p>
                 )}
               </div>
 
