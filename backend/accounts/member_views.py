@@ -78,6 +78,12 @@ class MemberListView(APIView):
     def get(self, request):
         qs = Member.objects.select_related('group').order_by('-created_at')
 
+        # Superuser is invisible in the member list to every admin except
+        # themselves — never leaked to any other admin, regardless of how
+        # broad their permissions are.
+        if not request.user.is_superuser:
+            qs = qs.exclude(is_superuser=True)
+
         group_id = request.query_params.get('group')
         if group_id:
             qs = safe_filter(qs, group__id=group_id)
@@ -137,6 +143,11 @@ class MemberDetailView(APIView):
         except Member.DoesNotExist:
             return api_error('Member not found.', status_code=404)
 
+        # Superuser is invisible to every other admin, even by direct pk —
+        # only visible to themselves.
+        if member.is_superuser and request.user.pk != member.pk:
+            return api_error('Member not found.', status_code=404)
+
         is_owner = request.user.pk == member.pk
         if is_owner or _can_view_member_details(request.user):
             return api_success(MemberDetailSerializer(member).data)
@@ -156,6 +167,9 @@ class MemberFullProfileView(APIView):
         try:
             member = Member.objects.select_related('group').get(pk=pk)
         except Member.DoesNotExist:
+            return api_error('Member not found.', status_code=404)
+
+        if member.is_superuser and request.user.pk != member.pk:
             return api_error('Member not found.', status_code=404)
 
         from core.models import ContactMessage

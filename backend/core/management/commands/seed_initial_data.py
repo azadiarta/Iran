@@ -19,6 +19,7 @@ PERMISSIONS = {
     'can_manage_permissions': ('Can Manage Permissions', 'Full admin access: members, groups, permissions, settings, payments and content moderation.'),
     'can_manage_contact_messages': ('Can Manage Contact Messages', 'View submitted contact form messages and mark them as handled.'),
     'can_view_member_details': ('Can View Member Details', "View a member's full profile: their comments, contributions, contact messages and activity."),
+    'can_toggle_lockdown': ('Can Toggle Lockdown', 'Enable or disable the permission-based site lockdown (blocks ordinary members; superuser/admins keep full access).'),
 }
 
 # The default group (assigned to newly registered members) gets the same
@@ -65,6 +66,14 @@ DEFAULT_SETTINGS = {
     'payment_stripe_secret_key':     ('', 'Reserved for future Stripe integration.'),
     'payment_stripe_webhook_secret': ('', 'Reserved for future Stripe integration.'),
     'payment_google_pay_enabled':    ('false', 'Reserved for future Google Pay integration — do not enable yet.'),
+
+    # Lockdown — see core/lockdown.py and core/lockdown_views.py. Never
+    # exposed via the generic settings list/update endpoints; only ever
+    # written through the dedicated lockdown toggle views.
+    'superuser_lockdown_enabled':   ('false', 'Superuser-only site lockdown: when true, the entire site is disabled for everyone except the superuser.'),
+    'superuser_lockdown_message':   ('', 'Message shown on the lockdown page while superuser_lockdown_enabled is true.'),
+    'permission_lockdown_enabled':  ('false', 'Permission-gated site lockdown: when true, the site is disabled for ordinary members; superuser and admins keep full access.'),
+    'permission_lockdown_message':  ('', 'Message shown on the lockdown page while permission_lockdown_enabled is true.'),
 }
 
 

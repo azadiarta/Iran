@@ -20,6 +20,7 @@ urlpatterns = [
     path('api/permissions/', include('core.urls')),
     path('api/payments/', include('payments.urls')),
     path('api/contact/', include('core.contact_urls')),
+    path('api/lockdown/', include('core.lockdown_urls')),
 ]
 
 if settings.DEBUG and not settings.AWS_STORAGE_BUCKET_NAME:

@@ -17,6 +17,11 @@ class ActivityLogListView(APIView):
     def get(self, request):
         qs = ActivityLog.objects.order_by('-created_at')
 
+        # Superuser-actor entries are invisible to every other admin — only
+        # the superuser themselves can see their own activity.
+        if not request.user.is_superuser:
+            qs = qs.exclude(actor__is_superuser=True)
+
         actor = request.query_params.get('actor')
         if actor:
             qs = safe_filter(qs, actor__id=actor)
@@ -46,6 +51,8 @@ class ActivityLogDetailView(APIView):
         try:
             log = ActivityLog.objects.get(pk=pk)
         except ActivityLog.DoesNotExist:
+            return api_error('Activity log not found.', status_code=404)
+        if not request.user.is_superuser and log.actor_id and log.actor.is_superuser:
             return api_error('Activity log not found.', status_code=404)
         return api_success(ActivityLogSerializer(log).data)
 

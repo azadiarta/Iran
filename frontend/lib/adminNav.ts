@@ -12,6 +12,7 @@ import {
   Database,
   ScrollText,
   Terminal,
+  Lock,
 } from 'lucide-react';
 
 export interface AdminNavItem {
@@ -37,6 +38,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { key: 'contact-messages', href: 'contact-messages', label: { en: 'Contact Messages', fa: 'پیام‌های تماس' }, icon: Mail, permission: 'can_manage_contact_messages', badgeKey: 'pendingContactMessageCount' },
   { key: 'payments', href: 'payments', label: { en: 'Payments', fa: 'تنظیمات پرداخت' }, icon: Wallet, permission: 'can_manage_permissions' },
   { key: 'settings', href: 'settings', label: { en: 'Settings', fa: 'تنظیمات' }, icon: Settings, permission: 'can_manage_permissions' },
+  { key: 'lockdown', href: 'lockdown', label: { en: 'Site Lockdown', fa: 'قفل سامانه' }, icon: Lock, permission: 'can_toggle_lockdown' },
   { key: 'system-status', href: 'system', label: { en: 'System Status', fa: 'وضعیت سیستم' }, icon: Database, superuserOnly: true },
   { key: 'activity-log', href: 'logs/activity', label: { en: 'Activity Log', fa: 'گزارش فعالیت' }, icon: ScrollText, divider: true, permission: 'can_manage_permissions' },
   { key: 'system-log', href: 'logs/system', label: { en: 'System Log', fa: 'گزارش سیستم' }, icon: Terminal, superuserOnly: true },

@@ -10,6 +10,7 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 
 from accounts.models import AccessGroup, Member
 from accounts.permissions import IsSuperuser
+from core.lockdown import LOCKDOWN_KEYS
 from core.log_utils import actor_display_for
 from core.models import DefaultSetting
 from core.serializers import DefaultSettingSerializer
@@ -88,7 +89,9 @@ class DefaultSettingListView(APIView):
     permission_classes = [IsAuthenticated, IsSuperuser]
 
     def get(self, request):
-        settings = DefaultSetting.objects.select_related('updated_by').all()
+        # Lockdown keys are deliberately excluded — they're only ever
+        # written through core.lockdown_views, never this generic endpoint.
+        settings = DefaultSetting.objects.exclude(key__in=LOCKDOWN_KEYS).select_related('updated_by').all()
         return api_success(DefaultSettingSerializer(settings, many=True).data)
 
 
@@ -113,6 +116,9 @@ class DefaultSettingUpdateView(APIView):
     permission_classes = [IsAuthenticated, IsSuperuser]
 
     def patch(self, request, key):
+        if key in LOCKDOWN_KEYS:
+            return api_error('Setting not found.', status_code=404)
+
         try:
             setting = DefaultSetting.objects.get(key=key)
         except DefaultSetting.DoesNotExist:

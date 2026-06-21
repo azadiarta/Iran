@@ -99,4 +99,11 @@ export const PERMISSION_META: Record<string, PermissionMeta> = {
       fa: 'مشاهده پروفایل کامل یک عضو: نظرات، مشارکت‌ها، پیام‌های تماس و فعالیت‌های او.',
     },
   },
+  can_toggle_lockdown: {
+    label: { en: 'Can Toggle Lockdown', fa: 'قفل کردن سامانه' },
+    description: {
+      en: 'Enable or disable the permission-based site lockdown (blocks ordinary members; superuser/admins keep full access).',
+      fa: 'فعال یا غیرفعال کردن قفل سامانه بر اساس دسترسی (اعضای عادی مسدود می‌شوند؛ سوپریوزر و ادمین‌ها دسترسی کامل دارند).',
+    },
+  },
 };

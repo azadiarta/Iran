@@ -903,6 +903,31 @@ export const systemAPI = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Lockdown API
+// ═══════════════════════════════════════════════════════════════════════════════
+// kind: null = site open. 'superuser' = superuser-only lockdown (blocks every
+// other admin too). 'permission' = blocks ordinary members only; superuser
+// and any admin keep full access. 'superuser' always takes precedence — see
+// backend/core/lockdown.py.
+export interface LockdownStatus {
+  kind: 'superuser' | 'permission' | null;
+  message: string;
+}
+
+export const lockdownAPI = {
+  // Public — polled by every client, including anonymous visitors.
+  getStatus: () => api.get<ApiResponse>('/api/lockdown/'),
+
+  // Superuser-only.
+  toggleSuperuser: (enabled: boolean, message?: string) =>
+    api.patch<ApiResponse>('/api/lockdown/superuser/', { enabled, message }),
+
+  // Requires the can_toggle_lockdown permission (superuser bypasses).
+  togglePermission: (enabled: boolean, message?: string) =>
+    api.patch<ApiResponse>('/api/lockdown/permission/', { enabled, message }),
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Contact API
 // ═══════════════════════════════════════════════════════════════════════════════
 export interface ContactMessage {

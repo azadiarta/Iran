@@ -4,20 +4,20 @@ project_summary:
   categories_found: 20
   quick_stats:
     total_forms: 23
-    total_action_buttons: 9
+    total_action_buttons: 11
     total_search_inputs: 11
     total_realtime_search_inputs: 9
-    total_api_endpoints: 69
-    total_view_classes: 67
+    total_api_endpoints: 72
+    total_view_classes: 70
     total_models: 12
     total_serializers: 47
-    total_url_patterns: 69
+    total_url_patterns: 72
     total_admin_registrations: 12
     total_django_forms: 0
-    total_frontend_routes: 32
-    total_frontend_api_modules: 13
-    total_zustand_stores: 3
-    total_reusable_ui_components: 25
+    total_frontend_routes: 33
+    total_frontend_api_modules: 14
+    total_zustand_stores: 4
+    total_reusable_ui_components: 27
     total_phone_fields: 1
 
 # ============================================================
@@ -43,14 +43,14 @@ project_summary:
 # URL pattern maps 1:1 (or 1:2 in two cases) to exactly one View
 # class, the categories "Django Views", "URL patterns" and "API
 # endpoints" are merged into a single category `api_endpoints`
-# below to avoid tripling the same 67 facts — each item there
+# below to avoid tripling the same 70 facts — each item there
 # already lists the urls.py file, the views.py file/class, and the
 # HTTP method/path/permission together.
 # ============================================================
 
 forms:
   scope: frontend
-  total_count: 22
+  total_count: 23
   description: Every <form> or form-like data-entry UI in the Next.js frontend that submits data to a backend API (mutating, not search/filter-only).
   subcategories:
     public_facing_forms:
@@ -278,7 +278,7 @@ forms:
 
 action_buttons:
   scope: frontend
-  total_count: 9
+  total_count: 11
   description: Standalone action triggers that mutate data without a multi-field form — confirm-and-fire deletes, status toggles, and approve/reject buttons.
   subcategories:
     destructive_confirm_actions:
@@ -318,7 +318,7 @@ action_buttons:
             - backend/posts/views.py
           notes: "Two related confirm actions: postsAPI.delete -> DELETE /api/posts/{pk}/delete/ (PostDeleteView), and per-image delete -> DELETE /api/posts/{pk}/images/{image_id}/delete/ (PostImageDeleteView). NOTE: this is the ONLY delete endpoint in the posts app for content — Comments cannot be deleted by anyone (CommentDeleteView was removed in Phase 24; all.yaml has been corrected to reflect this)."
     status_change_buttons:
-      count: 5
+      count: 7
       items:
         - id: action_admin_group_set_default
           label: Admin — set group as default (button)
@@ -361,6 +361,30 @@ action_buttons:
             - frontend/app/[locale]/admin/members/[id]/page.tsx
             - backend/accounts/member_views.py
           notes: "Cross-referenced with form_admin_member_deactivate above — listed here too because it is fundamentally a status-toggle action; the 'reason' field is optional metadata on top of the toggle."
+        - id: action_admin_lockdown_superuser_toggle
+          label: "Admin — site-wide superuser-only lockdown toggle (with required message)"
+          scope: frontend
+          location:
+            - frontend/app/[locale]/admin/lockdown/page.tsx
+            - frontend/components/admin/fields/AdminToggle.tsx
+            - frontend/components/admin/AdminConfirmDialog.tsx
+            - frontend/lib/api.ts
+            - backend/core/lockdown_views.py
+            - backend/core/lockdown.py
+            - backend/core/middleware.py
+          notes: "AdminToggle, visible ONLY to member.is_superuser (never rendered for any other admin). Turning ON opens AdminConfirmDialog with a required AdminTextarea (message shown to visitors) -> lockdownAPI.toggleSuperuser(true, message) -> PATCH /api/lockdown/superuser/ (SuperuserLockdownToggleView, IsSuperuser). When active, SiteLockdownMiddleware (core/middleware.py) blocks the entire backend for everyone except the superuser, and ClientLayout.tsx renders LockdownPage for every non-superuser visitor. Always takes precedence over the permission-based lockdown below — enabling it automatically disables that one server-side (core/lockdown.py)."
+        - id: action_admin_lockdown_permission_toggle
+          label: "Admin — site-wide lockdown for ordinary members toggle (with required message)"
+          scope: frontend
+          location:
+            - frontend/app/[locale]/admin/lockdown/page.tsx
+            - frontend/components/admin/fields/AdminToggle.tsx
+            - frontend/components/admin/AdminConfirmDialog.tsx
+            - frontend/lib/api.ts
+            - backend/core/lockdown_views.py
+            - backend/core/lockdown.py
+            - backend/core/middleware.py
+          notes: "AdminToggle, visible to the superuser and to any admin holding the new can_toggle_lockdown permission. Turning ON opens AdminConfirmDialog with a required AdminTextarea -> lockdownAPI.togglePermission(true, message) -> PATCH /api/lockdown/permission/ (PermissionLockdownToggleView, HasGroupPermission('can_toggle_lockdown')); returns 409 if the superuser-only lockdown is already active. When active, the site/admin panel stay fully open for the superuser and every admin (any member with at least one non-baseline group permission, per is_admin_member() in core/lockdown.py / hasAdminAccess() in lib/adminNav.ts); only ordinary members and guests see LockdownPage. Disabled (greyed out) in the UI whenever the superuser lockdown is on."
 
 search_inputs:
   scope: frontend
@@ -456,11 +480,11 @@ search_inputs:
 
 api_calls:
   scope: frontend
-  total_count: 13
+  total_count: 14
   description: All HTTP client modules in frontend/lib/api.ts (single axios instance, baseURL from NEXT_PUBLIC_API_URL), grouped by the backend app they target.
   subcategories:
     api_modules:
-      count: 13
+      count: 14
       items:
         - id: api_authAPI
           label: authAPI — register/login/logout/profile/token-refresh
@@ -566,11 +590,19 @@ api_calls:
             - backend/core/contact_views.py
             - backend/core/contact_urls.py
           notes: "Methods: submit, getMine, getList, toggleHandled. Targets /api/contact/*. Phase 31 — submit's data type gained a required captcha_token field, verified by ContactMessageCreateView via core.captcha.verify_captcha before the MAX_PENDING_MESSAGES check."
+        - id: api_lockdownAPI
+          label: lockdownAPI — site lockdown status + superuser/permission toggles
+          scope: frontend
+          location:
+            - frontend/lib/api.ts
+            - backend/core/lockdown_views.py
+            - backend/core/lockdown_urls.py
+          notes: "Methods: getStatus, toggleSuperuser, togglePermission. Targets /api/lockdown/*. getStatus is polled unconditionally (even for anonymous visitors) by LockdownSync.tsx every 20s into the non-persisted lockdownStore."
   notes_general: "frontend/lib/api.ts is the single source of truth for every frontend-to-backend call in the project — no component calls axios/fetch directly outside this file."
 
 ui_components:
   scope: frontend
-  total_count: 25
+  total_count: 27
   description: Reusable UI components under frontend/components — admin primitives, admin form fields, layout shells, and shared/animation components.
   subcategories:
     admin_primitives:
@@ -645,7 +677,7 @@ ui_components:
           location: [frontend/components/admin/fields/AdminToggle.tsx]
           notes: "Used for show_in_public_list and instant settings toggles in admin/payments and admin/settings."
     layout_components:
-      count: 7
+      count: 8
       items:
         - id: ui_AdminLayout
           label: AdminLayout — admin panel page shell
@@ -682,8 +714,13 @@ ui_components:
           scope: frontend
           location: [frontend/components/layout/Navbar.tsx]
           notes: "Locale switcher, auth-aware links (login vs profile), admin-panel link gated by hasAdminAccess()."
+        - id: ui_LockdownSync
+          label: LockdownSync — polls site lockdown status unconditionally
+          scope: frontend
+          location: [frontend/components/layout/LockdownSync.tsx, frontend/store/lockdownStore.ts]
+          notes: "Mounted at root layout for every visitor including anonymous ones (unlike AuthSync, runs with no auth gate). Polls lockdownAPI.getStatus() every 20s into lockdownStore; GET /api/lockdown/ is AllowAny and exempt from SiteLockdownMiddleware so it always succeeds even while the site is locked down."
     common_and_animation_components:
-      count: 5
+      count: 6
       items:
         - id: ui_Turnstile
           label: "Turnstile — Cloudflare Turnstile CAPTCHA widget (Phase 31, NEW)"
@@ -710,14 +747,19 @@ ui_components:
           scope: frontend
           location: [frontend/components/animations/SplashScreen.tsx, frontend/components/animations/IranianSymbols.tsx]
           notes: "Shown on first load only; purely decorative, no API calls."
+        - id: ui_LockdownPage
+          label: "LockdownPage — full-screen animated lockdown overlay (NEW)"
+          scope: frontend
+          location: [frontend/components/lockdown/LockdownPage.tsx, "frontend/app/[locale]/ClientLayout.tsx"]
+          notes: "position:fixed;inset:0;zIndex:9999 overlay, same dark #0a0a0f + amber #fbbf24 visual language as SplashScreen but with its own custom inline-SVG 'sleepy lock' mascot (closed crescent eyes, breathing scale/y animation, 3 floating animated Z letters) instead of the LionAndSun emblem. Rendered by ClientLayout.tsx whenever lockdownStore.kind blocks the current visitor (deny-by-default until auth hydration completes); shows the admin-entered message in a styled box."
 
 state_management:
   scope: frontend
-  total_count: 5
+  total_count: 6
   description: "All client-side state patterns. The project uses Zustand (NOT Redux); React Context is used only by next-intl for i18n, not for app data."
   subcategories:
     zustand_stores:
-      count: 3
+      count: 4
       items:
         - id: state_authStore
           label: authStore — current member, token, group/permissions
@@ -734,6 +776,11 @@ state_management:
           scope: frontend
           location: [frontend/store/toastStore.ts, frontend/components/admin/AdminToastContainer.tsx]
           notes: "No persist — ephemeral, in-memory only. Used for nearly all 'toast validation'/error notes referenced in the forms category."
+        - id: state_lockdownStore
+          label: lockdownStore — current site lockdown kind/message
+          scope: frontend
+          location: [frontend/store/lockdownStore.ts, frontend/components/layout/LockdownSync.tsx, "frontend/app/[locale]/ClientLayout.tsx"]
+          notes: "No persist — deliberately NOT cached in localStorage, since lockdown truth must always reflect the server, never a stale replayed value. Holds {kind: 'superuser'|'permission'|null, message, hasLoaded}. Read by ClientLayout.tsx to decide whether to render LockdownPage instead of the normal app tree."
     other_state_patterns:
       count: 2
       items:
@@ -750,7 +797,7 @@ state_management:
 
 routes:
   scope: frontend
-  total_count: 32
+  total_count: 33
   description: Every page.tsx under frontend/app/[locale]/** (Next.js App Router, locale-prefixed via next-intl middleware, locales en/fa).
   subcategories:
     public_routes:
@@ -824,7 +871,7 @@ routes:
           scope: frontend
           location: ["frontend/app/[locale]/profile/contact-messages/page.tsx"]
     admin_routes:
-      count: 14
+      count: 15
       items:
         - id: route_admin_dashboard
           label: "/admin — dashboard"
@@ -882,7 +929,12 @@ routes:
           label: "/admin/system — system status page"
           scope: frontend
           location: ["frontend/app/[locale]/admin/system/page.tsx"]
-      notes_subcategory: "All 14 admin routes are wrapped in AdminLayout and individually gated by hasAdminAccess()/isNavItemVisible() (frontend/lib/adminNav.ts) — a member whose group grants ONLY the 4 BASELINE_GROUP_PERMISSIONS (can_contribute, can_comment, can_view_balance, can_view_posts) has NO access to any /admin/* route."
+        - id: route_admin_lockdown
+          label: "/admin/lockdown — site-wide / member-only lockdown toggles"
+          scope: frontend
+          location: ["frontend/app/[locale]/admin/lockdown/page.tsx"]
+          notes: "Superuser-only toggle card rendered conditionally on member.is_superuser; permission-gated toggle card rendered for superuser or can_toggle_lockdown holders. Nav item itself gated on can_toggle_lockdown in lib/adminNav.ts (superuser sees it via the superuser-bypass in hasAdminAccess/isNavItemVisible)."
+      notes_subcategory: "All 15 admin routes are wrapped in AdminLayout and individually gated by hasAdminAccess()/isNavItemVisible() (frontend/lib/adminNav.ts) — a member whose group grants ONLY the 4 BASELINE_GROUP_PERMISSIONS (can_contribute, can_comment, can_view_balance, can_view_posts) has NO access to any /admin/* route."
     special_routes:
       count: 3
       items:
@@ -901,8 +953,8 @@ routes:
 
 api_endpoints:
   scope: backend
-  total_count: 67
-  description: "Every Django URL pattern / DRF APIView / API endpoint in the backend (merged into one category — see methodology note at top of file: this codebase has zero Django Forms and zero ViewSets, so views/urls/endpoints are 1:1 isomorphic and listing them three times would be pure duplication). All routes are mounted under root urlpatterns in backend/groupfund/urls.py. 67 items below represent 69 actual routes total (quick_stats.total_api_endpoints) — two items (ep_comment_admin_edit_update_detail groups 3 routes; this is explicitly noted per-item) cover more than one route each."
+  total_count: 70
+  description: "Every Django URL pattern / DRF APIView / API endpoint in the backend (merged into one category — see methodology note at top of file: this codebase has zero Django Forms and zero ViewSets, so views/urls/endpoints are 1:1 isomorphic and listing them three times would be pure duplication). All routes are mounted under root urlpatterns in backend/groupfund/urls.py. 70 items below represent 72 actual routes total (quick_stats.total_api_endpoints) — two items (ep_comment_admin_edit_update_detail groups 3 routes; this is explicitly noted per-item) cover more than one route each."
   subcategories:
     auth_endpoints:
       count: 5
@@ -1217,7 +1269,7 @@ api_endpoints:
           location: [backend/payments/urls.py, backend/payments/views.py]
           notes: "PaymentStatusView. Polled by the contribute wizard to show approval/rejection status."
     core_misc_endpoints:
-      count: 10
+      count: 13
       items:
         - id: ep_contact_submit
           label: "POST /api/contact/submit/"
@@ -1269,7 +1321,22 @@ api_endpoints:
           scope: backend
           location: [backend/core/urls.py, backend/core/views.py, backend/core/serializers.py]
           notes: "PermissionListView + PermissionSerializer. Lists the 13 seeded Permission codenames. Backs the group-permission-checkbox UI."
-  notes_general: "Two view classes (CommentListView, CommentCreateView) are each mounted twice, once under posts/urls.py (target_type=post) and once under fund/urls.py (target_type=expense) — this is why 67 distinct view classes produce 69 routes. The Django admin panel mount (/admin/, backend/groupfund/urls.py) is documented separately in the admin_panel category, since it is not a DRF API endpoint."
+        - id: ep_lockdown_status
+          label: "GET /api/lockdown/"
+          scope: backend
+          location: [backend/core/lockdown_urls.py, backend/core/lockdown_views.py, backend/core/lockdown.py]
+          notes: "LockdownStatusView. AllowAny, and explicitly exempted from SiteLockdownMiddleware itself (core/middleware.py) — otherwise a locked-down site could never report its own status to anonymous visitors. Returns {kind: 'superuser'|'permission'|null, message}, backed by DefaultSetting keys lockdown_kind/lockdown_message. Polled every 20s by frontend/components/layout/LockdownSync.tsx into the non-persisted lockdownStore."
+        - id: ep_lockdown_toggle_superuser
+          label: "PATCH /api/lockdown/superuser/"
+          scope: backend
+          location: [backend/core/lockdown_urls.py, backend/core/lockdown_views.py, backend/core/lockdown.py]
+          notes: "SuperuserLockdownToggleView. permission_classes=[IsAuthenticated, IsSuperuser] — the ONLY permission check in the codebase that excludes every admin, not just ordinary members. Body: {enabled: bool, message?: str} (message required when enabling). Enabling this unconditionally clears/overrides the permission-based lockdown (lockdown_kind is a single value, not independently-toggleable flags) — implements the 'superuser lockdown always takes priority' rule. Returns the post-update {kind, message}."
+        - id: ep_lockdown_toggle_permission
+          label: "PATCH /api/lockdown/permission/"
+          scope: backend
+          location: [backend/core/lockdown_urls.py, backend/core/lockdown_views.py, backend/core/lockdown.py]
+          notes: "PermissionLockdownToggleView. permission_classes=[IsAuthenticated, HasGroupPermission('can_toggle_lockdown')] (new permission, seeded in seed_initial_data.py). Body: {enabled: bool, message?: str}. Returns 409 if the superuser lockdown (ep_lockdown_toggle_superuser) is already active — by design the admin must disable that one first; this view will never silently override it. SiteLockdownMiddleware enforces the resulting state for every request except the exempted login/lockdown-status/superuser-toggle endpoints, using is_admin_member() to exempt every admin (superuser or any non-baseline group permission), not just the superuser."
+  notes_general: "Two view classes (CommentListView, CommentCreateView) are each mounted twice, once under posts/urls.py (target_type=post) and once under fund/urls.py (target_type=expense) — this is why 70 distinct view classes produce 72 routes. The Django admin panel mount (/admin/, backend/groupfund/urls.py) is documented separately in the admin_panel category, since it is not a DRF API endpoint."
 
 django_forms:
   scope: backend
@@ -1678,11 +1745,11 @@ admin_panel:
 
 auth_permission_checks:
   scope: both
-  total_count: 9
+  total_count: 11
   description: All authentication and permission-checking mechanisms, spanning JWT issuance on the backend through to admin-route gating on the frontend.
   subcategories:
     backend_auth:
-      count: 5
+      count: 6
       items:
         - id: auth_jwt_simplejwt
           label: JWT issuance/refresh via rest_framework_simplejwt
@@ -1709,8 +1776,13 @@ auth_permission_checks:
           scope: backend
           location: [backend/accounts/permissions.py]
           notes: "Factory function returning a DRF permission class that checks request.user.group.permissions.filter(codename=...).exists(). Superuser always bypasses. This is THE mechanism behind every can_* permission check across all api_endpoints (e.g. ExpenseDeleteView uses HasGroupPermission('can_manage_permissions'))."
+        - id: auth_SiteLockdownMiddleware
+          label: "SiteLockdownMiddleware + is_admin_member() + can_toggle_lockdown (NEW)"
+          scope: backend
+          location: [backend/core/middleware.py, backend/core/lockdown.py, backend/core/lockdown_views.py, backend/core/management/commands/seed_initial_data.py]
+          notes: "New seeded permission can_toggle_lockdown gates PermissionLockdownToggleView (HasGroupPermission). SuperuserLockdownToggleView instead uses the existing IsSuperuser class directly — by design no group permission can ever grant the site-wide superuser-only lockdown, only is_superuser itself. SiteLockdownMiddleware reads DefaultSetting lockdown_kind/lockdown_message on every request and short-circuits with 503 for blocked requests; is_admin_member(user) (deny-by-default helper) decides who is exempt — superuser always; under kind='permission', any member whose group holds at least one permission outside BASELINE_GROUP_PERMISSIONS. The login and lockdown-status endpoints are always exempt so an exempt admin/superuser can still sign in and lift the lockdown."
     frontend_auth:
-      count: 4
+      count: 5
       items:
         - id: auth_authStore_gating
           label: authStore as the single client-side source of auth truth
@@ -1732,10 +1804,15 @@ auth_permission_checks:
           scope: frontend
           location: [frontend/components/layout/DeactivatedGuard.tsx]
           notes: "Checks Member.is_active from authStore; renders a block/redirect if false, independent of the admin-permission gating above."
+        - id: auth_ClientLayout_lockdown_gating
+          label: "ClientLayout.tsx isBlocked logic — client-side lockdown gating (NEW)"
+          scope: frontend
+          location: ["frontend/app/[locale]/ClientLayout.tsx", frontend/store/lockdownStore.ts, frontend/lib/adminNav.ts]
+          notes: "Deny-by-default: until authStore.hasHydrated is true, treats the visitor as not exempt, mirroring the backend's is_admin_member() allowlist logic. kind==='superuser' exempts only member.is_superuser; kind==='permission' exempts hasAdminAccess({isSuperuser, groupPermissions}) (superuser or any admin). The /[locale]/login route is always exempt from the isBlocked check so an exempt user has a way to sign in and lift the lockdown."
 
 validation_logic:
   scope: both
-  total_count: 9
+  total_count: 10
   description: >
     Client-side and server-side validation. Both stacks now have a shared, canonical
     validation/sanitization module (added during the input-validation-security hardening
