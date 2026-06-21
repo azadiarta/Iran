@@ -8,6 +8,7 @@ import { Users, TrendingUp, Wallet, ArrowRight, CheckCircle, UserCheck, User, La
 import useLangStore from '@/store/langStore';
 import {
   LionAndSun,
+  HandsEmblem,
   GeometricPattern,
   FaravaharSimple,
   PersepolisIcon,
@@ -297,7 +298,7 @@ export default function LandingPage() {
             transition={{ duration: 0.8, ease: 'easeOut' }}
           >
             <div style={{ color: '#fbbf24', marginBottom: '1rem' }}>
-              <LionAndSun size={72} animated />
+              <HandsEmblem size={72} animated />
             </div>
           </motion.div>
 

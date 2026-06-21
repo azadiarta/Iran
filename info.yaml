@@ -140,7 +140,12 @@ project_conventions:
       fully opaque (#0a0a0f on the public site's per-page wrappers, the
       admin shell's --admin-bg). See all.yaml's roadmap.add_sitewide_watermark
       for the exact mechanism before touching any page-level or admin-shell
-      background color/opacity.
+      background color/opacity. Phase 38 — the SAME emblem image also has 2
+      foreground/logo roles, at full (native) opacity, via a new HandsEmblem
+      export in IranianSymbols.tsx: the landing page's Hero-content icon and
+      the Navbar brand logo (desktop + mobile drawer). These are ordinary
+      <img> elements, unrelated to and independent of the SiteBackground.tsx
+      watermark mechanism — changing one never affects the other.
   technology_stack:
     rule: >
       Backend: Django + Django REST Framework, PostgreSQL (SQLite fallback
@@ -900,7 +905,7 @@ ui_components:
           label: Navbar — public site nav bar
           scope: frontend
           location: [frontend/components/layout/Navbar.tsx]
-          notes: "Locale switcher, auth-aware links (login vs profile), admin-panel link gated by hasAdminAccess()."
+          notes: "Locale switcher, auth-aware links (login vs profile), admin-panel link gated by hasAdminAccess(). Phase 38 — brand logo (desktop header + mobile drawer header) swapped from LionAndSun to HandsEmblem (the Iranian Political Association Birmingham emblem photo, same asset as the sitewide watermark, shown here at full opacity)."
     common_and_animation_components:
       count: 5
       items:
@@ -928,7 +933,7 @@ ui_components:
           label: SplashScreen + IranianSymbols — initial load splash animation
           scope: frontend
           location: [frontend/components/animations/SplashScreen.tsx, frontend/components/animations/IranianSymbols.tsx]
-          notes: "Shown on first load only; purely decorative, no API calls."
+          notes: "Shown on first load only; purely decorative, no API calls. IranianSymbols.tsx gained a 9th export, HandsEmblem, in Phase 38 (used by Navbar.tsx and the landing page's Hero icon, NOT by SplashScreen itself) — see all.yaml shared_components.IranianSymbols for the full per-export consumer list."
 
 state_management:
   scope: frontend

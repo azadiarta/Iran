@@ -67,6 +67,46 @@ export function LionAndSun({ size = 100, className = '', animated = false }: Sym
   return content;
 }
 
+/* ─── HandsEmblem ────────────────────────────────────────────────────────── */
+// The Iranian Political Association (Birmingham) emblem — clasped hands —
+// the org's real logo (frontend/public/branding/ipa-birmingham.jpg), shown
+// at full opacity. The same image also renders site-wide as a faint
+// background watermark (SiteBackground.tsx) — unrelated to this component.
+
+const HANDS_EMBLEM_RATIO = 833 / 748; // ~1.114 (intrinsic JPEG dimensions)
+
+export function HandsEmblem({ size = 100, className = '', animated = false }: SymbolProps) {
+  const imgHeight = size / HANDS_EMBLEM_RATIO;
+
+  const content = (
+    <div
+      className={className}
+      aria-hidden="true"
+      style={{
+        width: size,
+        height: size,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <img
+        src="/branding/ipa-birmingham.jpg"
+        alt=""
+        width={size}
+        height={imgHeight}
+        style={{ width: size, height: imgHeight, display: 'block' }}
+      />
+    </div>
+  );
+
+  if (animated) {
+    return <GlowPulse>{content}</GlowPulse>;
+  }
+
+  return content;
+}
+
 /* ─── FaravaharSimple ────────────────────────────────────────────────────── */
 // The Faravahar (فروهر), rendered from a Public Domain SVG
 // (frontend/public/symbols/faravahar.svg).
