@@ -298,7 +298,7 @@ export default function LandingPage() {
             transition={{ duration: 0.8, ease: 'easeOut' }}
           >
             <div style={{ color: '#fbbf24', marginBottom: '1rem' }}>
-              <HandsEmblem size={72} animated />
+              <HandsEmblem size={140} animated />
             </div>
           </motion.div>
 
