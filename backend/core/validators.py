@@ -51,6 +51,15 @@ EMAIL_MAX_LENGTH = 75
 # wraps the same check through PasswordStrengthValidator below).
 PASSWORD_MIN_LENGTH = 8
 
+# Mirrors frontend/lib/validation.ts MEMBER_NUMBER_*. The member_number field
+# itself (accounts/models.py) is a PositiveIntegerField with no DB-level
+# length/range validator, so the 5-digit, never-leading-zero shape is only
+# ever enforced here and in MemberChangeNumberView — never assume the model
+# field alone protects this invariant.
+MEMBER_NUMBER_LENGTH = 5
+MEMBER_NUMBER_MIN = 10000
+MEMBER_NUMBER_MAX = 99999
+
 ALLOWED_IMAGE_FORMATS = {'JPEG', 'PNG'}
 MAX_UPLOAD_FILENAME_LENGTH = 255
 

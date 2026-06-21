@@ -182,16 +182,19 @@ export default function AdminMembersPage() {
     {
       key: 'actions',
       header: '',
-      render: (m) => (
-        <button
-          onClick={() => router.push(`/${locale}/admin/members/${m.id}`)}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all"
-          style={{ border: '1px solid rgba(0,255,255,0.3)', color: '#00ffff', backgroundColor: 'rgba(0,255,255,0.05)' }}
-        >
-          <Eye className="w-3.5 h-3.5" />
-          {isRTL ? 'مشاهده' : 'View'}
-        </button>
-      ),
+      render: (m) =>
+        m.is_superuser && !currentMember?.is_superuser ? (
+          <span className="text-xs text-white/30">{isRTL ? 'محدود شده' : 'Restricted'}</span>
+        ) : (
+          <button
+            onClick={() => router.push(`/${locale}/admin/members/${m.id}`)}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all"
+            style={{ border: '1px solid rgba(0,255,255,0.3)', color: '#00ffff', backgroundColor: 'rgba(0,255,255,0.05)' }}
+          >
+            <Eye className="w-3.5 h-3.5" />
+            {isRTL ? 'مشاهده' : 'View'}
+          </button>
+        ),
     },
   ];
 

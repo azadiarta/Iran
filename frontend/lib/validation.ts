@@ -13,6 +13,13 @@ export const LONG_TEXT_ADMIN_MAX_LENGTH = 550;
 
 export const PASSWORD_MIN_LENGTH = 8;
 
+// Mirrors backend MEMBER_NUMBER_* (core/validators.py). The member_number
+// field has no model-level range/length validator of its own — these bounds
+// are the only thing enforcing the 5-digit, never-leading-zero shape.
+export const MEMBER_NUMBER_LENGTH = 5;
+export const MEMBER_NUMBER_MIN = 10000;
+export const MEMBER_NUMBER_MAX = 99999;
+
 // Mirrors backend EMAIL_MAX_LENGTH (core/validators.py) — real addresses
 // never get remotely close to Django's default 254-char field limit.
 export const EMAIL_MAX_LENGTH = 75;
@@ -129,4 +136,10 @@ export function requiredFieldError(isRTL: boolean): string {
 
 export function emailFormatError(isRTL: boolean): string {
   return isRTL ? 'یک نشانی ایمیل معتبر وارد کنید.' : 'Enter a valid email address.';
+}
+
+export function memberNumberFormatError(isRTL: boolean): string {
+  return isRTL
+    ? `شماره عضویت باید دقیقاً ${MEMBER_NUMBER_LENGTH} رقم و بین ${MEMBER_NUMBER_MIN} تا ${MEMBER_NUMBER_MAX} باشد.`
+    : `Member number must be exactly ${MEMBER_NUMBER_LENGTH} digits, between ${MEMBER_NUMBER_MIN} and ${MEMBER_NUMBER_MAX}.`;
 }
