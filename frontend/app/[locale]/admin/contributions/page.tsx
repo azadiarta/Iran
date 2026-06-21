@@ -548,11 +548,11 @@ export default function AdminContributionsPage() {
                     </>
                   )}
                   <AdminTextarea
-                    label={isRTL ? `پیام (${editMessage.length}/150)` : `Message (${editMessage.length}/150)`}
+                    label={isRTL ? 'پیام' : 'Message'}
                     value={editMessage}
-                    onChange={(e) => setEditMessage(e.target.value.slice(0, 150))}
+                    onChange={(e) => setEditMessage(e.target.value.slice(0, 100))}
                     rows={2}
-                    maxLength={150}
+                    maxLength={100}
                   />
                 </div>
 

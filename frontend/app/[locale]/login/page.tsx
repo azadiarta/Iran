@@ -176,11 +176,18 @@ export default function LoginPage() {
               }}
               placeholder="you@example.com"
             />
-            {fieldErrors.credential && (
-              <p className="text-xs" style={{ color: '#ef4444' }} role="alert">
-                {fieldErrors.credential}
+            <div className="flex items-start justify-between gap-2">
+              {fieldErrors.credential ? (
+                <p className="text-xs" style={{ color: '#ef4444' }} role="alert">
+                  {fieldErrors.credential}
+                </p>
+              ) : (
+                <span />
+              )}
+              <p className="text-xs text-white/30 whitespace-nowrap">
+                {credential.length}/{EMAIL_MAX_LENGTH}
               </p>
-            )}
+            </div>
           </div>
 
           {/* Password input */}

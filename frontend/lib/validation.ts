@@ -13,6 +13,13 @@ export const LONG_TEXT_ADMIN_MAX_LENGTH = 550;
 
 export const PASSWORD_MIN_LENGTH = 8;
 
+// Mirrors backend MEMBER_NUMBER_* (core/validators.py). The member_number
+// field has no model-level range/length validator of its own — these bounds
+// are the only thing enforcing the 5-digit, never-leading-zero shape.
+export const MEMBER_NUMBER_LENGTH = 5;
+export const MEMBER_NUMBER_MIN = 10000;
+export const MEMBER_NUMBER_MAX = 99999;
+
 // Mirrors backend EMAIL_MAX_LENGTH (core/validators.py) — real addresses
 // never get remotely close to Django's default 254-char field limit.
 export const EMAIL_MAX_LENGTH = 75;
@@ -89,13 +96,34 @@ export function maxLengthError(isRTL: boolean, max: number): string {
   return isRTL ? `حداکثر ${max} نویسه مجاز است.` : `Must be ${max} characters or fewer.`;
 }
 
-// Real-time password-strength check, used as the user types (not just on submit).
-// Returns the error reason, or undefined if the password already satisfies the rule.
-export function passwordTooShortError(isRTL: boolean, value: string): string | undefined {
-  if (!value || value.length >= PASSWORD_MIN_LENGTH) return undefined;
-  return isRTL
-    ? `رمز عبور باید حداقل ${PASSWORD_MIN_LENGTH} نویسه باشد. (${value.length}/${PASSWORD_MIN_LENGTH})`
-    : `Password must be at least ${PASSWORD_MIN_LENGTH} characters. (${value.length}/${PASSWORD_MIN_LENGTH})`;
+// Real-time password-strength check, used as the user types (not just on
+// submit). Mirrors backend/core/validators.py _password_strength_errors —
+// same 4 rules, checked in the same order, so the first error a user sees
+// here is always the same one the server would reject with. Returns the
+// error reason, or undefined if the password already satisfies every rule.
+export function passwordStrengthError(isRTL: boolean, value: string): string | undefined {
+  if (!value) return undefined;
+  if (value.length < PASSWORD_MIN_LENGTH) {
+    return isRTL
+      ? `رمز عبور باید حداقل ${PASSWORD_MIN_LENGTH} نویسه باشد. (${value.length}/${PASSWORD_MIN_LENGTH})`
+      : `Password must be at least ${PASSWORD_MIN_LENGTH} characters. (${value.length}/${PASSWORD_MIN_LENGTH})`;
+  }
+  if (!/[A-Za-z]/.test(value) || !/\d/.test(value)) {
+    return isRTL
+      ? 'رمز عبور باید ترکیبی از حروف و اعداد باشد.'
+      : 'Password must contain a mix of letters and numbers.';
+  }
+  if (!/[A-Z]/.test(value)) {
+    return isRTL
+      ? 'رمز عبور باید حداقل یک حرف بزرگ داشته باشد.'
+      : 'Password must contain at least one uppercase letter.';
+  }
+  if (!/[^A-Za-z0-9]/.test(value)) {
+    return isRTL
+      ? 'رمز عبور باید حداقل یک کاراکتر خاص داشته باشد.'
+      : 'Password must contain at least one special character.';
+  }
+  return undefined;
 }
 
 export function passwordMismatchError(isRTL: boolean): string {
@@ -108,4 +136,10 @@ export function requiredFieldError(isRTL: boolean): string {
 
 export function emailFormatError(isRTL: boolean): string {
   return isRTL ? 'یک نشانی ایمیل معتبر وارد کنید.' : 'Enter a valid email address.';
+}
+
+export function memberNumberFormatError(isRTL: boolean): string {
+  return isRTL
+    ? `شماره عضویت باید دقیقاً ${MEMBER_NUMBER_LENGTH} رقم و بین ${MEMBER_NUMBER_MIN} تا ${MEMBER_NUMBER_MAX} باشد.`
+    : `Member number must be exactly ${MEMBER_NUMBER_LENGTH} digits, between ${MEMBER_NUMBER_MIN} and ${MEMBER_NUMBER_MAX}.`;
 }

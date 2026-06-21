@@ -6,9 +6,15 @@ from django.db.models import Q
 from django.utils.html import mark_safe
 from django.utils.translation import gettext_lazy as _
 
+from core.admin_forms import CaptchaAdminAuthenticationForm
 from core.log_utils import actor_display_for, target_display_for
 from core.models import ContactMessage, DefaultSetting, Permission
 from logs.models import ActivityLog
+
+# CAPTCHA-gate the /admin/ login form itself (see core/admin_forms.py +
+# templates/admin/login.html) -- this session-authenticated panel was
+# previously the only login form on the site with no CAPTCHA at all.
+admin.site.login_form = CaptchaAdminAuthenticationForm
 
 
 def _get_ip(request):

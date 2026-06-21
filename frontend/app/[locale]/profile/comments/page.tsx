@@ -187,6 +187,7 @@ export default function MyCommentsPage() {
                           maxLength={250}
                           className={inputClass}
                         />
+                        <p className="text-xs text-white/30 text-right">{editText.length}/250</p>
                         <div>
                           <label className="block text-xs text-white/50 mb-1.5">{t('my_comments_rating_label')}</label>
                           <select value={editRating} onChange={(e) => setEditRating(e.target.value)} className={inputClass}>
