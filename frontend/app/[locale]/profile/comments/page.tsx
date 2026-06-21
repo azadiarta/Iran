@@ -128,7 +128,7 @@ export default function MyCommentsPage() {
     'w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/20 outline-none focus:border-[#00ffff] focus:ring-1 focus:ring-[#00ffff]/30 transition-all';
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <div className="min-h-screen text-white">
       <div className="max-w-2xl mx-auto px-4 py-10">
         <button
           onClick={() => router.push(`/${locale}/profile`)}
@@ -187,6 +187,7 @@ export default function MyCommentsPage() {
                           maxLength={250}
                           className={inputClass}
                         />
+                        <p className="text-xs text-white/30 text-right">{editText.length}/250</p>
                         <div>
                           <label className="block text-xs text-white/50 mb-1.5">{t('my_comments_rating_label')}</label>
                           <select value={editRating} onChange={(e) => setEditRating(e.target.value)} className={inputClass}>

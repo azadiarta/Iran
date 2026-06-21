@@ -119,7 +119,6 @@ export default function LoginPage() {
   return (
     <div
       className="min-h-screen flex items-center justify-center px-4 py-16"
-      style={{ background: '#0a0a0f' }}
     >
       <div
         className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-8"
@@ -176,11 +175,18 @@ export default function LoginPage() {
               }}
               placeholder="you@example.com"
             />
-            {fieldErrors.credential && (
-              <p className="text-xs" style={{ color: '#ef4444' }} role="alert">
-                {fieldErrors.credential}
+            <div className="flex items-start justify-between gap-2">
+              {fieldErrors.credential ? (
+                <p className="text-xs" style={{ color: '#ef4444' }} role="alert">
+                  {fieldErrors.credential}
+                </p>
+              ) : (
+                <span />
+              )}
+              <p className="text-xs text-white/30 whitespace-nowrap">
+                {credential.length}/{EMAIL_MAX_LENGTH}
               </p>
-            )}
+            </div>
           </div>
 
           {/* Password input */}

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Menu, X, User, LogOut, ChevronDown, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LionAndSun } from '@/components/animations/IranianSymbols';
+import { HandsEmblem } from '@/components/animations/IranianSymbols';
 import BalanceIndicator from '@/components/common/BalanceIndicator';
 import useAuthStore from '@/store/authStore';
 import useLangStore from '@/store/langStore';
@@ -151,7 +151,7 @@ export default function Navbar({ locale }: NavbarProps) {
           {/* Logo */}
           <Link href={`/${locale}`} className="flex items-center gap-2 shrink-0">
             <span style={{ color: '#fbbf24' }}>
-              <LionAndSun size={32} />
+              <HandsEmblem size={32} />
             </span>
             <span
               className="font-semibold text-white text-lg hidden sm:block"
@@ -436,7 +436,7 @@ export default function Navbar({ locale }: NavbarProps) {
                   onClick={() => setMobileOpen(false)}
                 >
                   <span style={{ color: '#fbbf24' }}>
-                    <LionAndSun size={28} />
+                    <HandsEmblem size={28} />
                   </span>
                   <span
                     className="font-semibold text-white"

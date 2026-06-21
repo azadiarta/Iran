@@ -167,7 +167,6 @@ export default function PostsPage() {
   return (
     <div
       className="min-h-screen px-4 py-12"
-      style={{ background: '#0a0a0f' }}
     >
       <div className="max-w-6xl mx-auto">
 

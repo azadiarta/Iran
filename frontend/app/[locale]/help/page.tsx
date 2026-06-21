@@ -87,7 +87,7 @@ export default function HelpPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white px-4 py-10" dir={isRTL ? 'rtl' : 'ltr'}>
+    <div className="min-h-screen text-white px-4 py-10" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="mx-auto w-full max-w-3xl flex flex-col gap-8">
         {/* Header */}
         <div className="flex flex-col items-center gap-4 text-center">

@@ -79,7 +79,7 @@ export default function MyContactMessagesPage() {
       : { color: '#fbbf24', bg: 'rgba(251,191,36,0.1)', border: 'rgba(251,191,36,0.3)' };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <div className="min-h-screen text-white">
       <div className="max-w-2xl mx-auto px-4 py-10">
         <button
           onClick={() => router.push(`/${locale}/profile`)}

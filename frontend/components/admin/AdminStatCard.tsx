@@ -12,9 +12,10 @@ interface AdminStatCardProps {
   suffix?: string;
   trend?: 'up' | 'down' | 'neutral';
   decimals?: number;
+  locale?: string;
 }
 
-function CountUp({ value, decimals = 0 }: { value: number; decimals?: number }) {
+function CountUp({ value, decimals = 0, locale = 'en' }: { value: number; decimals?: number; locale?: string }) {
   const motionValue = useMotionValue(0);
   const [display, setDisplay] = useState('0');
 
@@ -22,13 +23,13 @@ function CountUp({ value, decimals = 0 }: { value: number; decimals?: number }) 
     const controls = animate(motionValue, value, {
       duration: 0.9,
       ease: 'easeOut',
-      onUpdate: (latest) => setDisplay(latest.toLocaleString(undefined, {
+      onUpdate: (latest) => setDisplay(latest.toLocaleString(locale === 'fa' ? 'fa-IR' : 'en-US', {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals,
       })),
     });
     return () => controls.stop();
-  }, [value, decimals, motionValue]);
+  }, [value, decimals, locale, motionValue]);
 
   return <span>{display}</span>;
 }
@@ -45,6 +46,7 @@ export default function AdminStatCard({
   suffix = '',
   trend,
   decimals = 0,
+  locale = 'en',
 }: AdminStatCardProps) {
   const TrendIcon = trend ? TREND_ICON[trend] : null;
 
@@ -71,7 +73,7 @@ export default function AdminStatCard({
         <p className="text-xs text-white/50 mb-1">{title}</p>
         <p className="text-2xl font-black" style={{ color, textShadow: `0 0 16px ${color}40` }}>
           {prefix}
-          <CountUp value={value} decimals={decimals} />
+          <CountUp value={value} decimals={decimals} locale={locale} />
           {suffix}
         </p>
       </div>

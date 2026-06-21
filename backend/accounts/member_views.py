@@ -19,7 +19,14 @@ from core.log_utils import actor_display_for, target_display_for
 from core.models import DefaultSetting
 from core.pagination import paginate
 from core.utils import api_error, api_success
-from core.validators import LONG_TEXT_ADMIN_MAX_LENGTH, safe_filter, sanitize_and_limit
+from core.validators import (
+    LONG_TEXT_ADMIN_MAX_LENGTH,
+    MEMBER_NUMBER_LENGTH,
+    MEMBER_NUMBER_MAX,
+    MEMBER_NUMBER_MIN,
+    safe_filter,
+    sanitize_and_limit,
+)
 from logs.models import ActivityLog
 
 
@@ -169,6 +176,8 @@ class MemberFullProfileView(APIView):
         except Member.DoesNotExist:
             return api_error('Member not found.', status_code=404)
 
+        # Superuser is invisible to every other admin, even by direct pk —
+        # only visible to themselves.
         if member.is_superuser and request.user.pk != member.pk:
             return api_error('Member not found.', status_code=404)
 
@@ -207,7 +216,7 @@ class MemberUpdateView(APIView):
         if not is_owner and not _is_admin(request.user):
             return api_error('Permission denied.', status_code=403)
 
-        if member.is_superuser and not is_owner:
+        if member.is_superuser and not is_owner and not request.user.is_superuser:
             return api_error('Cannot edit superuser profile.', status_code=403)
 
         before = {
@@ -283,15 +292,20 @@ class MemberChangeNumberView(APIView):
         except Member.DoesNotExist:
             return api_error('Member not found.', status_code=404)
 
+        raw_number = request.data.get('member_number')
+        if len(str(raw_number)) > MEMBER_NUMBER_LENGTH:
+            return api_error('Validation failed.',
+                              errors={'member_number': [f'Must be {MEMBER_NUMBER_LENGTH} digits or fewer.']})
+
         try:
-            new_number = int(request.data.get('member_number'))
+            new_number = int(raw_number)
         except (TypeError, ValueError):
             return api_error('Validation failed.',
                               errors={'member_number': ['Must be an integer.']})
 
-        if not (10000 <= new_number <= 99999):
+        if not (MEMBER_NUMBER_MIN <= new_number <= MEMBER_NUMBER_MAX):
             return api_error('Validation failed.',
-                              errors={'member_number': ['Must be between 10000 and 99999.']})
+                              errors={'member_number': [f'Must be between {MEMBER_NUMBER_MIN} and {MEMBER_NUMBER_MAX}.']})
 
         if Member.objects.filter(member_number=new_number).exclude(pk=member.pk).exists():
             return api_error('Validation failed.',
@@ -415,7 +429,7 @@ class ChangePasswordView(APIView):
             request.user.group.permissions.filter(codename='can_change_any_password').exists()
         )
 
-        if member.is_superuser and not is_owner:
+        if member.is_superuser and not is_owner and not request.user.is_superuser:
             return api_error('Cannot change superuser password.', status_code=403)
 
         if not is_owner and not is_password_admin:

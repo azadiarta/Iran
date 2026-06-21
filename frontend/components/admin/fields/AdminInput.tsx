@@ -4,10 +4,11 @@ import { forwardRef } from 'react';
 interface AdminInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
+  hint?: string;
 }
 
 const AdminInput = forwardRef<HTMLInputElement, AdminInputProps>(
-  ({ label, error, className = '', ...props }, ref) => {
+  ({ label, error, hint, className = '', ...props }, ref) => {
     return (
       <div>
         {label && <label className="block text-xs text-white/50 mb-1.5">{label}</label>}
@@ -34,10 +35,12 @@ const AdminInput = forwardRef<HTMLInputElement, AdminInputProps>(
             props.onBlur?.(e);
           }}
         />
-        {(error || typeof props.maxLength === 'number') && (
+        {(error || hint || typeof props.maxLength === 'number') && (
           <div className="mt-1 flex items-start justify-between gap-2">
             {error ? (
               <p className="text-xs" style={{ color: '#ef4444' }}>{error}</p>
+            ) : hint ? (
+              <p className="text-xs text-white/30">{hint}</p>
             ) : (
               <span />
             )}

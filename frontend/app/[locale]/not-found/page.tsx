@@ -10,7 +10,7 @@ export default function NotFoundPage() {
   const locale = (params?.locale as string) || 'en';
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white flex items-center justify-center px-4 py-10">
+    <div className="min-h-screen text-white flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-md text-center">
         <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 flex flex-col items-center gap-5">
           <div

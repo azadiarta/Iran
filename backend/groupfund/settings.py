@@ -109,13 +109,19 @@ ROOT_URLCONF = 'groupfund.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        # Lets templates/admin/login.html (the CAPTCHA-injecting override —
+        # see core/admin_forms.py) take priority over every app's own
+        # admin/login.html (django.contrib.admin's and jazzmin's), since the
+        # filesystem loader (driven by DIRS) is tried before the app_directories
+        # loader (driven by APP_DIRS) for every template lookup.
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'core.context_processors.turnstile',
             ],
         },
     },
@@ -125,6 +131,16 @@ AUTH_USER_MODEL = 'accounts.Member'
 
 AUTHENTICATION_BACKENDS = [
     'accounts.backends.MemberAuthBackend',
+]
+
+# Same password-strength rule enforced by the DRF serializers
+# (core.validators.validate_password_strength), wired into Django's own
+# password-validation framework so it ALSO applies to paths that don't go
+# through those serializers: the Django admin's "change password" form and
+# the createsuperuser/changepassword management commands. One rule, every
+# entry point.
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'core.validators.PasswordStrengthValidator'},
 ]
 
 # Railway's managed Postgres plugin (and many other PaaS providers) expose a
@@ -262,19 +278,31 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
         # Per-view rates below, keyed by each view's throttle_scope. A view
-        # without throttle_scope set is unaffected (ScopedRateThrottle is a
-        # no-op when there's no scope), so this only tightens the specific
-        # abuse-prone endpoints that opt in.
-        'rest_framework.throttling.ScopedRateThrottle',
+        # without throttle_scope set is unaffected (this throttle is a no-op
+        # when there's no scope), so this only tightens the specific
+        # abuse-prone endpoints that opt in. SessionAwareScopedRateThrottle
+        # (core/throttles.py) behaves exactly like DRF's own
+        # ScopedRateThrottle for authenticated requests, but for anonymous
+        # ones also folds the Django session key into the cache identity —
+        # this is a political-activity site, a realistic abuse/attack
+        # target, so guest-facing submission endpoints (register, login,
+        # contact, comment, contribution) shouldn't rely on IP alone, which
+        # is trivially bypassed by rotating IPs/VPNs.
+        'core.throttles.SessionAwareScopedRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/hour',
         'user': '1000/hour',
-        'login': '10/hour',
-        'register': '5/hour',
-        'contact': '5/hour',
-        'comment': '20/hour',
-        'contribution': '15/hour',
+        # Tightened below their original values for the same reason: these
+        # all gate guest-reachable submission endpoints on a site where
+        # abuse/attack attempts are a real, expected risk, not a hypothetical
+        # one. Adjust here only — every endpoint already reads its limit from
+        # this single shared table via throttle_scope.
+        'login': '6/hour',
+        'register': '4/hour',
+        'contact': '4/hour',
+        'comment': '12/hour',
+        'contribution': '8/hour',
     },
     'COERCE_DECIMAL_TO_STRING': False,
 }
@@ -285,6 +313,14 @@ REST_FRAMEWORK = {
 # Cloudflare's published "always passes" test keys, safe for local/dev use;
 # set real keys via env vars before deploying publicly.
 TURNSTILE_SECRET_KEY = os.environ.get('TURNSTILE_SECRET_KEY', '1x0000000000000000000000000000000AA')
+
+# Site key for the ONE Django-rendered (non-Next.js) Turnstile widget in the
+# project: the /admin/ login page (see templates/admin/login.html +
+# core/admin_forms.py). Every other widget lives in the Next.js frontend and
+# reads NEXT_PUBLIC_TURNSTILE_SITE_KEY instead (frontend/components/common/
+# Turnstile.tsx) — set both env vars to the same real Cloudflare site key
+# pair as TURNSTILE_SECRET_KEY before deploying publicly.
+TURNSTILE_SITE_KEY = os.environ.get('TURNSTILE_SITE_KEY', '1x00000000000000000000AA')
 
 # ─── i18n ─────────────────────────────────────────────────────────────────────
 # Run: django-admin makemessages -l fa

@@ -27,9 +27,13 @@ import {
   phoneFormatError,
   PHONE_PLACEHOLDER,
   LONG_TEXT_ADMIN_MAX_LENGTH,
-  passwordTooShortError,
+  passwordStrengthError,
   passwordMismatchError,
   EMAIL_MAX_LENGTH,
+  MEMBER_NUMBER_LENGTH,
+  MEMBER_NUMBER_MIN,
+  MEMBER_NUMBER_MAX,
+  memberNumberFormatError,
 } from '@/lib/validation';
 
 export default function AdminMemberDetailPage() {
@@ -47,6 +51,7 @@ export default function AdminMemberDetailPage() {
   const canChangeAnyPassword = !!currentMember?.is_superuser || hasPermission('can_change_any_password');
 
   const [target, setTarget] = useState<MemberDetail | null>(null);
+  const [accessDenied, setAccessDenied] = useState(false);
   const [groups, setGroups] = useState<AccessGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [comments, setComments] = useState<CommentDetail[]>([]);
@@ -75,6 +80,7 @@ export default function AdminMemberDetailPage() {
   // Member number change (superuser-only, works even on superuser targets)
   const [memberNumberInput, setMemberNumberInput] = useState('');
   const [savingMemberNumber, setSavingMemberNumber] = useState(false);
+  const [memberNumberError, setMemberNumberError] = useState<string | undefined>(undefined);
 
   // Danger zone
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
@@ -113,8 +119,18 @@ export default function AdminMemberDetailPage() {
           const matched = allGroups.find((g) => g.name === m.group_name);
           if (matched) setGroupId(matched.id);
         }
-      } catch {
-        if (!cancelled) showToast('error', isRTL ? 'بارگذاری اطلاعات عضو ناموفق بود' : 'Failed to load member');
+      } catch (err: unknown) {
+        const status =
+          err && typeof err === 'object' && 'response' in err && err.response &&
+          typeof err.response === 'object' && 'status' in err.response
+            ? (err.response as { status?: number }).status
+            : undefined;
+        if (cancelled) return;
+        if (status === 403) {
+          setAccessDenied(true);
+        } else {
+          showToast('error', isRTL ? 'بارگذاری اطلاعات عضو ناموفق بود' : 'Failed to load member');
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -192,7 +208,7 @@ export default function AdminMemberDetailPage() {
     setNewPassword(value);
     setPasswordFieldErrors((prev) => ({
       ...prev,
-      new_password: passwordTooShortError(isRTL, value),
+      new_password: passwordStrengthError(isRTL, value),
       confirm_password:
         confirmPassword && value !== confirmPassword ? passwordMismatchError(isRTL) : undefined,
     }));
@@ -208,7 +224,7 @@ export default function AdminMemberDetailPage() {
 
   async function savePassword(e: React.FormEvent) {
     e.preventDefault();
-    const lengthError = passwordTooShortError(isRTL, newPassword);
+    const lengthError = passwordStrengthError(isRTL, newPassword);
     if (lengthError) {
       showToast('warning', lengthError);
       return;
@@ -231,15 +247,32 @@ export default function AdminMemberDetailPage() {
     }
   }
 
+  function handleMemberNumberChange(value: string) {
+    const digitsOnly = value.replace(/\D/g, '').slice(0, MEMBER_NUMBER_LENGTH);
+    setMemberNumberInput(digitsOnly);
+    if (!digitsOnly) {
+      setMemberNumberError(undefined);
+      return;
+    }
+    const parsed = parseInt(digitsOnly, 10);
+    if (digitsOnly.length < MEMBER_NUMBER_LENGTH || parsed < MEMBER_NUMBER_MIN || parsed > MEMBER_NUMBER_MAX) {
+      setMemberNumberError(memberNumberFormatError(isRTL));
+    } else {
+      setMemberNumberError(undefined);
+    }
+  }
+
   async function saveMemberNumber(e: React.FormEvent) {
     e.preventDefault();
     const parsed = parseInt(memberNumberInput, 10);
-    if (!memberNumberInput.trim() || Number.isNaN(parsed)) {
-      showToast('warning', isRTL ? 'شماره عضویت باید عدد باشد' : 'Member number must be a number');
-      return;
-    }
-    if (parsed < 10000 || parsed > 99999) {
-      showToast('warning', isRTL ? 'شماره عضویت باید بین ۱۰۰۰۰ تا ۹۹۹۹۹ باشد' : 'Member number must be between 10000 and 99999');
+    if (
+      !memberNumberInput.trim() ||
+      Number.isNaN(parsed) ||
+      memberNumberInput.length < MEMBER_NUMBER_LENGTH ||
+      parsed < MEMBER_NUMBER_MIN ||
+      parsed > MEMBER_NUMBER_MAX
+    ) {
+      setMemberNumberError(memberNumberFormatError(isRTL));
       return;
     }
     setSavingMemberNumber(true);
@@ -247,6 +280,7 @@ export default function AdminMemberDetailPage() {
       const res = await membersAPI.updateMemberNumber(id, parsed);
       setTarget(res.data as unknown as MemberDetail);
       setMemberNumberInput('');
+      setMemberNumberError(undefined);
       showToast('success', isRTL ? 'شماره عضویت با موفقیت تغییر کرد' : 'Member number updated successfully');
     } catch (err: unknown) {
       const data =
@@ -255,7 +289,7 @@ export default function AdminMemberDetailPage() {
           ? (err.response as { data?: { errors?: { member_number?: string[] } } }).data
           : undefined;
       const fieldError = data?.errors?.member_number?.[0];
-      showToast('error', fieldError || (isRTL ? 'تغییر شماره عضویت ناموفق بود' : 'Failed to update member number'));
+      setMemberNumberError(fieldError || (isRTL ? 'تغییر شماره عضویت ناموفق بود' : 'Failed to update member number'));
     } finally {
       setSavingMemberNumber(false);
     }
@@ -312,6 +346,16 @@ export default function AdminMemberDetailPage() {
     );
   }
 
+  if (accessDenied) {
+    return (
+      <div className="admin-glass-card p-8 text-center text-white/50 text-sm">
+        {isRTL
+          ? 'این یک حساب سوپریوزر است. فقط خود سوپریوزر یا سوپریوزرهای دیگر می‌توانند این پروفایل را مشاهده کنند.'
+          : 'This is a superuser account. Only the superuser themselves or another superuser can view this profile.'}
+      </div>
+    );
+  }
+
   if (!target) {
     return (
       <div className="admin-glass-card p-8 text-center text-white/50 text-sm">
@@ -359,14 +403,18 @@ export default function AdminMemberDetailPage() {
           </p>
           <AdminInput
             label={isRTL ? 'شماره عضویت جدید' : 'New Member Number'}
-            type="number"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={memberNumberInput}
-            onChange={(e) => setMemberNumberInput(e.target.value)}
+            onChange={(e) => handleMemberNumberChange(e.target.value)}
+            maxLength={MEMBER_NUMBER_LENGTH}
+            error={memberNumberError}
             placeholder={String(target.member_number ?? '')}
           />
           <button
             type="submit"
-            disabled={savingMemberNumber || !memberNumberInput.trim()}
+            disabled={savingMemberNumber || !memberNumberInput.trim() || !!memberNumberError}
             className="self-start flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
             style={{ backgroundColor: '#00ffff', color: '#0a0a0f', boxShadow: '0 0 16px rgba(0,255,255,0.3)' }}
           >
@@ -376,18 +424,29 @@ export default function AdminMemberDetailPage() {
         </form>
       )}
 
-      {canManage && target.is_superuser && (
+      {canManage && target.is_superuser && !currentMember?.is_superuser && (
         <div className="admin-glass-card p-5 flex items-center gap-3" style={{ border: '1px solid rgba(251,191,36,0.3)' }}>
           <ShieldCheck className="w-5 h-5 flex-shrink-0" style={{ color: '#fbbf24' }} />
           <p className="text-sm text-white/70">
             {isRTL
-              ? 'این یک حساب سوپریوزر است. حساب‌های سوپریوزر را نمی‌توان از طریق پنل ادمین ویرایش، تغییر گروه، غیرفعال یا حذف کرد.'
-              : 'This is a superuser account. Superuser accounts cannot be edited, have their group changed, deactivated, or deleted from the admin panel.'}
+              ? 'این یک حساب سوپریوزر است. تنها خود سوپریوزر یا سوپریوزرهای دیگر می‌توانند این پروفایل را مشاهده یا ویرایش کنند.'
+              : 'This is a superuser account. Only the superuser themselves or another superuser can view or edit this profile.'}
           </p>
         </div>
       )}
 
-      {canManage && !target.is_superuser && (
+      {currentMember?.is_superuser && target.is_superuser && (
+        <div className="admin-glass-card p-5 flex items-center gap-3" style={{ border: '1px solid rgba(251,191,36,0.3)' }}>
+          <ShieldCheck className="w-5 h-5 flex-shrink-0" style={{ color: '#fbbf24' }} />
+          <p className="text-sm text-white/70">
+            {isRTL
+              ? 'این یک حساب سوپریوزر است. به‌عنوان سوپریوزر می‌توانید پروفایل و رمز عبور این حساب را ویرایش کنید، اما تغییر گروه دسترسی، غیرفعال‌سازی و حذف آن از طریق پنل ادمین همچنان مسدود است.'
+              : "This is a superuser account. As a superuser, you can edit this account's profile and password, but changing its access group, deactivating, or deleting it remains blocked from the admin panel."}
+          </p>
+        </div>
+      )}
+
+      {canManage && (!target.is_superuser || currentMember?.is_superuser) && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Profile form */}
         <form onSubmit={saveProfile} className="admin-glass-card p-5 flex flex-col gap-4">
@@ -414,7 +473,8 @@ export default function AdminMemberDetailPage() {
         </form>
 
         <div className="flex flex-col gap-6">
-          {/* Group */}
+          {/* Group — never editable for a superuser target, even by another superuser */}
+          {!target.is_superuser && (
           <form onSubmit={saveGroup} className="admin-glass-card p-5 flex flex-col gap-4">
             <h2 className="text-sm font-semibold text-white/80 flex items-center gap-2">
               <ShieldCheck className="w-4 h-4" style={{ color: '#8b5cf6' }} />
@@ -435,6 +495,7 @@ export default function AdminMemberDetailPage() {
               {savingGroup ? (isRTL ? 'در حال تغییر...' : 'Changing...') : (isRTL ? 'تغییر گروه' : 'Change Group')}
             </button>
           </form>
+          )}
 
           {/* Password */}
           {canChangeAnyPassword && (
@@ -449,6 +510,11 @@ export default function AdminMemberDetailPage() {
                 value={newPassword}
                 onChange={(e) => handleNewPasswordChange(e.target.value)}
                 error={passwordFieldErrors.new_password}
+                hint={
+                  isRTL
+                    ? 'حداقل ۸ نویسه، ترکیبی از حروف و اعداد، شامل حداقل یک حرف بزرگ و یک کاراکتر خاص.'
+                    : 'At least 8 characters, with letters and numbers, including one uppercase letter and one special character.'
+                }
               />
               <AdminInput
                 label={isRTL ? 'تکرار رمز عبور' : 'Confirm Password'}
@@ -471,7 +537,8 @@ export default function AdminMemberDetailPage() {
             </form>
           )}
 
-          {/* Danger zone */}
+          {/* Danger zone — never available for a superuser target, even to another superuser */}
+          {!target.is_superuser && (
           <div className="admin-glass-card p-5 flex flex-col gap-4" style={{ border: '1px solid rgba(239,68,68,0.25)' }}>
             <h2 className="text-sm font-semibold" style={{ color: '#ef4444' }}>
               {isRTL ? 'منطقه خطر' : 'Danger Zone'}
@@ -513,6 +580,7 @@ export default function AdminMemberDetailPage() {
               )}
             </div>
           </div>
+          )}
         </div>
       </div>
       )}
