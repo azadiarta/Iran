@@ -1,12 +1,19 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
+import { useParams } from 'next/navigation';
 import { Mail, Phone, Send, CheckCircle, AlertTriangle } from 'lucide-react';
 import { settingsAPI, contactAPI } from '@/lib/api';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
 import Turnstile from '@/components/common/Turnstile';
 import useAuthStore from '@/store/authStore';
-import { SHORT_TEXT_PUBLIC_MAX_LENGTH, LONG_TEXT_PUBLIC_MAX_LENGTH } from '@/lib/validation';
+import {
+  SHORT_TEXT_PUBLIC_MAX_LENGTH,
+  LONG_TEXT_PUBLIC_MAX_LENGTH,
+  requiredFieldError,
+  isValidPhoneOrEmail,
+  phoneOrEmailFormatError,
+} from '@/lib/validation';
 
 interface ContactInfo {
   email: string | null;
@@ -16,16 +23,50 @@ interface ContactInfo {
 export default function ContactPage() {
   const t = useTranslations('contact');
   const tCommon = useTranslations('common');
+  const params = useParams();
+  const isRTL = ((params?.locale as 'en' | 'fa') || 'en') === 'fa';
   const { member } = useAuthStore();
 
   const [contactInfo, setContactInfo] = useState<ContactInfo>({ email: null, phone: null });
   const [formData, setFormData] = useState({ name: '', contact: '', message: '' });
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; contact?: string; message?: string }>({});
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [mounted, setMounted] = useState(false);
   const [captchaToken, setCaptchaToken] = useState('');
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
+
+  function handleNameChange(value: string) {
+    setFormData((d) => ({ ...d, name: value }));
+    setFieldErrors((p) => ({ ...p, name: value.trim() ? undefined : requiredFieldError(isRTL) }));
+  }
+
+  function contactFieldError(value: string): string | undefined {
+    if (!value.trim()) return requiredFieldError(isRTL);
+    if (!isValidPhoneOrEmail(value)) return phoneOrEmailFormatError(isRTL);
+    return undefined;
+  }
+
+  function handleContactChange(value: string) {
+    setFormData((d) => ({ ...d, contact: value }));
+    setFieldErrors((p) => ({ ...p, contact: contactFieldError(value) }));
+  }
+
+  function handleMessageChange(value: string) {
+    setFormData((d) => ({ ...d, message: value }));
+    setFieldErrors((p) => ({ ...p, message: value.trim() ? undefined : requiredFieldError(isRTL) }));
+  }
+
+  function validateForm(): boolean {
+    const errors: { name?: string; contact?: string; message?: string } = {
+      name: formData.name.trim() ? undefined : requiredFieldError(isRTL),
+      contact: contactFieldError(formData.contact),
+      message: formData.message.trim() ? undefined : requiredFieldError(isRTL),
+    };
+    setFieldErrors(errors);
+    return !errors.name && !errors.contact && !errors.message;
+  }
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -59,6 +100,7 @@ export default function ContactPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError('');
+    if (!validateForm()) return;
 
     if (!captchaToken) {
       setSubmitError(tCommon('captcha_required_error'));
@@ -190,6 +232,7 @@ export default function ContactPage() {
                 onClick={() => {
                   setSubmitted(false);
                   setFormData({ name: '', contact: '', message: '' });
+                  setFieldErrors({});
                   setCaptchaToken('');
                   setCaptchaResetKey((k) => k + 1);
                 }}
@@ -207,16 +250,22 @@ export default function ContactPage() {
                   type="text"
                   required
                   value={formData.name}
-                  onChange={(e) => setFormData((d) => ({ ...d, name: e.target.value }))}
+                  onChange={(e) => handleNameChange(e.target.value)}
                   placeholder={t('name_placeholder')}
                   disabled={mounted && !!member}
                   maxLength={SHORT_TEXT_PUBLIC_MAX_LENGTH}
                   className={inputClass + (mounted && member ? ' opacity-60 cursor-not-allowed' : '')}
+                  style={{ borderColor: fieldErrors.name ? '#ef4444' : 'rgba(255,255,255,0.1)' }}
                 />
                 {!(mounted && member) && (
-                  <p className="mt-1 text-xs text-white/30 text-right">
-                    {formData.name.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}
-                  </p>
+                  <div className="mt-1 flex items-start justify-between gap-2">
+                    {fieldErrors.name ? (
+                      <p className="text-xs" style={{ color: '#ef4444' }}>{fieldErrors.name}</p>
+                    ) : <span />}
+                    <p className="text-xs text-white/30 text-right whitespace-nowrap">
+                      {formData.name.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}
+                    </p>
+                  </div>
                 )}
               </div>
 
@@ -242,14 +291,20 @@ export default function ContactPage() {
                   type="text"
                   required
                   value={formData.contact}
-                  onChange={(e) => setFormData((d) => ({ ...d, contact: e.target.value }))}
+                  onChange={(e) => handleContactChange(e.target.value)}
                   placeholder={t('contact_placeholder')}
                   maxLength={SHORT_TEXT_PUBLIC_MAX_LENGTH}
                   className={inputClass}
+                  style={{ borderColor: fieldErrors.contact ? '#ef4444' : 'rgba(255,255,255,0.1)' }}
                 />
-                <p className="mt-1 text-xs text-white/30 text-right">
-                  {formData.contact.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}
-                </p>
+                <div className="mt-1 flex items-start justify-between gap-2">
+                  {fieldErrors.contact ? (
+                    <p className="text-xs" style={{ color: '#ef4444' }}>{fieldErrors.contact}</p>
+                  ) : <span />}
+                  <p className="text-xs text-white/30 text-right whitespace-nowrap">
+                    {formData.contact.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}
+                  </p>
+                </div>
               </div>
 
               {/* Message */}
@@ -261,11 +316,20 @@ export default function ContactPage() {
                   required
                   rows={4}
                   value={formData.message}
-                  onChange={(e) => setFormData((d) => ({ ...d, message: e.target.value }))}
+                  onChange={(e) => handleMessageChange(e.target.value)}
                   placeholder={t('message_placeholder')}
                   maxLength={LONG_TEXT_PUBLIC_MAX_LENGTH}
                   className={inputClass + ' resize-none'}
+                  style={{ borderColor: fieldErrors.message ? '#ef4444' : 'rgba(255,255,255,0.1)' }}
                 />
+                <div className="mt-1 flex items-start justify-between gap-2">
+                  {fieldErrors.message ? (
+                    <p className="text-xs" style={{ color: '#ef4444' }}>{fieldErrors.message}</p>
+                  ) : <span />}
+                  <p className="text-xs text-white/30 text-right whitespace-nowrap">
+                    {formData.message.length}/{LONG_TEXT_PUBLIC_MAX_LENGTH}
+                  </p>
+                </div>
               </div>
 
               {/* CAPTCHA */}

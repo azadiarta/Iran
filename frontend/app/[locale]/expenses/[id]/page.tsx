@@ -151,6 +151,8 @@ export default function ExpenseDetailPage() {
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [commentSuccess, setCommentSuccess] = useState(false);
   const [commentError, setCommentError] = useState('');
+  const [commentNameError, setCommentNameError] = useState('');
+  const [commentTextError, setCommentTextError] = useState('');
   const [captchaToken, setCaptchaToken] = useState('');
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
 
@@ -212,18 +214,25 @@ export default function ExpenseDetailPage() {
       .finally(() => setCommentsLoading(false));
   }, [expenseId]);
 
+  function handleCommentNameChange(value: string) {
+    setCommentName(value);
+    setCommentNameError(!isAuthenticated && !value.trim() ? t('name_required') : '');
+  }
+
+  function handleCommentTextChange(value: string) {
+    setCommentText(value);
+    setCommentTextError(value.trim() ? '' : t('comment_text_required'));
+  }
+
   async function handleCommentSubmit(e: React.FormEvent) {
     e.preventDefault();
     setCommentError('');
 
-    if (!commentText.trim()) {
-      setCommentError(t('comment_text_required'));
-      return;
-    }
-    if (!isAuthenticated && !commentName.trim()) {
-      setCommentError(t('name_required'));
-      return;
-    }
+    const textError = commentText.trim() ? '' : t('comment_text_required');
+    const nameError = !isAuthenticated && !commentName.trim() ? t('name_required') : '';
+    setCommentTextError(textError);
+    setCommentNameError(nameError);
+    if (textError || nameError) return;
     if (commentRating === 0) {
       setCommentError(t('comment_rating_required'));
       return;
@@ -528,7 +537,7 @@ export default function ExpenseDetailPage() {
                     id="comment-name"
                     type="text"
                     value={commentName}
-                    onChange={(e) => setCommentName(e.target.value)}
+                    onChange={(e) => handleCommentNameChange(e.target.value)}
                     readOnly={isAuthenticated}
                     disabled={commentSubmitting}
                     placeholder={isAuthenticated ? (member?.display_name || member?.full_name || '') : t('comment_name_placeholder')}
@@ -538,21 +547,26 @@ export default function ExpenseDetailPage() {
                       background: isAuthenticated
                         ? 'rgba(255,255,255,0.03)'
                         : 'rgba(255,255,255,0.05)',
-                      border: '1px solid rgba(255,255,255,0.1)',
+                      border: `1px solid ${commentNameError ? '#ef4444' : 'rgba(255,255,255,0.1)'}`,
                       cursor: isAuthenticated ? 'default' : 'text',
                     }}
                     onFocus={(e) => {
-                      if (!isAuthenticated) {
+                      if (!isAuthenticated && !commentNameError) {
                         e.currentTarget.style.border = '1px solid #00ffff';
                         e.currentTarget.style.boxShadow = '0 0 10px rgba(0,255,255,0.15)';
                       }
                     }}
                     onBlur={(e) => {
-                      e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
+                      e.currentTarget.style.border = `1px solid ${commentNameError ? '#ef4444' : 'rgba(255,255,255,0.1)'}`;
                       e.currentTarget.style.boxShadow = 'none';
                     }}
                   />
-                  <p className="text-xs text-white/30 text-right">{commentName.length}/50</p>
+                  <div className="flex items-start justify-between gap-2">
+                    {commentNameError ? (
+                      <p className="text-xs" style={{ color: '#ef4444' }}>{commentNameError}</p>
+                    ) : <span />}
+                    <p className="text-xs text-white/30 text-right whitespace-nowrap">{commentName.length}/50</p>
+                  </div>
                 </div>
 
                 {/* Text */}
@@ -566,7 +580,7 @@ export default function ExpenseDetailPage() {
                   <textarea
                     id="comment-text"
                     value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
+                    onChange={(e) => handleCommentTextChange(e.target.value)}
                     disabled={commentSubmitting}
                     placeholder={t('comment_text')}
                     rows={4}
@@ -574,19 +588,26 @@ export default function ExpenseDetailPage() {
                     className="w-full rounded-xl px-4 py-3 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50 resize-y"
                     style={{
                       background: 'rgba(255,255,255,0.05)',
-                      border: '1px solid rgba(255,255,255,0.1)',
+                      border: `1px solid ${commentTextError ? '#ef4444' : 'rgba(255,255,255,0.1)'}`,
                       minHeight: '100px',
                     }}
                     onFocus={(e) => {
-                      e.currentTarget.style.border = '1px solid #00ffff';
-                      e.currentTarget.style.boxShadow = '0 0 10px rgba(0,255,255,0.15)';
+                      if (!commentTextError) {
+                        e.currentTarget.style.border = '1px solid #00ffff';
+                        e.currentTarget.style.boxShadow = '0 0 10px rgba(0,255,255,0.15)';
+                      }
                     }}
                     onBlur={(e) => {
-                      e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
+                      e.currentTarget.style.border = `1px solid ${commentTextError ? '#ef4444' : 'rgba(255,255,255,0.1)'}`;
                       e.currentTarget.style.boxShadow = 'none';
                     }}
                   />
-                  <p className="text-xs text-white/30 text-right">{commentText.length}/250</p>
+                  <div className="flex items-start justify-between gap-2">
+                    {commentTextError ? (
+                      <p className="text-xs" style={{ color: '#ef4444' }}>{commentTextError}</p>
+                    ) : <span />}
+                    <p className="text-xs text-white/30 text-right whitespace-nowrap">{commentText.length}/250</p>
+                  </div>
                 </div>
 
                 {/* Rating */}

@@ -11,6 +11,7 @@ import AdminTextarea from '@/components/admin/fields/AdminTextarea';
 import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
 import { commentsAPI, Comment, CommentDetail, CommentStatus, Paginated } from '@/lib/api';
+import { requiredFieldError } from '@/lib/validation';
 
 // "No rating" stays selectable here (unlike the public submission form) so
 // admins can still view/edit legacy comments that predate mandatory ratings.
@@ -35,7 +36,10 @@ export default function AdminCommentsPage() {
   const showToast = useToastStore((s) => s.show);
 
   const isSuperuser = !!currentMember?.is_superuser;
-  const canManage = isSuperuser || hasPermission('can_approve_comments');
+  // can_manage_permissions's own description covers "content moderation" —
+  // it must be able to moderate comments on its own, without also requiring
+  // can_approve_comments specifically.
+  const canManage = isSuperuser || hasPermission('can_manage_permissions') || hasPermission('can_approve_comments');
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,8 +60,20 @@ export default function AdminCommentsPage() {
   const [detailItem, setDetailItem] = useState<CommentDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [editText, setEditText] = useState('');
+  const [editTextError, setEditTextError] = useState<string | undefined>(undefined);
   const [editRating, setEditRating] = useState('0');
   const [savingEdit, setSavingEdit] = useState(false);
+
+  function handleEditTextChange(value: string) {
+    setEditText(value);
+    setEditTextError(value.trim() ? undefined : requiredFieldError(isRTL));
+  }
+
+  function validateEdit(): boolean {
+    const error = editText.trim() ? undefined : requiredFieldError(isRTL);
+    setEditTextError(error);
+    return !error;
+  }
   const [statusActionLoading, setStatusActionLoading] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -113,6 +129,7 @@ export default function AdminCommentsPage() {
       const d = res.data as unknown as CommentDetail;
       setDetailItem(d);
       setEditText(d.text);
+      setEditTextError(undefined);
       setEditRating(String(d.rating || 0));
     } catch {
       showToast('error', isRTL ? 'بارگذاری جزئیات ناموفق بود' : 'Failed to load details');
@@ -124,10 +141,7 @@ export default function AdminCommentsPage() {
 
   async function saveEdit() {
     if (!detailItem) return;
-    if (!editText.trim()) {
-      showToast('warning', isRTL ? 'متن نظر را وارد کنید' : 'Enter the comment text');
-      return;
-    }
+    if (!validateEdit()) return;
     setSavingEdit(true);
     try {
       const res = await commentsAPI.update(detailItem.id, {
@@ -332,7 +346,7 @@ export default function AdminCommentsPage() {
               </div>
             </div>
 
-            <AdminTextarea label={isRTL ? 'متن نظر' : 'Comment Text'} value={editText} onChange={(e) => setEditText(e.target.value)} rows={4} maxLength={550} />
+            <AdminTextarea label={isRTL ? 'متن نظر' : 'Comment Text'} value={editText} onChange={(e) => handleEditTextChange(e.target.value)} error={editTextError} rows={4} maxLength={550} />
             <AdminSelect label={isRTL ? 'امتیاز' : 'Rating'} value={editRating} onChange={(e) => setEditRating(e.target.value)} options={RATING_OPTIONS(isRTL)} />
 
             <div>

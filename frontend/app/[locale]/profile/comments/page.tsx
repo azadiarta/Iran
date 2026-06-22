@@ -30,6 +30,7 @@ export default function MyCommentsPage() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
+  const [editTextError, setEditTextError] = useState<string | null>(null);
   const [editRating, setEditRating] = useState('1');
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
@@ -93,6 +94,7 @@ export default function MyCommentsPage() {
   function startEdit(c: MyComment) {
     setEditingId(c.id);
     setEditText(c.text);
+    setEditTextError(null);
     setEditRating(String(c.rating || 1));
     setEditError(null);
   }
@@ -102,10 +104,15 @@ export default function MyCommentsPage() {
     setEditError(null);
   }
 
+  function handleEditTextChange(value: string) {
+    setEditText(value);
+    setEditTextError(value.trim() ? null : t('my_comments_text_required'));
+  }
+
   async function saveEdit() {
     if (!editingId) return;
     if (!editText.trim()) {
-      setEditError(t('my_comments_text_required'));
+      setEditTextError(t('my_comments_text_required'));
       return;
     }
     setEditSaving(true);
@@ -182,12 +189,18 @@ export default function MyCommentsPage() {
                       <div className="mt-3 space-y-3">
                         <textarea
                           value={editText}
-                          onChange={(e) => setEditText(e.target.value)}
+                          onChange={(e) => handleEditTextChange(e.target.value)}
                           rows={3}
                           maxLength={250}
                           className={inputClass}
+                          style={{ borderColor: editTextError ? '#ef4444' : 'rgba(255,255,255,0.1)' }}
                         />
-                        <p className="text-xs text-white/30 text-right">{editText.length}/250</p>
+                        <div className="flex items-start justify-between gap-2">
+                          {editTextError ? (
+                            <p className="text-xs" style={{ color: '#ef4444' }}>{editTextError}</p>
+                          ) : <span />}
+                          <p className="text-xs text-white/30 text-right whitespace-nowrap">{editText.length}/250</p>
+                        </div>
                         <div>
                           <label className="block text-xs text-white/50 mb-1.5">{t('my_comments_rating_label')}</label>
                           <select value={editRating} onChange={(e) => setEditRating(e.target.value)} className={inputClass}>

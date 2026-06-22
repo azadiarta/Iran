@@ -10,7 +10,7 @@ import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
 import { settingsAPI, DefaultSettingItem } from '@/lib/api';
 import { PAYMENT_SETTINGS_META } from '@/lib/settingsMeta';
-import { isValidEmail, SHORT_TEXT_ADMIN_MAX_LENGTH } from '@/lib/validation';
+import { isValidEmail, emailFormatError, SHORT_TEXT_ADMIN_MAX_LENGTH } from '@/lib/validation';
 
 const MANUAL_FIELDS = [
   'payment_manual_bank_name',
@@ -33,6 +33,12 @@ export default function AdminPaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [values, setValues] = useState<Record<string, string>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string | undefined>>({});
+
+  function keyError(key: string, value: string): string | undefined {
+    if (key === 'payment_paypal_email' && value && !isValidEmail(value)) return emailFormatError(isRTL);
+    return undefined;
+  }
 
   useEffect(() => {
     if (!isSuperuser) {
@@ -54,14 +60,14 @@ export default function AdminPaymentsPage() {
 
   function set(key: string, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }));
+    setFieldErrors((prev) => ({ ...prev, [key]: keyError(key, value) }));
   }
 
   async function save(key: string) {
     const value = values[key] ?? '';
-    if (key === 'payment_paypal_email' && value && !isValidEmail(value)) {
-      showToast('warning', isRTL ? 'ایمیل وارد شده معتبر نیست' : 'Enter a valid email address');
-      return;
-    }
+    const error = keyError(key, value);
+    setFieldErrors((prev) => ({ ...prev, [key]: error }));
+    if (error) return;
     setSavingKey(key);
     try {
       await settingsAPI.update(key, value);
@@ -100,7 +106,7 @@ export default function AdminPaymentsPage() {
             {multiline ? (
               <AdminTextarea label={label} value={value} onChange={(e) => set(key, e.target.value)} rows={2} maxLength={550} />
             ) : (
-              <AdminInput label={label} value={value} onChange={(e) => set(key, e.target.value)} maxLength={SHORT_TEXT_ADMIN_MAX_LENGTH} />
+              <AdminInput label={label} value={value} onChange={(e) => set(key, e.target.value)} error={fieldErrors[key]} maxLength={SHORT_TEXT_ADMIN_MAX_LENGTH} />
             )}
           </div>
           <button

@@ -15,6 +15,7 @@ import useToastStore from '@/store/toastStore';
 import { fundAPI, Contribution, ContributionDisplayNameChoice, Paginated } from '@/lib/api';
 import { SETTINGS_META } from '@/lib/settingsMeta';
 import { PAYMENT_METHOD_LABELS, getPaymentMethodLabel } from '@/lib/paymentMethodsMeta';
+import { requiredFieldError } from '@/lib/validation';
 
 // pending = contribution created, awaiting payment/receipt; pending_review = a
 // receipt has been uploaded and is awaiting admin verification. Both are real,
@@ -45,6 +46,9 @@ export default function AdminContributionsPage() {
 
   const canView = !!currentMember?.is_superuser || hasPermission('can_view_balance');
   const canManage = !!currentMember?.is_superuser || hasPermission('can_manage_permissions');
+  // can_manage_permissions's own description covers "payments" — it must be
+  // able to see this page on its own, without also requiring can_view_balance.
+  const canViewOrManage = canView || canManage;
 
   const [items, setItems] = useState<Contribution[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,6 +74,32 @@ export default function AdminContributionsPage() {
   const [status, setStatus] = useState('completed');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ guestName?: string; amount?: string }>({});
+
+  function amountError(value: string): string | undefined {
+    const n = parseFloat(value);
+    if (!value || isNaN(n) || n <= 0) return isRTL ? 'مبلغ معتبر وارد کنید' : 'Enter a valid amount';
+    return undefined;
+  }
+
+  function handleGuestNameChange(value: string) {
+    setGuestName(value);
+    setFieldErrors((p) => ({ ...p, guestName: value.trim() ? undefined : requiredFieldError(isRTL) }));
+  }
+
+  function handleAmountChange(value: string) {
+    setAmount(value);
+    setFieldErrors((p) => ({ ...p, amount: amountError(value) }));
+  }
+
+  function validateCreate(): boolean {
+    const errors: { guestName?: string; amount?: string } = {
+      guestName: guestName.trim() ? undefined : requiredFieldError(isRTL),
+      amount: amountError(amount),
+    };
+    setFieldErrors(errors);
+    return !errors.guestName && !errors.amount;
+  }
 
   // Unified detail modal — viewing, editing, approving and rejecting all happen here.
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -87,6 +117,18 @@ export default function AdminContributionsPage() {
   const [editPublicDisplayName, setEditPublicDisplayName] = useState('');
   const [editMessage, setEditMessage] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
+  const [editFieldErrors, setEditFieldErrors] = useState<{ amount?: string }>({});
+
+  function handleEditAmountChange(value: string) {
+    setEditAmount(value);
+    setEditFieldErrors((p) => ({ ...p, amount: amountError(value) }));
+  }
+
+  function validateEdit(): boolean {
+    const errors: { amount?: string } = { amount: amountError(editAmount) };
+    setEditFieldErrors(errors);
+    return !errors.amount;
+  }
 
   const [statusActionLoading, setStatusActionLoading] = useState(false);
   const [rejecting, setRejecting] = useState(false);
@@ -114,10 +156,10 @@ export default function AdminContributionsPage() {
   }
 
   useEffect(() => {
-    if (canView) load();
+    if (canViewOrManage) load();
     else setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canView, page, statusFilter, methodFilter, dateFrom, dateTo, memberFilterId, appliedSearch]);
+  }, [canViewOrManage, page, statusFilter, methodFilter, dateFrom, dateTo, memberFilterId, appliedSearch]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -141,20 +183,14 @@ export default function AdminContributionsPage() {
     setPaymentMethod('manual');
     setStatus('completed');
     setNotes('');
+    setFieldErrors({});
     setModalOpen(true);
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!guestName.trim()) {
-      showToast('warning', isRTL ? 'نام مشارکت‌کننده را وارد کنید' : 'Enter the contributor name');
-      return;
-    }
+    if (!validateCreate()) return;
     const amountNum = parseFloat(amount);
-    if (!amountNum || amountNum <= 0) {
-      showToast('warning', isRTL ? 'مبلغ معتبر وارد کنید' : 'Enter a valid amount');
-      return;
-    }
     setSaving(true);
     try {
       await fundAPI.createManualContribution({
@@ -181,6 +217,7 @@ export default function AdminContributionsPage() {
     setDetailItem(null);
     setRejecting(false);
     setRejectReason('');
+    setEditFieldErrors({});
     try {
       const res = await fundAPI.getContributionDetail(c.id);
       const d = res.data as unknown as Contribution;
@@ -204,11 +241,8 @@ export default function AdminContributionsPage() {
 
   async function saveEdit() {
     if (!detailItem) return;
+    if (!validateEdit()) return;
     const amountNum = parseFloat(editAmount);
-    if (!amountNum || amountNum <= 0) {
-      showToast('warning', isRTL ? 'مبلغ معتبر وارد کنید' : 'Enter a valid amount');
-      return;
-    }
     setSavingEdit(true);
     try {
       const res = await fundAPI.updateContribution(detailItem.id, {
@@ -267,7 +301,7 @@ export default function AdminContributionsPage() {
     }
   }
 
-  if (!canView) {
+  if (!canViewOrManage) {
     return (
       <div className="admin-glass-card p-8 text-center text-white/50 text-sm">
         {isRTL ? 'شما دسترسی مشاهده مشارکت‌ها را ندارید.' : 'You do not have permission to view contributions.'}
@@ -408,8 +442,8 @@ export default function AdminContributionsPage() {
 
       <AdminModal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={isRTL ? 'افزودن مشارکت' : 'Add Contribution'}>
         <form onSubmit={submit} className="flex flex-col gap-4">
-          <AdminInput label={isRTL ? 'نام مشارکت‌کننده' : 'Contributor Name'} value={guestName} onChange={(e) => setGuestName(e.target.value)} required maxLength={50} />
-          <AdminInput label={isRTL ? 'مبلغ' : 'Amount'} type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+          <AdminInput label={isRTL ? 'نام مشارکت‌کننده' : 'Contributor Name'} value={guestName} onChange={(e) => handleGuestNameChange(e.target.value)} error={fieldErrors.guestName} required maxLength={50} />
+          <AdminInput label={isRTL ? 'مبلغ' : 'Amount'} type="number" min="0" step="0.01" value={amount} onChange={(e) => handleAmountChange(e.target.value)} error={fieldErrors.amount} required />
           <AdminSelect
             label={isRTL ? 'واحد پول' : 'Currency'}
             value={currency}
@@ -500,7 +534,7 @@ export default function AdminContributionsPage() {
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <AdminInput label={isRTL ? 'نام مشارکت‌کننده' : 'Contributor Name'} value={editGuestName} onChange={(e) => setEditGuestName(e.target.value)} maxLength={50} />
-                  <AdminInput label={isRTL ? 'مبلغ' : 'Amount'} type="number" min="0" step="0.01" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} required />
+                  <AdminInput label={isRTL ? 'مبلغ' : 'Amount'} type="number" min="0" step="0.01" value={editAmount} onChange={(e) => handleEditAmountChange(e.target.value)} error={editFieldErrors.amount} required />
                   <AdminSelect
                     label={isRTL ? 'واحد پول' : 'Currency'}
                     value={editCurrency}

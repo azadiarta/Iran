@@ -182,6 +182,37 @@ class MemberDetailSerializer(serializers.ModelSerializer):
         return obj.deactivated_by.display_name or obj.deactivated_by.full_name
 
 
+class MemberMinimalSerializer(serializers.ModelSerializer):
+    """Bare-minimum identification fields — used when the viewer holds only a
+    narrow, action-specific permission (e.g. can_change_any_password) with no
+    right to see anything from the can_view_member_details domain. Just
+    enough to identify a member and click through to perform the one action
+    their permission actually grants."""
+
+    class Meta:
+        model = Member
+        fields = ['id', 'full_name', 'member_number']
+        read_only_fields = fields
+
+
+class MemberDeleteMinimalSerializer(MemberMinimalSerializer):
+    """Same bare-minimum identification, plus the active/deactivation state —
+    that state belongs to can_delete_member's own domain (its description
+    covers both deactivating and deleting), so it's not 'someone else's'
+    detail being leaked."""
+
+    deactivated_by_name = serializers.SerializerMethodField()
+
+    class Meta(MemberMinimalSerializer.Meta):
+        fields = MemberMinimalSerializer.Meta.fields + ['is_active', 'deactivation_reason', 'deactivated_by_name']
+        read_only_fields = fields
+
+    def get_deactivated_by_name(self, obj):
+        if not obj.deactivated_by:
+            return None
+        return obj.deactivated_by.display_name or obj.deactivated_by.full_name
+
+
 class MemberUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Member

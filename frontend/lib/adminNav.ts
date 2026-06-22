@@ -29,12 +29,12 @@ export interface AdminNavItem {
 
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { key: 'dashboard', href: '', label: { en: 'Dashboard', fa: 'داشبورد' }, icon: LayoutDashboard, permission: 'can_view_dashboard' },
-  { key: 'members', href: 'members', label: { en: 'Members', fa: 'اعضا' }, icon: Users, permission: ['can_manage_permissions', 'can_view_member_details'] },
+  { key: 'members', href: 'members', label: { en: 'Members', fa: 'اعضا' }, icon: Users, permission: ['can_manage_permissions', 'can_view_member_details', 'can_change_any_password', 'can_delete_member'] },
   { key: 'groups', href: 'groups', label: { en: 'Groups', fa: 'گروه‌ها' }, icon: ShieldCheck, permission: 'can_manage_permissions' },
-  { key: 'contributions', href: 'contributions', label: { en: 'Contributions', fa: 'مشارکت‌ها' }, icon: HandCoins, permission: 'can_view_balance', badgeKey: 'pendingContributionCount' },
-  { key: 'expenses', href: 'expenses', label: { en: 'Expenses', fa: 'هزینه‌ها' }, icon: Receipt, permission: ['can_view_balance', 'can_expense'] },
-  { key: 'posts', href: 'posts', label: { en: 'Posts', fa: 'پست‌ها' }, icon: Newspaper, permission: 'can_post' },
-  { key: 'comments', href: 'comments', label: { en: 'Comments', fa: 'نظرات' }, icon: MessageSquare, permission: 'can_approve_comments', badgeKey: 'pendingCommentCount' },
+  { key: 'contributions', href: 'contributions', label: { en: 'Contributions', fa: 'مشارکت‌ها' }, icon: HandCoins, permission: ['can_manage_permissions', 'can_view_balance'], badgeKey: 'pendingContributionCount' },
+  { key: 'expenses', href: 'expenses', label: { en: 'Expenses', fa: 'هزینه‌ها' }, icon: Receipt, permission: ['can_manage_permissions', 'can_view_balance', 'can_expense'] },
+  { key: 'posts', href: 'posts', label: { en: 'Posts', fa: 'پست‌ها' }, icon: Newspaper, permission: ['can_manage_permissions', 'can_post'] },
+  { key: 'comments', href: 'comments', label: { en: 'Comments', fa: 'نظرات' }, icon: MessageSquare, permission: ['can_manage_permissions', 'can_approve_comments'], badgeKey: 'pendingCommentCount' },
   { key: 'contact-messages', href: 'contact-messages', label: { en: 'Contact Messages', fa: 'پیام‌های تماس' }, icon: Mail, permission: 'can_manage_contact_messages', badgeKey: 'pendingContactMessageCount' },
   { key: 'payments', href: 'payments', label: { en: 'Payments', fa: 'تنظیمات پرداخت' }, icon: Wallet, permission: 'can_manage_permissions' },
   { key: 'settings', href: 'settings', label: { en: 'Settings', fa: 'تنظیمات' }, icon: Settings, permission: 'can_manage_permissions' },

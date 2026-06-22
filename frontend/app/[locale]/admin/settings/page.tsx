@@ -10,7 +10,7 @@ import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
 import { settingsAPI, groupsAPI, DefaultSettingItem, AccessGroup } from '@/lib/api';
 import { SETTINGS_META } from '@/lib/settingsMeta';
-import { isValidPhoneStrict, isValidEmail, phoneFormatError, PHONE_PLACEHOLDER, SHORT_TEXT_ADMIN_MAX_LENGTH } from '@/lib/validation';
+import { isValidPhoneStrict, isValidEmail, phoneFormatError, emailFormatError, PHONE_PLACEHOLDER, SHORT_TEXT_ADMIN_MAX_LENGTH } from '@/lib/validation';
 
 const _EMAIL_KEYS = ['contact_email'];
 const _PHONE_KEYS = ['contact_phone'];
@@ -31,6 +31,14 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [values, setValues] = useState<Record<string, string>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string | undefined>>({});
+
+  function keyError(key: string, value: string): string | undefined {
+    if (!value) return undefined;
+    if (_EMAIL_KEYS.includes(key) && !isValidEmail(value)) return emailFormatError(isRTL);
+    if (_PHONE_KEYS.includes(key) && !isValidPhoneStrict(value)) return phoneFormatError(isRTL);
+    return undefined;
+  }
 
   useEffect(() => {
     if (!isSuperuser) {
@@ -60,18 +68,14 @@ export default function AdminSettingsPage() {
 
   function set(key: string, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }));
+    setFieldErrors((prev) => ({ ...prev, [key]: keyError(key, value) }));
   }
 
   async function save(key: string) {
     const value = values[key] ?? '';
-    if (value && _EMAIL_KEYS.includes(key) && !isValidEmail(value)) {
-      showToast('warning', isRTL ? 'ایمیل وارد شده معتبر نیست' : 'Enter a valid email address');
-      return;
-    }
-    if (value && _PHONE_KEYS.includes(key) && !isValidPhoneStrict(value)) {
-      showToast('warning', phoneFormatError(isRTL));
-      return;
-    }
+    const error = keyError(key, value);
+    setFieldErrors((prev) => ({ ...prev, [key]: error }));
+    if (error) return;
     setSavingKey(key);
     try {
       await settingsAPI.update(key, value);
@@ -181,6 +185,7 @@ export default function AdminSettingsPage() {
                       type={meta?.type === 'number' ? 'number' : 'text'}
                       value={values[s.key] ?? ''}
                       onChange={(e) => set(s.key, e.target.value)}
+                      error={fieldErrors[s.key]}
                       placeholder={_PHONE_KEYS.includes(s.key) ? PHONE_PLACEHOLDER : undefined}
                       maxLength={meta?.maxLength ?? SHORT_TEXT_ADMIN_MAX_LENGTH}
                     />
