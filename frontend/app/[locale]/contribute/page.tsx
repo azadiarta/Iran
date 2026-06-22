@@ -19,7 +19,7 @@ import { getPaymentMethodLabel, getPaymentMethodUnavailableMessage } from '@/lib
 import AdminToggle from '@/components/admin/fields/AdminToggle';
 import Turnstile from '@/components/common/Turnstile';
 import useAuthStore from '@/store/authStore';
-import { SHORT_TEXT_PUBLIC_MAX_LENGTH } from '@/lib/validation';
+import { SHORT_TEXT_PUBLIC_MAX_LENGTH, requiredFieldError } from '@/lib/validation';
 
 const AMOUNT_REGEX = /^\d{0,9}(\.\d{0,2})?$/;
 
@@ -73,6 +73,7 @@ export default function ContributePage() {
   const [amount, setAmount] = useState('');
   const [amountError, setAmountError] = useState<string | null>(null);
   const [guestName, setGuestName] = useState('');
+  const [guestNameError, setGuestNameError] = useState<string | null>(null);
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [loadingMethods, setLoadingMethods] = useState(true);
@@ -90,6 +91,7 @@ export default function ContributePage() {
   const [showInPublicList, setShowInPublicList] = useState(false);
   const [displayNameChoice, setDisplayNameChoice] = useState<ContributionDisplayNameChoice>('display_name');
   const [customDisplayName, setCustomDisplayName] = useState('');
+  const [customDisplayNameError, setCustomDisplayNameError] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [captchaToken, setCaptchaToken] = useState('');
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
@@ -213,6 +215,16 @@ export default function ContributePage() {
     setTimeout(() => setAmountError(null), 3000);
   };
 
+  const handleGuestNameChange = (value: string) => {
+    setGuestName(value);
+    setGuestNameError(value.trim() ? null : requiredFieldError(isRTL));
+  };
+
+  const handleCustomDisplayNameChange = (value: string) => {
+    setCustomDisplayName(value);
+    setCustomDisplayNameError(value.trim() ? null : requiredFieldError(isRTL));
+  };
+
   const nameChoices: ContributionDisplayNameChoice[] = isAuthenticated
     ? ['display_name', 'full_name', 'custom']
     : ['display_name', 'custom'];
@@ -325,14 +337,20 @@ export default function ContributePage() {
           <input
             type="text"
             value={guestName}
-            onChange={(e) => setGuestName(e.target.value)}
+            onChange={(e) => handleGuestNameChange(e.target.value)}
             placeholder={t('contribute.guest_name_placeholder')}
             maxLength={SHORT_TEXT_PUBLIC_MAX_LENGTH}
-            className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-white/20 outline-none focus:border-[#00ffff] focus:ring-1 focus:ring-[#00ffff]/30 transition-all"
+            className="w-full px-4 py-3 rounded-2xl bg-white/5 border text-white placeholder-white/20 outline-none focus:ring-1 focus:ring-[#00ffff]/30 transition-all"
+            style={{ borderColor: guestNameError ? '#ef4444' : 'rgba(255,255,255,0.1)' }}
           />
-          <p className="text-xs text-white/30 mt-1 text-right">
-            {guestName.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}
-          </p>
+          <div className="mt-1 flex items-start justify-between gap-2">
+            {guestNameError ? (
+              <p className="text-xs" style={{ color: '#ef4444' }}>{guestNameError}</p>
+            ) : <span />}
+            <p className="text-xs text-white/30 text-right whitespace-nowrap">
+              {guestName.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}
+            </p>
+          </div>
         </div>
       )}
 
@@ -441,16 +459,22 @@ export default function ContributePage() {
                 <input
                   type="text"
                   value={customDisplayName}
-                  onChange={(e) => setCustomDisplayName(e.target.value)}
+                  onChange={(e) => handleCustomDisplayNameChange(e.target.value)}
                   maxLength={SHORT_TEXT_PUBLIC_MAX_LENGTH}
                   placeholder={t('contribute.custom_name_placeholder')}
-                  className="mt-3 w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-white/20 outline-none focus:border-[#00ffff] focus:ring-1 focus:ring-[#00ffff]/30 transition-all"
+                  className="mt-3 w-full px-4 py-3 rounded-2xl bg-white/5 border text-white placeholder-white/20 outline-none focus:ring-1 focus:ring-[#00ffff]/30 transition-all"
+                  style={{ borderColor: customDisplayNameError ? '#ef4444' : 'rgba(255,255,255,0.1)' }}
                 />
               )}
               {displayNameChoice === 'custom' && (
-                <p className="text-xs text-white/30 mt-1 text-right">
-                  {customDisplayName.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}
-                </p>
+                <div className="mt-1 flex items-start justify-between gap-2">
+                  {customDisplayNameError ? (
+                    <p className="text-xs" style={{ color: '#ef4444' }}>{customDisplayNameError}</p>
+                  ) : <span />}
+                  <p className="text-xs text-white/30 text-right whitespace-nowrap">
+                    {customDisplayName.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}
+                  </p>
+                </div>
               )}
             </div>
 

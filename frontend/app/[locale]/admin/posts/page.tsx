@@ -11,7 +11,7 @@ import AdminFileUpload from '@/components/admin/fields/AdminFileUpload';
 import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
 import { postsAPI, PostAdminDetail, PostDetail, Paginated } from '@/lib/api';
-import { SHORT_TEXT_ADMIN_MAX_LENGTH } from '@/lib/validation';
+import { SHORT_TEXT_ADMIN_MAX_LENGTH, requiredFieldError } from '@/lib/validation';
 
 export default function AdminPostsPage() {
   const params = useParams();
@@ -20,7 +20,9 @@ export default function AdminPostsPage() {
   const { hasPermission, member: currentMember } = useAuthStore();
   const showToast = useToastStore((s) => s.show);
 
-  const canPost = !!currentMember?.is_superuser || hasPermission('can_post');
+  // can_manage_permissions's own description covers "content moderation" —
+  // it must be able to manage posts on its own, without also requiring can_post.
+  const canPost = !!currentMember?.is_superuser || hasPermission('can_manage_permissions') || hasPermission('can_post');
 
   const [items, setItems] = useState<PostAdminDetail[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +40,26 @@ export default function AdminPostsPage() {
   const [body, setBody] = useState('');
   const [images, setImages] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ title?: string; body?: string }>({});
+
+  function handleTitleChange(value: string) {
+    setTitle(value);
+    setFieldErrors((p) => ({ ...p, title: value.trim() ? undefined : requiredFieldError(isRTL) }));
+  }
+
+  function handleBodyChange(value: string) {
+    setBody(value);
+    setFieldErrors((p) => ({ ...p, body: value.trim() ? undefined : requiredFieldError(isRTL) }));
+  }
+
+  function validatePost(): boolean {
+    const errors: { title?: string; body?: string } = {
+      title: title.trim() ? undefined : requiredFieldError(isRTL),
+      body: body.trim() ? undefined : requiredFieldError(isRTL),
+    };
+    setFieldErrors(errors);
+    return !errors.title && !errors.body;
+  }
 
   const [confirmDelete, setConfirmDelete] = useState<PostAdminDetail | null>(null);
   const [confirmDeleteImage, setConfirmDeleteImage] = useState<{ id: string } | null>(null);
@@ -76,6 +98,7 @@ export default function AdminPostsPage() {
     setTitle('');
     setBody('');
     setImages([]);
+    setFieldErrors({});
     setModalOpen(true);
   }
 
@@ -87,6 +110,7 @@ export default function AdminPostsPage() {
       setTitle(detail.title);
       setBody(detail.body);
       setImages([]);
+      setFieldErrors({});
       setModalOpen(true);
     } catch {
       showToast('error', isRTL ? 'بارگذاری پست ناموفق بود' : 'Failed to load post');
@@ -95,6 +119,7 @@ export default function AdminPostsPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!validatePost()) return;
     setSaving(true);
     try {
       if (editing) {
@@ -246,8 +271,8 @@ export default function AdminPostsPage() {
 
       <AdminModal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editing ? (isRTL ? 'ویرایش پست' : 'Edit Post') : (isRTL ? 'پست جدید' : 'New Post')} maxWidth="max-w-2xl">
         <form onSubmit={submit} className="flex flex-col gap-4">
-          <AdminInput label={isRTL ? 'عنوان' : 'Title'} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={SHORT_TEXT_ADMIN_MAX_LENGTH} />
-          <AdminTextarea label={isRTL ? 'متن' : 'Body'} value={body} onChange={(e) => setBody(e.target.value)} rows={6} required maxLength={550} />
+          <AdminInput label={isRTL ? 'عنوان' : 'Title'} value={title} onChange={(e) => handleTitleChange(e.target.value)} error={fieldErrors.title} required maxLength={SHORT_TEXT_ADMIN_MAX_LENGTH} />
+          <AdminTextarea label={isRTL ? 'متن' : 'Body'} value={body} onChange={(e) => handleBodyChange(e.target.value)} error={fieldErrors.body} rows={6} required maxLength={550} />
 
           {editing && editing.images.length > 0 && (
             <div>

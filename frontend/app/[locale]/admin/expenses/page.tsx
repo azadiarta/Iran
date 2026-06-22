@@ -11,6 +11,7 @@ import AdminFileUpload from '@/components/admin/fields/AdminFileUpload';
 import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
 import { fundAPI, Expense, Paginated } from '@/lib/api';
+import { requiredFieldError } from '@/lib/validation';
 
 export default function AdminExpensesPage() {
   const params = useParams();
@@ -22,6 +23,9 @@ export default function AdminExpensesPage() {
   const canView = !!currentMember?.is_superuser || hasPermission('can_view_balance');
   const canCreate = !!currentMember?.is_superuser || hasPermission('can_expense');
   const canDelete = !!currentMember?.is_superuser || hasPermission('can_manage_permissions');
+  // can_manage_permissions's own description covers "payments" — it must be
+  // able to see the list on its own, without also requiring can_view_balance.
+  const canViewList = canView || canDelete;
 
   const [items, setItems] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,9 +41,41 @@ export default function AdminExpensesPage() {
   const [expenseDate, setExpenseDate] = useState('');
   const [receipt, setReceipt] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ amount?: string; shortReason?: string; expenseDate?: string }>({});
 
   const [confirmDelete, setConfirmDelete] = useState<Expense | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+
+  function amountError(value: string): string | undefined {
+    const n = parseFloat(value);
+    if (!value || isNaN(n) || n <= 0) return isRTL ? 'مبلغ معتبر وارد کنید' : 'Enter a valid amount';
+    return undefined;
+  }
+
+  function handleAmountChange(value: string) {
+    setAmount(value);
+    setFieldErrors((p) => ({ ...p, amount: amountError(value) }));
+  }
+
+  function handleShortReasonChange(value: string) {
+    setShortReason(value);
+    setFieldErrors((p) => ({ ...p, shortReason: value.trim() ? undefined : requiredFieldError(isRTL) }));
+  }
+
+  function handleExpenseDateChange(value: string) {
+    setExpenseDate(value);
+    setFieldErrors((p) => ({ ...p, expenseDate: value ? undefined : requiredFieldError(isRTL) }));
+  }
+
+  function validateCreate(): boolean {
+    const errors: { amount?: string; shortReason?: string; expenseDate?: string } = {
+      amount: amountError(amount),
+      shortReason: shortReason.trim() ? undefined : requiredFieldError(isRTL),
+      expenseDate: expenseDate ? undefined : requiredFieldError(isRTL),
+    };
+    setFieldErrors(errors);
+    return !errors.amount && !errors.shortReason && !errors.expenseDate;
+  }
 
   function load() {
     setLoading(true);
@@ -56,10 +92,10 @@ export default function AdminExpensesPage() {
   }
 
   useEffect(() => {
-    if (canView) load();
+    if (canViewList) load();
     else setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canView, page]);
+  }, [canViewList, page]);
 
   function openCreate() {
     setAmount('');
@@ -67,16 +103,14 @@ export default function AdminExpensesPage() {
     setDescription('');
     setExpenseDate(new Date().toISOString().slice(0, 10));
     setReceipt(null);
+    setFieldErrors({});
     setModalOpen(true);
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!validateCreate()) return;
     const amountNum = parseFloat(amount);
-    if (!amountNum || amountNum <= 0) {
-      showToast('warning', isRTL ? 'مبلغ معتبر وارد کنید' : 'Enter a valid amount');
-      return;
-    }
     setSaving(true);
     try {
       await fundAPI.createExpense({
@@ -88,7 +122,7 @@ export default function AdminExpensesPage() {
       });
       showToast('success', isRTL ? 'هزینه با موفقیت ثبت شد' : 'Expense recorded successfully');
       setModalOpen(false);
-      load();
+      if (canViewList) load();
     } catch {
       showToast('error', isRTL ? 'ثبت هزینه ناموفق بود' : 'Failed to record expense');
     } finally {
@@ -111,7 +145,7 @@ export default function AdminExpensesPage() {
     }
   }
 
-  if (!canView) {
+  if (!canViewList && !canCreate) {
     return (
       <div className="admin-glass-card p-8 text-center text-white/50 text-sm">
         {isRTL ? 'شما دسترسی مشاهده هزینه‌ها را ندارید.' : 'You do not have permission to view expenses.'}
@@ -183,31 +217,39 @@ export default function AdminExpensesPage() {
         )}
       </div>
 
-      <AdminTable
-        columns={columns}
-        data={items}
-        loading={loading}
-        rowKey={(e) => e.id}
-        emptyMessage={isRTL ? 'هزینه‌ای یافت نشد' : 'No expenses found'}
-        pagination={{
-          page,
-          hasNext,
-          hasPrev: page > 1,
-          onPageChange: setPage,
-          prevLabel: isRTL ? 'قبلی' : 'Prev',
-          nextLabel: isRTL ? 'بعدی' : 'Next',
-          pageLabel: isRTL
-            ? `صفحه ${page} از ${Math.max(1, Math.ceil(totalCount / pageSize))}`
-            : `Page ${page} of ${Math.max(1, Math.ceil(totalCount / pageSize))}`,
-        }}
-      />
+      {canViewList ? (
+        <AdminTable
+          columns={columns}
+          data={items}
+          loading={loading}
+          rowKey={(e) => e.id}
+          emptyMessage={isRTL ? 'هزینه‌ای یافت نشد' : 'No expenses found'}
+          pagination={{
+            page,
+            hasNext,
+            hasPrev: page > 1,
+            onPageChange: setPage,
+            prevLabel: isRTL ? 'قبلی' : 'Prev',
+            nextLabel: isRTL ? 'بعدی' : 'Next',
+            pageLabel: isRTL
+              ? `صفحه ${page} از ${Math.max(1, Math.ceil(totalCount / pageSize))}`
+              : `Page ${page} of ${Math.max(1, Math.ceil(totalCount / pageSize))}`,
+          }}
+        />
+      ) : (
+        <div className="admin-glass-card p-6 text-center text-white/50 text-sm">
+          {isRTL
+            ? 'شما فقط دسترسی ثبت هزینه‌ی جدید را دارید؛ فهرست هزینه‌های ثبت‌شده در اختیار شما نیست.'
+            : 'You only have permission to record new expenses; the list of recorded expenses is not available to you.'}
+        </div>
+      )}
 
       <AdminModal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={isRTL ? 'ثبت هزینه جدید' : 'Record New Expense'}>
         <form onSubmit={submit} className="flex flex-col gap-4">
-          <AdminInput label={isRTL ? 'مبلغ' : 'Amount'} type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
-          <AdminInput label={isRTL ? 'علت کوتاه' : 'Short Reason'} value={shortReason} onChange={(e) => setShortReason(e.target.value)} required maxLength={100} />
+          <AdminInput label={isRTL ? 'مبلغ' : 'Amount'} type="number" min="0" step="0.01" value={amount} onChange={(e) => handleAmountChange(e.target.value)} error={fieldErrors.amount} required />
+          <AdminInput label={isRTL ? 'علت کوتاه' : 'Short Reason'} value={shortReason} onChange={(e) => handleShortReasonChange(e.target.value)} error={fieldErrors.shortReason} required maxLength={100} />
           <AdminTextarea label={isRTL ? 'توضیحات' : 'Description'} value={description} onChange={(e) => setDescription(e.target.value)} rows={3} maxLength={550} />
-          <AdminInput label={isRTL ? 'تاریخ هزینه' : 'Expense Date'} type="date" value={expenseDate} onChange={(e) => setExpenseDate(e.target.value)} required />
+          <AdminInput label={isRTL ? 'تاریخ هزینه' : 'Expense Date'} type="date" value={expenseDate} onChange={(e) => handleExpenseDateChange(e.target.value)} error={fieldErrors.expenseDate} required />
           <AdminFileUpload
             label={isRTL ? 'تصویر رسید (اختیاری)' : 'Receipt Image (optional)'}
             accept="image/*"
