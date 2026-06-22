@@ -145,7 +145,12 @@ project_conventions:
       export in IranianSymbols.tsx: the landing page's Hero-content icon and
       the Navbar brand logo (desktop + mobile drawer). These are ordinary
       <img> elements, unrelated to and independent of the SiteBackground.tsx
-      watermark mechanism — changing one never affects the other.
+      watermark mechanism — changing one never affects the other. Phase 42 —
+      the Navbar's DESKTOP logo was changed again to a standalone circular-crop
+      <img> (border-radius 50%, same source image) and no longer uses
+      HandsEmblem; the mobile drawer logo and the landing-page Hero icon are
+      untouched and still render <HandsEmblem> uncropped — see ui_Navbar in
+      ui_components and shared_components.IranianSymbols in all.yaml.
   technology_stack:
     rule: >
       Backend: Django + Django REST Framework, PostgreSQL (SQLite fallback
@@ -581,29 +586,31 @@ action_buttons:
             - backend/accounts/member_views.py
           notes: "Cross-referenced with form_admin_member_deactivate above — listed here too because it is fundamentally a status-toggle action; the 'reason' field is optional metadata on top of the toggle."
         - id: action_admin_lockdown_superuser_toggle
-          label: "Admin — site-wide superuser-only lockdown toggle (with required message)"
+          label: "Admin — site-wide superuser-only lockdown toggle (with optional message)"
           scope: frontend
           location:
             - frontend/app/[locale]/admin/lockdown/page.tsx
             - frontend/components/admin/fields/AdminToggle.tsx
             - frontend/components/admin/AdminConfirmDialog.tsx
+            - frontend/components/lockdown/LockdownPage.tsx
             - frontend/lib/api.ts
             - backend/core/lockdown_views.py
             - backend/core/lockdown.py
             - backend/core/middleware.py
-          notes: "AdminToggle, visible ONLY to member.is_superuser (never rendered for any other admin). Turning ON opens AdminConfirmDialog with a required AdminTextarea (message shown to visitors) -> lockdownAPI.toggleSuperuser(true, message) -> PATCH /api/lockdown/superuser/ (SuperuserLockdownToggleView, IsSuperuser). When active, SiteLockdownMiddleware (core/middleware.py) blocks the entire backend for everyone except the superuser, and ClientLayout.tsx renders LockdownPage for every non-superuser visitor. Always takes precedence over the permission-based lockdown below — enabling it automatically disables that one server-side (core/lockdown.py)."
+          notes: "AdminToggle, visible ONLY to member.is_superuser (never rendered for any other admin). Turning ON opens AdminConfirmDialog with an OPTIONAL AdminTextarea (message shown to visitors) -> lockdownAPI.toggleSuperuser(true, message) -> PATCH /api/lockdown/superuser/ (SuperuserLockdownToggleView, IsSuperuser); message may be left blank — both lockdown_views.py and the serializer accept an empty string. Phase 42 — the message box was made genuinely optional end-to-end: the admin form no longer blocks submission when empty, and LockdownPage.tsx (the full-screen visitor-facing overlay) falls back to a bilingual default notice ('No further details are available at this time.' / 'اطلاعات بیشتری در حال حاضر ارائه نشده است.') whenever the admin left the box blank, so visitors never see an empty box. When active, SiteLockdownMiddleware (core/middleware.py) blocks the entire backend for everyone except the superuser, and ClientLayout.tsx renders LockdownPage for every non-superuser visitor. Always takes precedence over the permission-based lockdown below — enabling it automatically disables that one server-side (core/lockdown.py)."
         - id: action_admin_lockdown_permission_toggle
-          label: "Admin — site-wide lockdown for ordinary members toggle (with required message)"
+          label: "Admin — site-wide lockdown for ordinary members toggle (with optional message)"
           scope: frontend
           location:
             - frontend/app/[locale]/admin/lockdown/page.tsx
             - frontend/components/admin/fields/AdminToggle.tsx
             - frontend/components/admin/AdminConfirmDialog.tsx
+            - frontend/components/lockdown/LockdownPage.tsx
             - frontend/lib/api.ts
             - backend/core/lockdown_views.py
             - backend/core/lockdown.py
             - backend/core/middleware.py
-          notes: "AdminToggle, visible to the superuser and to any admin holding the new can_toggle_lockdown permission. Turning ON opens AdminConfirmDialog with a required AdminTextarea -> lockdownAPI.togglePermission(true, message) -> PATCH /api/lockdown/permission/ (PermissionLockdownToggleView, HasGroupPermission('can_toggle_lockdown')); returns 409 if the superuser-only lockdown is already active. When active, the site/admin panel stay fully open for the superuser and every admin (any member with at least one non-baseline group permission, per is_admin_member() in core/lockdown.py / hasAdminAccess() in lib/adminNav.ts); only ordinary members and guests see LockdownPage. Disabled (greyed out) in the UI whenever the superuser lockdown is on."
+          notes: "AdminToggle, visible to the superuser and to any admin holding the new can_toggle_lockdown permission. Turning ON opens AdminConfirmDialog with an OPTIONAL AdminTextarea -> lockdownAPI.togglePermission(true, message) -> PATCH /api/lockdown/permission/ (PermissionLockdownToggleView, HasGroupPermission('can_toggle_lockdown')); returns 409 if the superuser-only lockdown is already active. Phase 42 — same optional-message + bilingual-default-fallback treatment as the superuser toggle above (see LockdownPage.tsx); the message is never required to enable either lockdown. When active, the site/admin panel stay fully open for the superuser and every admin (any member with at least one non-baseline group permission, per is_admin_member() in core/lockdown.py / hasAdminAccess() in lib/adminNav.ts); only ordinary members and guests see LockdownPage. Disabled (greyed out) in the UI whenever the superuser lockdown is on."
 
 search_inputs:
   scope: frontend
@@ -937,7 +944,7 @@ ui_components:
           label: Navbar — public site nav bar
           scope: frontend
           location: [frontend/components/layout/Navbar.tsx]
-          notes: "Locale switcher, auth-aware links (login vs profile), admin-panel link gated by hasAdminAccess(). Phase 38 — brand logo (desktop header + mobile drawer header) swapped from LionAndSun to HandsEmblem (the Iranian Political Association Birmingham emblem photo, same asset as the sitewide watermark, shown here at full opacity)."
+          notes: "Locale switcher, auth-aware links (login vs profile), admin-panel link gated by hasAdminAccess(). Phase 38 — brand logo (desktop header + mobile drawer header) swapped from LionAndSun to HandsEmblem (the Iranian Political Association Birmingham emblem photo, same asset as the sitewide watermark, shown here at full opacity). Phase 42 — the DESKTOP header logo only was changed again: it no longer renders <HandsEmblem>; it's now a standalone 32x32 circular-crop <span><img></span> (border-radius 50%, overflow hidden, object-fit cover) showing the same /branding/ipa-birmingham.jpg asset cropped to a circle. The mobile drawer header logo is untouched and still renders <HandsEmblem size={28} /> uncropped — see shared_components.IranianSymbols in all.yaml for the current per-export consumer list."
         - id: ui_LockdownSync
           label: LockdownSync — polls site lockdown status unconditionally
           scope: frontend
@@ -2094,7 +2101,7 @@ validation_logic:
           label: core/serializers.py validators
           scope: backend
           location: [backend/core/serializers.py]
-          notes: "ContactMessageCreateSerializer.validate_name/validate_contact_info/validate_message use sanitize_and_limit (50/50/250, both via SHORT_TEXT_PUBLIC_MAX_LENGTH and LONG_TEXT_PUBLIC_MAX_LENGTH respectively — corrected from a previously-stale '100/150/250'; this form is public-facing only). DefaultSettingSerializer.validate_value uses sanitize_and_limit(value, LONG_TEXT_ADMIN_MAX_LENGTH=550)."
+          notes: "ContactMessageCreateSerializer.validate_name/validate_contact_info/validate_message use sanitize_and_limit (50/50/250, both via SHORT_TEXT_PUBLIC_MAX_LENGTH and LONG_TEXT_PUBLIC_MAX_LENGTH respectively — corrected from a previously-stale '100/150/250'; this form is public-facing only). Phase 42 — removed DefaultSettingSerializer.validate_value entirely: it was dead code, asserting a flat sanitize_and_limit(value, LONG_TEXT_ADMIN_MAX_LENGTH=550) cap that was NEVER actually invoked, because DefaultSettingUpdateView.patch() (backend/core/settings_views.py) bypasses this serializer's is_valid()/data= path completely — it manually sanitizes via sanitize_text() and validates through the standalone _validate_value(key, value) function, using DefaultSettingSerializer only for output shaping (.data, read-only). Discovered while auditing a Phase 42 bugfix that hit BOTH layers: every admin-panel single-line settings box (admin/settings/page.tsx, admin/payments/page.tsx) was wrongly given maxLength={LONG_TEXT_ADMIN_MAX_LENGTH} (550, the admin-textarea tier) instead of SHORT_TEXT_ADMIN_MAX_LENGTH (100, the correct admin single-line tier) on the frontend — AND _validate_value in backend/core/settings_views.py had the identical bug server-side: its else-branch unconditionally returned LONG_TEXT_ADMIN_MAX_LENGTH for every non-long-text key instead of a per-key tiered cap, so the real enforcement ceiling for plain settings (e.g. contact_email, default_currency) was also 550, not 100. Fixed on both sides in the same phase: frontend maxLength props + import swapped to SHORT_TEXT_ADMIN_MAX_LENGTH (with a frontend/lib/settingsMeta.ts maxLength override of 150/300 for the two landing_headline/_tagline keys, which are intentionally longer than 100 but still short of the 550 textarea tier); backend _validate_value's else-branch changed to `_LENGTH_OVERRIDES.get(key, SHORT_TEXT_ADMIN_MAX_LENGTH)` mirroring the same per-key override map. A flat 550 cap in the now-removed validate_value would have contradicted this corrected tiered enforcement even when unreachable."
         - id: validate_fund
           label: fund/serializers.py validators
           scope: backend

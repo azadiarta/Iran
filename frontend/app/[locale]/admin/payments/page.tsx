@@ -10,7 +10,7 @@ import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
 import { settingsAPI, DefaultSettingItem } from '@/lib/api';
 import { PAYMENT_SETTINGS_META } from '@/lib/settingsMeta';
-import { isValidEmail } from '@/lib/validation';
+import { isValidEmail, SHORT_TEXT_ADMIN_MAX_LENGTH } from '@/lib/validation';
 
 const MANUAL_FIELDS = [
   'payment_manual_bank_name',
@@ -100,7 +100,7 @@ export default function AdminPaymentsPage() {
             {multiline ? (
               <AdminTextarea label={label} value={value} onChange={(e) => set(key, e.target.value)} rows={2} maxLength={550} />
             ) : (
-              <AdminInput label={label} value={value} onChange={(e) => set(key, e.target.value)} maxLength={550} />
+              <AdminInput label={label} value={value} onChange={(e) => set(key, e.target.value)} maxLength={SHORT_TEXT_ADMIN_MAX_LENGTH} />
             )}
           </div>
           <button

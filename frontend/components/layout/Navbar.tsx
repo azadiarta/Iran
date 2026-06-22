@@ -148,10 +148,26 @@ export default function Navbar({ locale }: NavbarProps) {
           className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8"
           dir={isRTL ? 'rtl' : 'ltr'}
         >
-          {/* Logo */}
+          {/* Logo — circular crop of the hands emblem, unique to this top corner spot */}
           <Link href={`/${locale}`} className="flex items-center gap-2 shrink-0">
-            <span style={{ color: '#fbbf24' }}>
-              <HandsEmblem size={32} />
+            <span
+              aria-hidden="true"
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                overflow: 'hidden',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <img
+                src="/branding/ipa-birmingham.jpg"
+                alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
             </span>
             <span
               className="font-semibold text-white text-lg hidden sm:block"

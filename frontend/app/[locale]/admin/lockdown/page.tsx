@@ -47,10 +47,6 @@ export default function AdminLockdownPage() {
   }
 
   async function confirmSu() {
-    if (suTurningOn && !suMessage.trim()) {
-      showToast('warning', isRTL ? 'وارد کردن پیام الزامی است.' : 'A message is required.');
-      return;
-    }
     setSuLoading(true);
     try {
       const res = await lockdownAPI.toggleSuperuser(suTurningOn, suMessage.trim() || undefined);
@@ -78,10 +74,6 @@ export default function AdminLockdownPage() {
   }
 
   async function confirmPerm() {
-    if (permTurningOn && !permMessage.trim()) {
-      showToast('warning', isRTL ? 'وارد کردن پیام الزامی است.' : 'A message is required.');
-      return;
-    }
     setPermLoading(true);
     try {
       const res = await lockdownAPI.togglePermission(permTurningOn, permMessage.trim() || undefined);
@@ -223,7 +215,9 @@ export default function AdminLockdownPage() {
         <AdminTextarea
           label={
             suTurningOn
-              ? (isRTL ? 'پیامی که به بازدیدکنندگان نمایش داده می‌شود' : 'Message shown to visitors')
+              ? (isRTL
+                  ? 'پیامی که به بازدیدکنندگان نمایش داده می‌شود (اختیاری — در صورت خالی بودن، متن پیش‌فرض نمایش داده می‌شود)'
+                  : 'Message shown to visitors (optional — a default message is shown if left empty)')
               : (isRTL ? 'یادداشت اختیاری (می‌توانید خالی بگذارید)' : 'Optional note (you may leave this empty)')
           }
           value={suMessage}
@@ -252,7 +246,9 @@ export default function AdminLockdownPage() {
         <AdminTextarea
           label={
             permTurningOn
-              ? (isRTL ? 'پیامی که به اعضای عادی نمایش داده می‌شود' : 'Message shown to ordinary members')
+              ? (isRTL
+                  ? 'پیامی که به اعضای عادی نمایش داده می‌شود (اختیاری — در صورت خالی بودن، متن پیش‌فرض نمایش داده می‌شود)'
+                  : 'Message shown to ordinary members (optional — a default message is shown if left empty)')
               : (isRTL ? 'یادداشت اختیاری (می‌توانید خالی بگذارید)' : 'Optional note (you may leave this empty)')
           }
           value={permMessage}

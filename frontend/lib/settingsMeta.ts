@@ -13,6 +13,11 @@ export interface SettingMeta {
   description: { en: string; fa: string };
   type: 'select' | 'toggle' | 'number' | 'text';
   options?: SettingOption[];
+  // Overrides the SHORT_TEXT_ADMIN_MAX_LENGTH default for fields that need
+  // more room than a typical single-line value but are still far short of
+  // the LONG_TEXT_ADMIN_MAX_LENGTH textarea ceiling — mirrors the backend's
+  // _LENGTH_OVERRIDES dict in core/settings_views.py.
+  maxLength?: number;
 }
 
 export const SETTINGS_META: Record<string, SettingMeta> = {
@@ -172,6 +177,7 @@ export const SETTINGS_META: Record<string, SettingMeta> = {
       fa: 'تیتر اصلی که در بالای صفحه اصلی سایت، به زبان انگلیسی نمایش داده می‌شود.',
     },
     type: 'text',
+    maxLength: 150,
   },
   landing_headline_fa: {
     label: { en: 'Homepage Headline (Farsi)', fa: 'تیتر صفحه اصلی (فارسی)' },
@@ -180,6 +186,7 @@ export const SETTINGS_META: Record<string, SettingMeta> = {
       fa: 'تیتر اصلی که در بالای صفحه اصلی سایت، به زبان فارسی نمایش داده می‌شود.',
     },
     type: 'text',
+    maxLength: 150,
   },
   landing_tagline_en: {
     label: { en: 'Homepage Tagline (English)', fa: 'شعار صفحه اصلی (انگلیسی)' },
@@ -188,6 +195,7 @@ export const SETTINGS_META: Record<string, SettingMeta> = {
       fa: 'شعار کوتاهی که زیر تیتر صفحه اصلی، به زبان انگلیسی نمایش داده می‌شود.',
     },
     type: 'text',
+    maxLength: 300,
   },
   landing_tagline_fa: {
     label: { en: 'Homepage Tagline (Farsi)', fa: 'شعار صفحه اصلی (فارسی)' },
@@ -196,6 +204,7 @@ export const SETTINGS_META: Record<string, SettingMeta> = {
       fa: 'شعار کوتاهی که زیر تیتر صفحه اصلی، به زبان فارسی نمایش داده می‌شود.',
     },
     type: 'text',
+    maxLength: 300,
   },
 };
 
