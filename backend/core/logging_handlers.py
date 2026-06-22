@@ -14,13 +14,17 @@ class Quiet4xxFilter(logging.Filter):
     at WARNING via log_response(), e.g. anonymous visitors hitting member-only
     endpoints (the homepage's balance/posts widgets) or bots probing the API.
     That floods both the console and the admin System Log with routine,
-    expected traffic. Demote anything below 500 to INFO; real server errors
-    (5xx) keep their original level.
+    expected traffic. Demote anything below 500 to INFO.
+
+    503 is also demoted: it's never a real server error in this codebase —
+    core.middleware.SiteLockdownMiddleware is the only thing that ever
+    returns it, deliberately, for visitors blocked by an active site
+    lockdown. Every other 5xx status keeps its original (error) level.
     """
 
     def filter(self, record):
         status_code = getattr(record, 'status_code', None)
-        if status_code is not None and status_code < 500 and record.levelno > logging.INFO:
+        if status_code is not None and record.levelno > logging.INFO and (status_code < 500 or status_code == 503):
             record.levelno = logging.INFO
             record.levelname = 'INFO'
         return True

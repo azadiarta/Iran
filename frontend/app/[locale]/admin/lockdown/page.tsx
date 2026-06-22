@@ -53,7 +53,7 @@ export default function AdminLockdownPage() {
     }
     setSuLoading(true);
     try {
-      const res = await lockdownAPI.toggleSuperuser(suTurningOn, suTurningOn ? suMessage.trim() : undefined);
+      const res = await lockdownAPI.toggleSuperuser(suTurningOn, suMessage.trim() || undefined);
       const data = res.data as unknown as LockdownStatus;
       setStatus(data.kind, data.message);
       showToast(
@@ -84,7 +84,7 @@ export default function AdminLockdownPage() {
     }
     setPermLoading(true);
     try {
-      const res = await lockdownAPI.togglePermission(permTurningOn, permTurningOn ? permMessage.trim() : undefined);
+      const res = await lockdownAPI.togglePermission(permTurningOn, permMessage.trim() || undefined);
       const data = res.data as unknown as LockdownStatus;
       setStatus(data.kind, data.message);
       showToast(
@@ -220,15 +220,17 @@ export default function AdminLockdownPage() {
         confirmLabel={suTurningOn ? (isRTL ? 'فعال کن' : 'Enable') : (isRTL ? 'غیرفعال کن' : 'Disable')}
         cancelLabel={isRTL ? 'انصراف' : 'Cancel'}
       >
-        {suTurningOn && (
-          <AdminTextarea
-            label={isRTL ? 'پیامی که به بازدیدکنندگان نمایش داده می‌شود' : 'Message shown to visitors'}
-            value={suMessage}
-            onChange={(e) => setSuMessage(e.target.value)}
-            rows={3}
-            maxLength={LONG_TEXT_ADMIN_MAX_LENGTH}
-          />
-        )}
+        <AdminTextarea
+          label={
+            suTurningOn
+              ? (isRTL ? 'پیامی که به بازدیدکنندگان نمایش داده می‌شود' : 'Message shown to visitors')
+              : (isRTL ? 'یادداشت اختیاری (می‌توانید خالی بگذارید)' : 'Optional note (you may leave this empty)')
+          }
+          value={suMessage}
+          onChange={(e) => setSuMessage(e.target.value)}
+          rows={3}
+          maxLength={LONG_TEXT_ADMIN_MAX_LENGTH}
+        />
       </AdminConfirmDialog>
 
       <AdminConfirmDialog
@@ -247,15 +249,17 @@ export default function AdminLockdownPage() {
         confirmLabel={permTurningOn ? (isRTL ? 'فعال کن' : 'Enable') : (isRTL ? 'غیرفعال کن' : 'Disable')}
         cancelLabel={isRTL ? 'انصراف' : 'Cancel'}
       >
-        {permTurningOn && (
-          <AdminTextarea
-            label={isRTL ? 'پیامی که به اعضای عادی نمایش داده می‌شود' : 'Message shown to ordinary members'}
-            value={permMessage}
-            onChange={(e) => setPermMessage(e.target.value)}
-            rows={3}
-            maxLength={LONG_TEXT_ADMIN_MAX_LENGTH}
-          />
-        )}
+        <AdminTextarea
+          label={
+            permTurningOn
+              ? (isRTL ? 'پیامی که به اعضای عادی نمایش داده می‌شود' : 'Message shown to ordinary members')
+              : (isRTL ? 'یادداشت اختیاری (می‌توانید خالی بگذارید)' : 'Optional note (you may leave this empty)')
+          }
+          value={permMessage}
+          onChange={(e) => setPermMessage(e.target.value)}
+          rows={3}
+          maxLength={LONG_TEXT_ADMIN_MAX_LENGTH}
+        />
       </AdminConfirmDialog>
     </div>
   );

@@ -179,8 +179,20 @@ api.interceptors.response.use(
     }
 
     // ── 503: service unavailable ────────────────────────────────────────────
+    // The site-lockdown middleware (core/middleware.py) also answers with 503
+    // for any visitor it blocks — that's not an infra outage, and
+    // ClientLayout/LockdownSync already render the in-place lockdown screen
+    // for it once the status poll lands. Hard-redirecting here too raced
+    // with that in-place handling: every blocked admin page keeps firing its
+    // own data fetches (dashboard stats, balance, ...), each 503 forced a
+    // full reload to /unavailable, which on landing fired its own fetches
+    // and reloaded again — an endless loop. Only redirect for a *genuine*
+    // outage, identified by the absence of the middleware's `lockdown` field.
     if (status === 503) {
-      if (typeof window !== 'undefined') {
+      const isLockdownBlock = Boolean(
+        (error.response.data as { lockdown?: string | null } | undefined)?.lockdown
+      );
+      if (!isLockdownBlock && typeof window !== 'undefined') {
         window.location.href = `${prefix}/unavailable`;
       }
       return Promise.reject(error);
