@@ -10,7 +10,24 @@ import AdminSelect from '@/components/admin/fields/AdminSelect';
 import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
 import { membersAPI, groupsAPI, MemberListItem, AccessGroup, Paginated } from '@/lib/api';
-import { isValidPhoneStrict, isValidEmail, phoneFormatError, passwordStrengthError, PHONE_PLACEHOLDER, EMAIL_MAX_LENGTH } from '@/lib/validation';
+import {
+  isValidPhoneStrict,
+  isValidEmail,
+  phoneFormatError,
+  emailFormatError,
+  passwordStrengthError,
+  passwordMismatchError,
+  requiredFieldError,
+  PHONE_PLACEHOLDER,
+  EMAIL_MAX_LENGTH,
+} from '@/lib/validation';
+
+interface CreateFieldErrors {
+  phone?: string;
+  email?: string;
+  password?: string;
+  password_confirm?: string;
+}
 
 export default function AdminMembersPage() {
   const params = useParams();
@@ -21,7 +38,13 @@ export default function AdminMembersPage() {
   const showToast = useToastStore((s) => s.show);
 
   const canManage = !!currentMember?.is_superuser || hasPermission('can_manage_permissions');
-  const canView = canManage || hasPermission('can_view_member_details');
+  // Three independent tiers, matching the backend's serializer branching
+  // (accounts.member_views): full detail, delete/deactivate-only minimal
+  // (adds is_active), or bare name+ID minimal. Each works standalone.
+  const canViewFull = canManage || hasPermission('can_view_member_details');
+  const canDeleteOrDeactivate = canManage || hasPermission('can_delete_member');
+  const canChangeAnyPassword = !!currentMember?.is_superuser || hasPermission('can_change_any_password');
+  const canView = canViewFull || canDeleteOrDeactivate || canChangeAnyPassword;
 
   const [members, setMembers] = useState<MemberListItem[]>([]);
   const [groups, setGroups] = useState<AccessGroup[]>([]);
@@ -44,13 +67,19 @@ export default function AdminMembersPage() {
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [saving, setSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<CreateFieldErrors>({});
 
   useEffect(() => {
+    // Fetching the group list itself requires can_manage_permissions; a
+    // restricted viewer (can_change_any_password/can_delete_member-only)
+    // can't create members anyway, so skip the call entirely for them.
+    if (!canManage) return;
     groupsAPI
       .getList()
       .then((res) => setGroups(res.data as unknown as AccessGroup[]))
       .catch(() => {});
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canManage]);
 
   function load() {
     if (!canView) {
@@ -96,40 +125,72 @@ export default function AdminMembersPage() {
     setNewGroupId('');
     setPassword('');
     setPasswordConfirm('');
+    setFieldErrors({});
     setModalOpen(true);
+  }
+
+  function handlePhoneChange(value: string) {
+    setPhone(value);
+    setFieldErrors((prev) => ({
+      ...prev,
+      phone: value.trim() && !isValidPhoneStrict(value) ? phoneFormatError(isRTL) : undefined,
+      // Typing a phone satisfies "at least one of phone or email" — clear a
+      // stale required-error on email if it was only there for that reason.
+      email: prev.email === requiredFieldError(isRTL) ? undefined : prev.email,
+    }));
+  }
+
+  function handleEmailChange(value: string) {
+    setEmail(value);
+    setFieldErrors((prev) => ({
+      ...prev,
+      email: value.trim() && !isValidEmail(value) ? emailFormatError(isRTL) : undefined,
+      phone: prev.phone === requiredFieldError(isRTL) ? undefined : prev.phone,
+    }));
+  }
+
+  function handlePasswordChange(value: string) {
+    setPassword(value);
+    setFieldErrors((prev) => ({
+      ...prev,
+      password: passwordStrengthError(isRTL, value),
+      password_confirm:
+        passwordConfirm && value !== passwordConfirm ? passwordMismatchError(isRTL) : undefined,
+    }));
+  }
+
+  function handlePasswordConfirmChange(value: string) {
+    setPasswordConfirm(value);
+    setFieldErrors((prev) => ({
+      ...prev,
+      password_confirm: value && value !== password ? passwordMismatchError(isRTL) : undefined,
+    }));
+  }
+
+  function validateCreate(): boolean {
+    const errors: CreateFieldErrors = {};
+    if (!phone.trim() && !email.trim()) {
+      errors.phone = requiredFieldError(isRTL);
+      errors.email = requiredFieldError(isRTL);
+    }
+    if (phone.trim() && !isValidPhoneStrict(phone)) {
+      errors.phone = phoneFormatError(isRTL);
+    }
+    if (email.trim() && !isValidEmail(email)) {
+      errors.email = emailFormatError(isRTL);
+    }
+    const passwordError = passwordStrengthError(isRTL, password);
+    if (passwordError) errors.password = passwordError;
+    if (password !== passwordConfirm) {
+      errors.password_confirm = passwordMismatchError(isRTL);
+    }
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
   }
 
   async function submitCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!phone.trim() && !email.trim()) {
-      showToast('warning', isRTL ? 'حداقل یکی از تلفن یا ایمیل را وارد کنید' : 'Enter at least one of phone or email');
-      return;
-    }
-    if (phone.trim() && !isValidPhoneStrict(phone)) {
-      showToast('warning', phoneFormatError(isRTL));
-      return;
-    }
-    if (email.trim() && !isValidEmail(email)) {
-      showToast('warning', isRTL ? 'ایمیل وارد شده معتبر نیست' : 'Enter a valid email address');
-      return;
-    }
-    if (fullName.trim().length > 35) {
-      showToast('warning', isRTL ? 'نام کامل باید حداکثر ۳۵ نویسه باشد' : 'Full name must be 35 characters or fewer');
-      return;
-    }
-    if (displayName.trim().length > 20) {
-      showToast('warning', isRTL ? 'نام نمایشی باید حداکثر ۲۰ نویسه باشد' : 'Display name must be 20 characters or fewer');
-      return;
-    }
-    if (password !== passwordConfirm) {
-      showToast('warning', isRTL ? 'رمزهای عبور مطابقت ندارند' : 'Passwords do not match');
-      return;
-    }
-    const passwordError = passwordStrengthError(isRTL, password);
-    if (passwordError) {
-      showToast('warning', passwordError);
-      return;
-    }
+    if (!validateCreate()) return;
     setSaving(true);
     try {
       await membersAPI.create({
@@ -159,44 +220,73 @@ export default function AdminMembersPage() {
     );
   }
 
-  const columns: AdminTableColumn<MemberListItem>[] = [
-    { key: 'full_name', header: isRTL ? 'نام کامل' : 'Full Name', render: (m) => <span className="text-white/80">{m.full_name}</span> },
-    { key: 'display_name', header: isRTL ? 'نام نمایشی' : 'Display Name', render: (m) => <span className="text-white/60">{m.display_name}</span> },
-    { key: 'member_number', header: isRTL ? 'شناسه' : 'ID', render: (m) => <span className="text-white/40 text-xs font-mono">#{m.member_number}</span> },
-    {
-      key: 'group',
-      header: isRTL ? 'گروه' : 'Group',
-      render: (m) =>
-        m.is_superuser ? (
-          <span className="text-xs font-bold" style={{ color: '#fbbf24' }}>{isRTL ? 'سوپریوزر' : 'Superuser'}</span>
-        ) : (
-          <span className="text-white/60">{m.group_name || '—'}</span>
-        ),
-    },
-    { key: 'status', header: isRTL ? 'وضعیت' : 'Status', render: (m) => <AdminBadge status={m.is_active ? 'active' : 'inactive'} /> },
-    {
-      key: 'created_at',
-      header: isRTL ? 'تاریخ عضویت' : 'Joined',
-      render: (m) => <span className="text-white/40 text-xs">{new Date(m.created_at).toLocaleDateString(locale === 'fa' ? 'fa-IR' : 'en-US')}</span>,
-    },
-    {
-      key: 'actions',
-      header: '',
-      render: (m) =>
-        m.is_superuser && !currentMember?.is_superuser ? (
-          <span className="text-xs text-white/30">{isRTL ? 'محدود شده' : 'Restricted'}</span>
-        ) : (
-          <button
-            onClick={() => router.push(`/${locale}/admin/members/${m.id}`)}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all"
-            style={{ border: '1px solid rgba(0,255,255,0.3)', color: '#00ffff', backgroundColor: 'rgba(0,255,255,0.05)' }}
-          >
-            <Eye className="w-3.5 h-3.5" />
-            {isRTL ? 'مشاهده' : 'View'}
-          </button>
-        ),
-    },
-  ];
+  // Three independent column sets, matching the backend's serializer tiers:
+  // a restricted viewer's rows simply don't carry display_name/group_name/
+  // is_active/created_at, so those columns must not be rendered for them —
+  // showing "Invalid Date" or a blank cell would leak the absence as a bug
+  // rather than as the deliberate minimal payload it is.
+  const idColumn: AdminTableColumn<MemberListItem> = {
+    key: 'full_name',
+    header: isRTL ? 'نام کامل' : 'Full Name',
+    render: (m) => <span className="text-white/80">{m.full_name}</span>,
+  };
+  const memberNumberColumn: AdminTableColumn<MemberListItem> = {
+    key: 'member_number',
+    header: isRTL ? 'شناسه' : 'ID',
+    render: (m) => <span className="text-white/40 text-xs font-mono">#{m.member_number}</span>,
+  };
+  const actionsColumn: AdminTableColumn<MemberListItem> = {
+    key: 'actions',
+    header: '',
+    render: (m) =>
+      m.is_superuser && !currentMember?.is_superuser ? (
+        <span className="text-xs text-white/30">{isRTL ? 'محدود شده' : 'Restricted'}</span>
+      ) : (
+        <button
+          onClick={() => router.push(`/${locale}/admin/members/${m.id}`)}
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all"
+          style={{ border: '1px solid rgba(0,255,255,0.3)', color: '#00ffff', backgroundColor: 'rgba(0,255,255,0.05)' }}
+        >
+          <Eye className="w-3.5 h-3.5" />
+          {isRTL ? 'مشاهده' : 'View'}
+        </button>
+      ),
+  };
+
+  let columns: AdminTableColumn<MemberListItem>[];
+  if (canViewFull) {
+    columns = [
+      idColumn,
+      { key: 'display_name', header: isRTL ? 'نام نمایشی' : 'Display Name', render: (m) => <span className="text-white/60">{m.display_name}</span> },
+      memberNumberColumn,
+      {
+        key: 'group',
+        header: isRTL ? 'گروه' : 'Group',
+        render: (m) =>
+          m.is_superuser ? (
+            <span className="text-xs font-bold" style={{ color: '#fbbf24' }}>{isRTL ? 'سوپریوزر' : 'Superuser'}</span>
+          ) : (
+            <span className="text-white/60">{m.group_name || '—'}</span>
+          ),
+      },
+      { key: 'status', header: isRTL ? 'وضعیت' : 'Status', render: (m) => <AdminBadge status={m.is_active ? 'active' : 'inactive'} /> },
+      {
+        key: 'created_at',
+        header: isRTL ? 'تاریخ عضویت' : 'Joined',
+        render: (m) => <span className="text-white/40 text-xs">{m.created_at ? new Date(m.created_at).toLocaleDateString(locale === 'fa' ? 'fa-IR' : 'en-US') : '—'}</span>,
+      },
+      actionsColumn,
+    ];
+  } else if (canDeleteOrDeactivate) {
+    columns = [
+      idColumn,
+      memberNumberColumn,
+      { key: 'status', header: isRTL ? 'وضعیت' : 'Status', render: (m) => <AdminBadge status={m.is_active ? 'active' : 'inactive'} /> },
+      actionsColumn,
+    ];
+  } else {
+    columns = [idColumn, memberNumberColumn, actionsColumn];
+  }
 
   return (
     <div className="flex flex-col gap-6" dir={isRTL ? 'rtl' : 'ltr'}>
@@ -226,23 +316,32 @@ export default function AdminMembersPage() {
             maxLength={150}
           />
         </div>
-        <AdminSelect
-          value={groupFilter}
-          onChange={(e) => { setGroupFilter(e.target.value); setPage(1); }}
-          options={[
-            { value: '', label: isRTL ? 'همه گروه‌ها' : 'All groups' },
-            ...groups.map((g) => ({ value: g.id, label: g.name })),
-          ]}
-        />
-        <AdminSelect
-          value={activeFilter}
-          onChange={(e) => { setActiveFilter(e.target.value); setPage(1); }}
-          options={[
-            { value: '', label: isRTL ? 'همه وضعیت‌ها' : 'All statuses' },
-            { value: 'active', label: isRTL ? 'فعال' : 'Active' },
-            { value: 'inactive', label: isRTL ? 'غیرفعال' : 'Inactive' },
-          ]}
-        />
+        {/* Group names aren't part of a restricted viewer's payload (and the
+            group list itself isn't fetched for them), so this filter is
+            meaningless outside the full-detail tier. */}
+        {canManage && (
+          <AdminSelect
+            value={groupFilter}
+            onChange={(e) => { setGroupFilter(e.target.value); setPage(1); }}
+            options={[
+              { value: '', label: isRTL ? 'همه گروه‌ها' : 'All groups' },
+              ...groups.map((g) => ({ value: g.id, label: g.name })),
+            ]}
+          />
+        )}
+        {/* is_active is only present for canViewFull/canDeleteOrDeactivate
+            tiers — a can_change_any_password-only viewer never sees it. */}
+        {(canViewFull || canDeleteOrDeactivate) && (
+          <AdminSelect
+            value={activeFilter}
+            onChange={(e) => { setActiveFilter(e.target.value); setPage(1); }}
+            options={[
+              { value: '', label: isRTL ? 'همه وضعیت‌ها' : 'All statuses' },
+              { value: 'active', label: isRTL ? 'فعال' : 'Active' },
+              { value: 'inactive', label: isRTL ? 'غیرفعال' : 'Inactive' },
+            ]}
+          />
+        )}
       </div>
 
       <AdminTable
@@ -271,11 +370,19 @@ export default function AdminMembersPage() {
           <AdminInput
             label={isRTL ? 'تلفن (اختیاری)' : 'Phone (optional)'}
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => handlePhoneChange(e.target.value)}
             placeholder={PHONE_PLACEHOLDER}
             maxLength={17}
+            error={fieldErrors.phone}
           />
-          <AdminInput label={isRTL ? 'ایمیل (اختیاری)' : 'Email (optional)'} type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={EMAIL_MAX_LENGTH} />
+          <AdminInput
+            label={isRTL ? 'ایمیل (اختیاری)' : 'Email (optional)'}
+            type="email"
+            value={email}
+            onChange={(e) => handleEmailChange(e.target.value)}
+            maxLength={EMAIL_MAX_LENGTH}
+            error={fieldErrors.email}
+          />
           <AdminSelect
             label={isRTL ? 'گروه دسترسی' : 'Access Group'}
             value={newGroupId}
@@ -287,15 +394,23 @@ export default function AdminMembersPage() {
             label={isRTL ? 'رمز عبور' : 'Password'}
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => handlePasswordChange(e.target.value)}
             required
+            error={fieldErrors.password}
             hint={
               isRTL
                 ? 'حداقل ۸ نویسه، ترکیبی از حروف و اعداد، شامل حداقل یک حرف بزرگ و یک کاراکتر خاص.'
                 : 'At least 8 characters, with letters and numbers, including one uppercase letter and one special character.'
             }
           />
-          <AdminInput label={isRTL ? 'تکرار رمز عبور' : 'Confirm Password'} type="password" value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)} required />
+          <AdminInput
+            label={isRTL ? 'تکرار رمز عبور' : 'Confirm Password'}
+            type="password"
+            value={passwordConfirm}
+            onChange={(e) => handlePasswordConfirmChange(e.target.value)}
+            required
+            error={fieldErrors.password_confirm}
+          />
           <div className="flex items-center gap-3 mt-1">
             <button
               type="submit"

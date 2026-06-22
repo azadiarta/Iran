@@ -25,6 +25,8 @@ import {
   isValidPhoneStrict,
   isValidEmail,
   phoneFormatError,
+  emailFormatError,
+  maxLengthError,
   PHONE_PLACEHOLDER,
   LONG_TEXT_ADMIN_MAX_LENGTH,
   passwordStrengthError,
@@ -36,6 +38,13 @@ import {
   memberNumberFormatError,
 } from '@/lib/validation';
 
+interface ProfileFieldErrors {
+  full_name?: string;
+  display_name?: string;
+  email?: string;
+  phone?: string;
+}
+
 export default function AdminMemberDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -46,9 +55,20 @@ export default function AdminMemberDetailPage() {
   const showToast = useToastStore((s) => s.show);
 
   const canManage = !!currentMember?.is_superuser || hasPermission('can_manage_permissions');
-  const canViewDetails = canManage || hasPermission('can_view_member_details');
+  // Three independent tiers, matching the backend's serializer branching
+  // (accounts.member_views): full detail, delete/deactivate-only minimal
+  // (adds is_active), or bare name+ID minimal. Each works standalone — a
+  // viewer holding only one of these must still be able to reach this page
+  // and use exactly the one action their permission grants, nothing more.
+  const canViewFull = canManage || hasPermission('can_view_member_details');
+  const canDeleteOrDeactivate = canManage || hasPermission('can_delete_member');
+  // The literal delete action stays narrower than "deactivate" — deliberately
+  // not OR'd with can_manage_permissions, mirroring MemberDeleteView's own
+  // permission_classes (destructive actions are never folded into the
+  // general admin permission).
   const canDelete = !!currentMember?.is_superuser || hasPermission('can_delete_member');
   const canChangeAnyPassword = !!currentMember?.is_superuser || hasPermission('can_change_any_password');
+  const canView = canViewFull || canDeleteOrDeactivate || canChangeAnyPassword;
 
   const [target, setTarget] = useState<MemberDetail | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
@@ -71,6 +91,8 @@ export default function AdminMemberDetailPage() {
   const [groupId, setGroupId] = useState('');
   const [savingGroup, setSavingGroup] = useState(false);
 
+  const [profileFieldErrors, setProfileFieldErrors] = useState<ProfileFieldErrors>({});
+
   // Password change
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -89,7 +111,7 @@ export default function AdminMemberDetailPage() {
   const [deactivateReason, setDeactivateReason] = useState('');
 
   useEffect(() => {
-    if (!canViewDetails) {
+    if (!canView) {
       setLoading(false);
       return;
     }
@@ -102,7 +124,7 @@ export default function AdminMemberDetailPage() {
         const m = profile.member;
         setTarget(m);
         setFullName(m.full_name);
-        setDisplayName(m.display_name);
+        setDisplayName(m.display_name || '');
         setEmail(m.email || '');
         setPhone(m.phone || '');
         setOriginalPhone(m.phone || '');
@@ -126,7 +148,14 @@ export default function AdminMemberDetailPage() {
             ? (err.response as { status?: number }).status
             : undefined;
         if (cancelled) return;
-        if (status === 403) {
+        // The backend deliberately returns the same generic 404 for "doesn't
+        // exist" and "exists but is a hidden superuser" (so probing an ID
+        // can't be used to discover who's a superuser) — so this branch must
+        // stay equally generic and not name the superuser reason specifically,
+        // or it would defeat that. Status can be 403 (DRF permission_classes
+        // rejection) or 404 (the view's own explicit member-not-found/hidden
+        // response); both land here.
+        if (status === 403 || status === 404) {
           setAccessDenied(true);
         } else {
           showToast('error', isRTL ? 'بارگذاری اطلاعات عضو ناموفق بود' : 'Failed to load member');
@@ -139,32 +168,50 @@ export default function AdminMemberDetailPage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canViewDetails, canManage, id]);
+  }, [canView, canManage, id]);
 
   function fmt(n: number) {
     return new Intl.NumberFormat(locale === 'fa' ? 'fa-IR' : 'en-US').format(n);
   }
 
-  async function saveProfile(e: React.FormEvent) {
-    e.preventDefault();
-    if (fullName.trim().length > 35) {
-      showToast('warning', isRTL ? 'نام کامل باید حداکثر ۳۵ نویسه باشد' : 'Full name must be 35 characters or fewer');
-      return;
-    }
-    if (displayName.trim().length > 20) {
-      showToast('warning', isRTL ? 'نام نمایشی باید حداکثر ۲۰ نویسه باشد' : 'Display name must be 20 characters or fewer');
-      return;
-    }
-    if (email.trim() && !isValidEmail(email)) {
-      showToast('warning', isRTL ? 'ایمیل وارد شده معتبر نیست' : 'Enter a valid email address');
-      return;
-    }
+  function handleFullNameChange(value: string) {
+    setFullName(value);
+    setProfileFieldErrors((prev) => ({ ...prev, full_name: value.trim().length > 35 ? maxLengthError(isRTL, 35) : undefined }));
+  }
+
+  function handleDisplayNameChange(value: string) {
+    setDisplayName(value);
+    setProfileFieldErrors((prev) => ({ ...prev, display_name: value.trim().length > 20 ? maxLengthError(isRTL, 20) : undefined }));
+  }
+
+  function handleProfileEmailChange(value: string) {
+    setEmail(value);
+    setProfileFieldErrors((prev) => ({ ...prev, email: value.trim() && !isValidEmail(value) ? emailFormatError(isRTL) : undefined }));
+  }
+
+  function handleProfilePhoneChange(value: string) {
+    setPhone(value);
     // Only enforce strict "00"-prefixed format if the phone is being changed,
     // mirroring the backend (legacy numbers must not block unrelated edits).
-    if (phone.trim() && phone.trim() !== originalPhone && !isValidPhoneStrict(phone)) {
-      showToast('warning', phoneFormatError(isRTL));
-      return;
-    }
+    setProfileFieldErrors((prev) => ({
+      ...prev,
+      phone: value.trim() && value.trim() !== originalPhone && !isValidPhoneStrict(value) ? phoneFormatError(isRTL) : undefined,
+    }));
+  }
+
+  function validateProfile(): boolean {
+    const errors: ProfileFieldErrors = {};
+    if (fullName.trim().length > 35) errors.full_name = maxLengthError(isRTL, 35);
+    if (displayName.trim().length > 20) errors.display_name = maxLengthError(isRTL, 20);
+    if (email.trim() && !isValidEmail(email)) errors.email = emailFormatError(isRTL);
+    if (phone.trim() && phone.trim() !== originalPhone && !isValidPhoneStrict(phone)) errors.phone = phoneFormatError(isRTL);
+    setProfileFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  }
+
+  async function saveProfile(e: React.FormEvent) {
+    e.preventDefault();
+    if (!validateProfile()) return;
     setSavingProfile(true);
     try {
       const res = await membersAPI.updateProfile(id, { full_name: fullName, display_name: displayName, email, phone });
@@ -330,7 +377,7 @@ export default function AdminMemberDetailPage() {
     }
   }
 
-  if (!canViewDetails) {
+  if (!canView) {
     return (
       <div className="admin-glass-card p-8 text-center text-white/50 text-sm">
         {isRTL ? 'شما دسترسی مشاهده جزئیات اعضا را ندارید.' : 'You do not have permission to view member details.'}
@@ -347,11 +394,12 @@ export default function AdminMemberDetailPage() {
   }
 
   if (accessDenied) {
+    // Deliberately generic: the backend returns the same response whether
+    // the ID doesn't exist or belongs to a hidden superuser, specifically so
+    // this page can't be used to discover who's a superuser by guessing IDs.
     return (
       <div className="admin-glass-card p-8 text-center text-white/50 text-sm">
-        {isRTL
-          ? 'این یک حساب سوپریوزر است. فقط خود سوپریوزر یا سوپریوزرهای دیگر می‌توانند این پروفایل را مشاهده کنند.'
-          : 'This is a superuser account. Only the superuser themselves or another superuser can view this profile.'}
+        {isRTL ? 'عضو یافت نشد یا دسترسی به آن ندارید.' : 'Member not found or you do not have access to it.'}
       </div>
     );
   }
@@ -377,15 +425,34 @@ export default function AdminMemberDetailPage() {
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             {target.full_name}
-            <AdminBadge status={target.is_active ? 'active' : 'inactive'} />
+            {/* is_active is absent from the bare-minimal payload a
+                can_change_any_password-only viewer receives — omit the
+                badge entirely rather than guess at "inactive". */}
+            {target.is_active !== undefined && <AdminBadge status={target.is_active ? 'active' : 'inactive'} />}
           </h1>
           <p className="text-sm text-white/40 mt-1">
-            {target.display_name} · #{target.member_number} ·{' '}
-            {target.is_superuser ? (
-              <span className="font-bold" style={{ color: '#fbbf24' }}>{isRTL ? 'سوپریوزر' : 'Superuser'}</span>
-            ) : (
-              target.group_name || '—'
-            )}
+            {(() => {
+              const parts: React.ReactNode[] = [];
+              if (target.member_number != null) parts.push(`#${target.member_number}`);
+              if (target.display_name) parts.push(target.display_name);
+              // group/superuser status is only part of the full-detail
+              // payload — a restricted-tier viewer's target never has it.
+              if (canViewFull) {
+                parts.push(
+                  target.is_superuser ? (
+                    <span className="font-bold" style={{ color: '#fbbf24' }}>{isRTL ? 'سوپریوزر' : 'Superuser'}</span>
+                  ) : (
+                    target.group_name || '—'
+                  )
+                );
+              }
+              return parts.map((part, i) => (
+                <span key={i}>
+                  {i > 0 && ' · '}
+                  {part}
+                </span>
+              ));
+            })()}
           </p>
         </div>
       </div>
@@ -446,20 +513,45 @@ export default function AdminMemberDetailPage() {
         </div>
       )}
 
-      {canManage && (!target.is_superuser || currentMember?.is_superuser) && (
+      {/* Each card below is gated independently on the one permission that
+          actually grants it — a viewer holding only one of canManage /
+          canChangeAnyPassword / canDeleteOrDeactivate must still reach
+          exactly their own card, never blocked by lacking the others. */}
+      {(canManage || canChangeAnyPassword || canDeleteOrDeactivate) && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Profile form */}
+        {/* Profile form — can_manage_permissions only; no narrower permission claims this territory */}
+        {canManage && (!target.is_superuser || currentMember?.is_superuser) && (
         <form onSubmit={saveProfile} className="admin-glass-card p-5 flex flex-col gap-4">
           <h2 className="text-sm font-semibold text-white/80">{isRTL ? 'ویرایش پروفایل' : 'Edit Profile'}</h2>
-          <AdminInput label={isRTL ? 'نام کامل' : 'Full Name'} value={fullName} onChange={(e) => setFullName(e.target.value)} maxLength={35} />
-          <AdminInput label={isRTL ? 'نام نمایشی' : 'Display Name'} value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={20} />
-          <AdminInput label={isRTL ? 'ایمیل' : 'Email'} type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={EMAIL_MAX_LENGTH} />
+          <AdminInput
+            label={isRTL ? 'نام کامل' : 'Full Name'}
+            value={fullName}
+            onChange={(e) => handleFullNameChange(e.target.value)}
+            maxLength={35}
+            error={profileFieldErrors.full_name}
+          />
+          <AdminInput
+            label={isRTL ? 'نام نمایشی' : 'Display Name'}
+            value={displayName}
+            onChange={(e) => handleDisplayNameChange(e.target.value)}
+            maxLength={20}
+            error={profileFieldErrors.display_name}
+          />
+          <AdminInput
+            label={isRTL ? 'ایمیل' : 'Email'}
+            type="email"
+            value={email}
+            onChange={(e) => handleProfileEmailChange(e.target.value)}
+            maxLength={EMAIL_MAX_LENGTH}
+            error={profileFieldErrors.email}
+          />
           <AdminInput
             label={isRTL ? 'تلفن' : 'Phone'}
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => handleProfilePhoneChange(e.target.value)}
             placeholder={PHONE_PLACEHOLDER}
             maxLength={17}
+            error={profileFieldErrors.phone}
           />
           <button
             type="submit"
@@ -471,10 +563,11 @@ export default function AdminMemberDetailPage() {
             {savingProfile ? (isRTL ? 'در حال ذخیره...' : 'Saving...') : (isRTL ? 'ذخیره تغییرات' : 'Save Changes')}
           </button>
         </form>
+        )}
 
         <div className="flex flex-col gap-6">
-          {/* Group — never editable for a superuser target, even by another superuser */}
-          {!target.is_superuser && (
+          {/* Group — can_manage_permissions only; never editable for a superuser target, even by another superuser */}
+          {canManage && !target.is_superuser && (
           <form onSubmit={saveGroup} className="admin-glass-card p-5 flex flex-col gap-4">
             <h2 className="text-sm font-semibold text-white/80 flex items-center gap-2">
               <ShieldCheck className="w-4 h-4" style={{ color: '#8b5cf6' }} />
@@ -497,8 +590,10 @@ export default function AdminMemberDetailPage() {
           </form>
           )}
 
-          {/* Password */}
-          {canChangeAnyPassword && (
+          {/* Password — works independently for a can_change_any_password-only
+              viewer, with no need for can_manage_permissions or any other
+              member-management permission. */}
+          {canChangeAnyPassword && (!target.is_superuser || currentMember?.is_superuser) && (
             <form onSubmit={savePassword} className="admin-glass-card p-5 flex flex-col gap-4">
               <h2 className="text-sm font-semibold text-white/80 flex items-center gap-2">
                 <KeyRound className="w-4 h-4" style={{ color: '#fbbf24' }} />
@@ -537,13 +632,17 @@ export default function AdminMemberDetailPage() {
             </form>
           )}
 
-          {/* Danger zone — never available for a superuser target, even to another superuser */}
-          {!target.is_superuser && (
+          {/* Danger zone — deactivate/activate works for can_delete_member
+              alone too (its own description covers both deactivating and
+              removing); delete itself stays narrower (canDelete, matching
+              MemberDeleteView). Never available for a superuser target,
+              even to another superuser. */}
+          {canDeleteOrDeactivate && !target.is_superuser && (
           <div className="admin-glass-card p-5 flex flex-col gap-4" style={{ border: '1px solid rgba(239,68,68,0.25)' }}>
             <h2 className="text-sm font-semibold" style={{ color: '#ef4444' }}>
               {isRTL ? 'منطقه خطر' : 'Danger Zone'}
             </h2>
-            {!target.is_active && (target.deactivation_reason || target.deactivated_by_name) && (
+            {target.is_active === false && (target.deactivation_reason || target.deactivated_by_name) && (
               <div className="text-xs text-white/50 rounded-lg p-3" style={{ backgroundColor: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}>
                 {target.deactivation_reason && (
                   <p>
@@ -585,6 +684,12 @@ export default function AdminMemberDetailPage() {
       </div>
       )}
 
+      {/* Comments/contributions/contact-messages/activity-log aggregation is
+          exclusive to the full-detail tier — a restricted-tier viewer's
+          backend response has these as empty arrays by design (not "really
+          empty"), so showing four "nothing yet" cards here would actively
+          mislead rather than just omit. */}
+      {canViewFull && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Comments */}
         <div className="admin-glass-card p-5 flex flex-col gap-3">
@@ -743,6 +848,7 @@ export default function AdminMemberDetailPage() {
           </div>
         </div>
       </div>
+      )}
 
       <AdminConfirmDialog
         isOpen={confirmDeactivate}

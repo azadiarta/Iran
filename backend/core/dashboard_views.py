@@ -74,7 +74,9 @@ class DashboardView(APIView):
 
         can_approve = request.user.is_superuser or (
             request.user.group and
-            request.user.group.permissions.filter(codename='can_approve_comments').exists()
+            request.user.group.permissions.filter(
+                codename__in=['can_manage_permissions', 'can_approve_comments']
+            ).exists()
         )
         if can_approve:
             pending = Comment.objects.select_related('author').filter(
@@ -84,7 +86,9 @@ class DashboardView(APIView):
 
         can_view_balance = request.user.is_superuser or (
             request.user.group and
-            request.user.group.permissions.filter(codename='can_view_balance').exists()
+            request.user.group.permissions.filter(
+                codename__in=['can_manage_permissions', 'can_view_balance']
+            ).exists()
         )
         if can_view_balance:
             data['pending_contributions_count'] = Contribution.objects.filter(

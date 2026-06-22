@@ -34,11 +34,11 @@ const SECTIONS: HelpSection[] = [
 
   // ─── Admin panel — gated by permission ───────────────────────────
   { key: 'dashboard', group: 'admin', permission: 'can_view_dashboard' },
-  { key: 'members', group: 'admin', permission: ['can_manage_permissions', 'can_view_member_details'] },
+  { key: 'members', group: 'admin', permission: ['can_manage_permissions', 'can_view_member_details', 'can_change_any_password', 'can_delete_member'] },
   { key: 'groups', group: 'admin', permission: 'can_manage_permissions' },
-  { key: 'balance', group: 'admin', permission: 'can_view_balance' },
-  { key: 'manage_posts', group: 'admin', permission: 'can_post' },
-  { key: 'manage_comments', group: 'admin', permission: 'can_approve_comments' },
+  { key: 'balance', group: 'admin', permission: ['can_manage_permissions', 'can_view_balance'] },
+  { key: 'manage_posts', group: 'admin', permission: ['can_manage_permissions', 'can_post'] },
+  { key: 'manage_comments', group: 'admin', permission: ['can_manage_permissions', 'can_approve_comments'] },
   { key: 'payments', group: 'admin', permission: 'can_manage_permissions' },
   { key: 'settings', group: 'admin', permission: 'can_manage_permissions' },
   { key: 'activity_log', group: 'admin', permission: 'can_manage_permissions' },

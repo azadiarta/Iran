@@ -644,20 +644,25 @@ export const paymentsAPI = {
 export interface MemberListItem {
   id: string;
   full_name: string;
-  display_name: string;
   member_number: number | null;
-  group_name: string | null;
-  is_active: boolean;
-  is_superuser: boolean;
-  created_at: string;
+  // Present only when the viewer holds can_manage_permissions or
+  // can_view_member_details. A viewer with only can_change_any_password
+  // and/or can_delete_member gets a reduced payload — see
+  // accounts.serializers.MemberMinimalSerializer / MemberDeleteMinimalSerializer
+  // on the backend — so these must be treated as optional everywhere.
+  display_name?: string;
+  group_name?: string | null;
+  is_active?: boolean;
+  is_superuser?: boolean;
+  created_at?: string;
+  deactivation_reason?: string;
+  deactivated_by_name?: string | null;
 }
 
 export interface MemberDetail extends MemberListItem {
-  email: string | null;
-  phone: string | null;
-  group_permissions: string[];
-  deactivation_reason?: string;
-  deactivated_by_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  group_permissions?: string[];
 }
 
 export interface MemberFullProfile {

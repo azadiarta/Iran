@@ -9,8 +9,10 @@ from accounts.permissions import HasGroupPermission, IsSuperuser
 from accounts.serializers import (
     ChangePasswordSerializer,
     MemberCreateSerializer,
+    MemberDeleteMinimalSerializer,
     MemberDetailSerializer,
     MemberListSerializer,
+    MemberMinimalSerializer,
     MemberUpdateSerializer,
 )
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -59,13 +61,27 @@ def _is_admin(user):
     )
 
 
+def _has_any_permission(user, codenames):
+    return user.is_superuser or (
+        user.group and user.group.permissions.filter(codename__in=codenames).exists()
+    )
+
+
 def _can_view_member_details(user):
     """can_manage_permissions OR the narrower, view-only can_view_member_details."""
-    return user.is_superuser or (
-        user.group and user.group.permissions.filter(
-            codename__in=['can_manage_permissions', 'can_view_member_details']
-        ).exists()
-    )
+    return _has_any_permission(user, ['can_manage_permissions', 'can_view_member_details'])
+
+
+def _can_delete_or_deactivate(user):
+    """can_manage_permissions OR the narrower can_delete_member — its own
+    description ('Deactivate or remove member accounts') covers both."""
+    return _has_any_permission(user, ['can_manage_permissions', 'can_delete_member'])
+
+
+def _restricted_member_serializer(user):
+    """Serializer for a viewer who lacks can_view_member_details entirely —
+    picks the richest minimal shape their *other* permissions still justify."""
+    return MemberDeleteMinimalSerializer if _can_delete_or_deactivate(user) else MemberMinimalSerializer
 
 
 class MemberPublicCountView(APIView):
@@ -79,7 +95,10 @@ class MemberPublicCountView(APIView):
 class MemberListView(APIView):
     permission_classes = [
         IsAuthenticated,
-        HasGroupPermission('can_manage_permissions') | HasGroupPermission('can_view_member_details'),
+        HasGroupPermission('can_manage_permissions')
+        | HasGroupPermission('can_view_member_details')
+        | HasGroupPermission('can_change_any_password')
+        | HasGroupPermission('can_delete_member'),
     ]
 
     def get(self, request):
@@ -111,7 +130,11 @@ class MemberListView(APIView):
                 q |= Q(member_number=int(search))
             qs = qs.filter(q).distinct()
 
-        return paginate(qs, request, MemberListSerializer)
+        if _can_view_member_details(request.user):
+            serializer_cls = MemberListSerializer
+        else:
+            serializer_cls = _restricted_member_serializer(request.user)
+        return paginate(qs, request, serializer_cls)
 
 
 class MemberCreateView(APIView):
@@ -150,9 +173,10 @@ class MemberDetailView(APIView):
         except Member.DoesNotExist:
             return api_error('Member not found.', status_code=404)
 
-        # Superuser is invisible to every other admin, even by direct pk —
-        # only visible to themselves.
-        if member.is_superuser and request.user.pk != member.pk:
+        # Superuser is invisible to every non-superuser admin — but, like
+        # everywhere else (MemberListView, MemberUpdateView,
+        # ChangePasswordView), visible to *other* superusers, not just self.
+        if member.is_superuser and not request.user.is_superuser:
             return api_error('Member not found.', status_code=404)
 
         is_owner = request.user.pk == member.pk
@@ -163,11 +187,18 @@ class MemberDetailView(APIView):
 
 class MemberFullProfileView(APIView):
     """Aggregated, read-only view of everything tied to one member: their
-    comments, contributions, contact messages and recent activity — gated on
-    the narrower can_view_member_details permission (or full can_manage_permissions)."""
+    comments, contributions, contact messages and recent activity. Gated on
+    *any* member-management permission, but the response shape narrows to
+    match what the caller actually holds: only can_manage_permissions /
+    can_view_member_details unlock the comments/contributions/contact/
+    activity aggregation; a can_change_any_password- or can_delete_member-
+    only caller gets just the identification fields their own action needs."""
     permission_classes = [
         IsAuthenticated,
-        HasGroupPermission('can_manage_permissions') | HasGroupPermission('can_view_member_details'),
+        HasGroupPermission('can_manage_permissions')
+        | HasGroupPermission('can_view_member_details')
+        | HasGroupPermission('can_change_any_password')
+        | HasGroupPermission('can_delete_member'),
     ]
 
     def get(self, request, pk):
@@ -176,10 +207,20 @@ class MemberFullProfileView(APIView):
         except Member.DoesNotExist:
             return api_error('Member not found.', status_code=404)
 
-        # Superuser is invisible to every other admin, even by direct pk —
-        # only visible to themselves.
-        if member.is_superuser and request.user.pk != member.pk:
+        # Superuser is invisible to every non-superuser admin — but, like
+        # everywhere else, visible to *other* superusers, not just self.
+        if member.is_superuser and not request.user.is_superuser:
             return api_error('Member not found.', status_code=404)
+
+        if not _can_view_member_details(request.user):
+            member_data = _restricted_member_serializer(request.user)(member).data
+            return api_success({
+                'member': member_data,
+                'comments': [],
+                'contributions': [],
+                'contact_messages': [],
+                'activity_logs': [],
+            })
 
         from core.models import ContactMessage
         from core.serializers import ContactMessageSerializer
@@ -339,7 +380,10 @@ class MemberChangeNumberView(APIView):
 
 
 class MemberToggleActiveView(APIView):
-    permission_classes = [IsAuthenticated, HasGroupPermission('can_manage_permissions')]
+    permission_classes = [
+        IsAuthenticated,
+        HasGroupPermission('can_manage_permissions') | HasGroupPermission('can_delete_member'),
+    ]
 
     def patch(self, request, pk):
         try:
@@ -378,7 +422,11 @@ class MemberToggleActiveView(APIView):
             'reason': member.deactivation_reason,
         })
         status_label = 'activated' if member.is_active else 'deactivated'
-        return api_success(MemberListSerializer(member).data, message=f'Member {status_label}.')
+        if _can_view_member_details(request.user):
+            data = MemberListSerializer(member).data
+        else:
+            data = _restricted_member_serializer(request.user)(member).data
+        return api_success(data, message=f'Member {status_label}.')
 
 
 class MemberDeleteView(APIView):

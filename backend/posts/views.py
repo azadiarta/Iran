@@ -83,7 +83,12 @@ def _can_modify_post(request, post):
         return True
     if post.author and post.author == request.user:
         return True
-    if request.user.group and request.user.group.permissions.filter(codename='can_manage_permissions').exists():
+    # can_post's own description ('Create, edit and delete posts and post
+    # images') already covers any post, not just one's own — so it must
+    # work on its own here, same as can_manage_permissions.
+    if request.user.group and request.user.group.permissions.filter(
+        codename__in=['can_manage_permissions', 'can_post']
+    ).exists():
         return True
     return False
 
@@ -123,7 +128,10 @@ class PostListView(APIView):
 
 class PostAdminListView(APIView):
     """GET /api/posts/admin/ — paginated, filterable admin post list (search/author/date range)."""
-    permission_classes = [IsAuthenticated, HasGroupPermission('can_post')]
+    permission_classes = [
+        IsAuthenticated,
+        HasGroupPermission('can_manage_permissions') | HasGroupPermission('can_post'),
+    ]
 
     def get(self, request):
         qs = Post.objects.prefetch_related('images').select_related('author').order_by('-created_at')
@@ -177,7 +185,10 @@ class PostDetailView(APIView):
 
 
 class PostCreateView(APIView):
-    permission_classes = [IsAuthenticated, HasGroupPermission('can_post')]
+    permission_classes = [
+        IsAuthenticated,
+        HasGroupPermission('can_manage_permissions') | HasGroupPermission('can_post'),
+    ]
     parser_classes = [MultiPartParser, JSONParser]
 
     def post(self, request):
@@ -327,7 +338,10 @@ def _resolve_comment_target(target_type, pk):
 
 class CommentGlobalListView(APIView):
     """GET /api/posts/comments/ — paginated, filterable global comment list (admin moderation)."""
-    permission_classes = [IsAuthenticated, HasGroupPermission('can_approve_comments')]
+    permission_classes = [
+        IsAuthenticated,
+        HasGroupPermission('can_manage_permissions') | HasGroupPermission('can_approve_comments'),
+    ]
 
     def get(self, request):
         qs = Comment.objects.select_related('author').order_by('-created_at')
@@ -397,7 +411,10 @@ class CommentCreateView(APIView):
 
 
 class CommentStatusUpdateView(APIView):
-    permission_classes = [IsAuthenticated, HasGroupPermission('can_approve_comments')]
+    permission_classes = [
+        IsAuthenticated,
+        HasGroupPermission('can_manage_permissions') | HasGroupPermission('can_approve_comments'),
+    ]
 
     def patch(self, request, pk):
         try:
@@ -419,7 +436,10 @@ class CommentStatusUpdateView(APIView):
 
 
 class CommentAdminDetailView(APIView):
-    permission_classes = [IsAuthenticated, HasGroupPermission('can_approve_comments')]
+    permission_classes = [
+        IsAuthenticated,
+        HasGroupPermission('can_manage_permissions') | HasGroupPermission('can_approve_comments'),
+    ]
 
     def get(self, request, pk):
         try:
@@ -430,7 +450,10 @@ class CommentAdminDetailView(APIView):
 
 
 class CommentAdminEditView(APIView):
-    permission_classes = [IsAuthenticated, HasGroupPermission('can_approve_comments')]
+    permission_classes = [
+        IsAuthenticated,
+        HasGroupPermission('can_manage_permissions') | HasGroupPermission('can_approve_comments'),
+    ]
 
     EDITABLE_FIELDS = ['text', 'rating', 'status', 'rejection_reason']
 
