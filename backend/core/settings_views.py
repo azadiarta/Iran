@@ -17,6 +17,7 @@ from core.serializers import DefaultSettingSerializer
 from core.utils import api_error, api_success
 from core.validators import (
     LONG_TEXT_ADMIN_MAX_LENGTH,
+    SHORT_TEXT_ADMIN_MAX_LENGTH,
     sanitize_text,
     validate_email_format,
     validate_phone_format,
@@ -38,10 +39,29 @@ _CHOICES = {
 _EMAIL_KEYS = ('contact_email', 'payment_paypal_email')
 _PHONE_KEYS = ('contact_phone',)
 
+# Every general/payment setting is a single-line value (SHORT_TEXT_ADMIN_MAX_LENGTH)
+# except these two free-text instructions fields, which are genuinely
+# multi-line and editable via an AdminTextarea on the frontend — they alone
+# get the LONG_TEXT_ADMIN_MAX_LENGTH ceiling. Keys not listed here that need
+# something other than the short-text default (e.g. the landing headline/
+# tagline, longer than 100 but still far short of 550) get their own entry
+# in _LENGTH_OVERRIDES instead.
+_LONG_TEXT_KEYS = ('payment_manual_instructions', 'payment_paypal_instructions')
+_LENGTH_OVERRIDES = {
+    'landing_headline_en': 150,
+    'landing_headline_fa': 150,
+    'landing_tagline_en': 300,
+    'landing_tagline_fa': 300,
+}
+
 
 def _validate_value(key, value):
-    if len(value) > LONG_TEXT_ADMIN_MAX_LENGTH:
-        return f'Must be {LONG_TEXT_ADMIN_MAX_LENGTH} characters or fewer.'
+    if key in _LONG_TEXT_KEYS:
+        max_length = LONG_TEXT_ADMIN_MAX_LENGTH
+    else:
+        max_length = _LENGTH_OVERRIDES.get(key, SHORT_TEXT_ADMIN_MAX_LENGTH)
+    if len(value) > max_length:
+        return f'Must be {max_length} characters or fewer.'
     if key == 'default_group':
         try:
             import uuid
@@ -56,12 +76,6 @@ def _validate_value(key, value):
     elif key in ('max_receipt_image_size_mb', 'auth_sync_interval_seconds'):
         if not value.isdigit() or int(value) <= 0:
             return 'Must be a positive integer.'
-    elif key in ('landing_headline_en', 'landing_headline_fa'):
-        if len(value) > 150:
-            return 'Must be at most 150 characters.'
-    elif key in ('landing_tagline_en', 'landing_tagline_fa'):
-        if len(value) > 300:
-            return 'Must be at most 300 characters.'
     elif key in _CHOICES:
         if value not in _CHOICES[key]:
             return f"Must be one of: {', '.join(_CHOICES[key])}."

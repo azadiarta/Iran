@@ -10,7 +10,7 @@ import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
 import { settingsAPI, groupsAPI, DefaultSettingItem, AccessGroup } from '@/lib/api';
 import { SETTINGS_META } from '@/lib/settingsMeta';
-import { isValidPhoneStrict, isValidEmail, phoneFormatError, PHONE_PLACEHOLDER, LONG_TEXT_ADMIN_MAX_LENGTH } from '@/lib/validation';
+import { isValidPhoneStrict, isValidEmail, phoneFormatError, PHONE_PLACEHOLDER, SHORT_TEXT_ADMIN_MAX_LENGTH } from '@/lib/validation';
 
 const _EMAIL_KEYS = ['contact_email'];
 const _PHONE_KEYS = ['contact_phone'];
@@ -182,7 +182,7 @@ export default function AdminSettingsPage() {
                       value={values[s.key] ?? ''}
                       onChange={(e) => set(s.key, e.target.value)}
                       placeholder={_PHONE_KEYS.includes(s.key) ? PHONE_PLACEHOLDER : undefined}
-                      maxLength={LONG_TEXT_ADMIN_MAX_LENGTH}
+                      maxLength={meta?.maxLength ?? SHORT_TEXT_ADMIN_MAX_LENGTH}
                     />
                     {meta && <p className="mt-1.5 text-xs text-white/40">{isRTL ? meta.description.fa : meta.description.en}</p>}
                   </div>

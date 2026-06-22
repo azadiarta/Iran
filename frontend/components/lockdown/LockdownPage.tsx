@@ -18,6 +18,12 @@ export default function LockdownPage({ locale, message }: LockdownPageProps) {
   const subtitle = isFa
     ? 'به‌زودی برمی‌گردیم. لطفاً کمی صبر کنید.'
     : "We'll be back soon. Thanks for your patience.";
+  // The admin's message box is optional — fall back to this generic notice
+  // so visitors always see something in the highlighted box, not a gap.
+  const defaultMessage = isFa
+    ? 'اطلاعات بیشتری در حال حاضر ارائه نشده است.'
+    : 'No further details are available at this time.';
+  const displayMessage = message || defaultMessage;
 
   return (
     <div
@@ -85,32 +91,30 @@ export default function LockdownPage({ locale, message }: LockdownPageProps) {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5, duration: 0.5, ease: 'easeOut' }}
-        style={{ fontFamily, fontSize: '0.95rem', color: 'rgba(255,255,255,0.5)', marginBottom: message ? '1.5rem' : 0 }}
+        style={{ fontFamily, fontSize: '0.95rem', color: 'rgba(255,255,255,0.5)', marginBottom: '1.5rem' }}
       >
         {subtitle}
       </motion.p>
 
-      {message && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7, duration: 0.5, ease: 'easeOut' }}
-          style={{
-            fontFamily,
-            maxWidth: '32rem',
-            padding: '1rem 1.5rem',
-            borderRadius: '1rem',
-            backgroundColor: 'rgba(251,191,36,0.06)',
-            border: '1px solid rgba(251,191,36,0.25)',
-            color: 'rgba(255,255,255,0.85)',
-            fontSize: '0.95rem',
-            lineHeight: 1.7,
-            whiteSpace: 'pre-wrap',
-          }}
-        >
-          {message}
-        </motion.div>
-      )}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.7, duration: 0.5, ease: 'easeOut' }}
+        style={{
+          fontFamily,
+          maxWidth: '32rem',
+          padding: '1rem 1.5rem',
+          borderRadius: '1rem',
+          backgroundColor: 'rgba(251,191,36,0.06)',
+          border: '1px solid rgba(251,191,36,0.25)',
+          color: 'rgba(255,255,255,0.85)',
+          fontSize: '0.95rem',
+          lineHeight: 1.7,
+          whiteSpace: 'pre-wrap',
+        }}
+      >
+        {displayMessage}
+      </motion.div>
     </div>
   );
 }

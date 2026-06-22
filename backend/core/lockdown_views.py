@@ -76,9 +76,6 @@ class SuperuserLockdownToggleView(APIView):
             except DRFValidationError as exc:
                 detail = exc.detail[0] if isinstance(exc.detail, list) else exc.detail
                 return api_error(str(detail), errors={'message': [str(detail)]})
-            if not message:
-                return api_error('A message is required to enable lockdown.',
-                                  errors={'message': ['This field is required.']})
 
             # Priority rule: superuser-kind lockdown always wins over the
             # permission-kind one — force the latter off (persisted, not just
@@ -129,9 +126,6 @@ class PermissionLockdownToggleView(APIView):
             except DRFValidationError as exc:
                 detail = exc.detail[0] if isinstance(exc.detail, list) else exc.detail
                 return api_error(str(detail), errors={'message': [str(detail)]})
-            if not message:
-                return api_error('A message is required to enable lockdown.',
-                                  errors={'message': ['This field is required.']})
 
             _set_setting(PERMISSION_ENABLED_KEY, 'true', request.user)
             _set_setting(PERMISSION_MESSAGE_KEY, message, request.user)
