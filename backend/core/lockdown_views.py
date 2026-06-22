@@ -37,6 +37,22 @@ def _set_setting(key, value, user):
     DefaultSetting.objects.update_or_create(key=key, defaults={'value': value, 'updated_by': user})
 
 
+def _optional_note(request):
+    """Sanitized, optional free-text note attached to a *disable* action's
+    activity log entry. Unlike the enable path's message, this is never
+    required and is never persisted as the lockdown message shown to
+    visitors — there's nothing left to show once the lockdown is off.
+    Returns '' when absent, or None if the submitted text exceeds the limit.
+    """
+    raw = str(request.data.get('message') or '')
+    if not raw:
+        return ''
+    try:
+        return sanitize_and_limit(raw, LONG_TEXT_ADMIN_MAX_LENGTH)
+    except DRFValidationError:
+        return None
+
+
 class LockdownStatusView(APIView):
     """Public — the frontend gate (and anonymous visitors) need this with no auth."""
     permission_classes = [AllowAny]
@@ -80,9 +96,13 @@ class SuperuserLockdownToggleView(APIView):
             _set_setting(SUPERUSER_MESSAGE_KEY, message, request.user)
             _log(request.user, 'superuser_lockdown_enabled', extra_data={'message': message}, ip=_get_ip(request))
         else:
+            note = _optional_note(request)
+            if note is None:
+                return api_error('Note is too long.', errors={'message': ['Too long.']})
             _set_setting(SUPERUSER_ENABLED_KEY, 'false', request.user)
             _set_setting(SUPERUSER_MESSAGE_KEY, '', request.user)
-            _log(request.user, 'superuser_lockdown_disabled', ip=_get_ip(request))
+            _log(request.user, 'superuser_lockdown_disabled',
+                 extra_data={'note': note} if note else None, ip=_get_ip(request))
 
         kind, message = get_lockdown_state()
         return api_success({'kind': kind, 'message': message}, message='Lockdown updated.')
@@ -117,9 +137,13 @@ class PermissionLockdownToggleView(APIView):
             _set_setting(PERMISSION_MESSAGE_KEY, message, request.user)
             _log(request.user, 'permission_lockdown_enabled', extra_data={'message': message}, ip=_get_ip(request))
         else:
+            note = _optional_note(request)
+            if note is None:
+                return api_error('Note is too long.', errors={'message': ['Too long.']})
             _set_setting(PERMISSION_ENABLED_KEY, 'false', request.user)
             _set_setting(PERMISSION_MESSAGE_KEY, '', request.user)
-            _log(request.user, 'permission_lockdown_disabled', ip=_get_ip(request))
+            _log(request.user, 'permission_lockdown_disabled',
+                 extra_data={'note': note} if note else None, ip=_get_ip(request))
 
         kind, message = get_lockdown_state()
         return api_success({'kind': kind, 'message': message}, message='Lockdown updated.')
