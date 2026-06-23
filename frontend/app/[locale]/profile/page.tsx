@@ -7,6 +7,8 @@ import { User, Edit2, Save, X, Lock, Eye, EyeOff, CheckCircle, AlertTriangle, Ch
 import { membersAPI } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 import type { Member } from '@/store/authStore';
+import PasswordRequirementsChecklist from '@/components/common/PasswordRequirementsChecklist';
+import { useTransientError } from '@/hooks/useFieldFeedback';
 import {
   isValidPhoneStrict,
   isValidEmail,
@@ -275,6 +277,12 @@ export default function ProfilePage() {
   const inputClass =
     'w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/20 outline-none focus:border-[#00ffff] focus:ring-1 focus:ring-[#00ffff]/30 transition-all';
 
+  const fullNameFeedback = useTransientError(editFieldErrors.full_name);
+  const displayNameFeedback = useTransientError(editFieldErrors.display_name);
+  const emailFeedback = useTransientError(editFieldErrors.email);
+  const phoneFeedback = useTransientError(editFieldErrors.phone);
+  const confirmNewPasswordFeedback = useTransientError(passwordFieldErrors.confirm_new_password);
+
   return (
     <div className="min-h-screen text-white">
       <div className="max-w-2xl mx-auto px-4 py-10">
@@ -375,8 +383,13 @@ export default function ProfilePage() {
                   maxLength={35}
                 />
                 <div className="flex items-start justify-between gap-2 mt-1">
-                  {editFieldErrors.full_name ? (
-                    <p className="text-xs text-[#ef4444]">{editFieldErrors.full_name}</p>
+                  {fullNameFeedback.message ? (
+                    <p
+                      className="text-xs transition-colors duration-300"
+                      style={{ color: fullNameFeedback.status === 'success' ? '#10b981' : '#ef4444' }}
+                    >
+                      {fullNameFeedback.message}
+                    </p>
                   ) : (
                     <span />
                   )}
@@ -395,8 +408,13 @@ export default function ProfilePage() {
                   maxLength={20}
                 />
                 <div className="flex items-start justify-between gap-2 mt-1">
-                  {editFieldErrors.display_name ? (
-                    <p className="text-xs text-[#ef4444]">{editFieldErrors.display_name}</p>
+                  {displayNameFeedback.message ? (
+                    <p
+                      className="text-xs transition-colors duration-300"
+                      style={{ color: displayNameFeedback.status === 'success' ? '#10b981' : '#ef4444' }}
+                    >
+                      {displayNameFeedback.message}
+                    </p>
                   ) : (
                     <span />
                   )}
@@ -415,8 +433,13 @@ export default function ProfilePage() {
                   maxLength={EMAIL_MAX_LENGTH}
                 />
                 <div className="flex items-start justify-between gap-2 mt-1">
-                  {editFieldErrors.email ? (
-                    <p className="text-xs text-[#ef4444]">{editFieldErrors.email}</p>
+                  {emailFeedback.message ? (
+                    <p
+                      className="text-xs transition-colors duration-300"
+                      style={{ color: emailFeedback.status === 'success' ? '#10b981' : '#ef4444' }}
+                    >
+                      {emailFeedback.message}
+                    </p>
                   ) : (
                     <span />
                   )}
@@ -436,8 +459,13 @@ export default function ProfilePage() {
                   maxLength={17}
                 />
                 <div className="flex items-start justify-between gap-2 mt-1">
-                  {editFieldErrors.phone ? (
-                    <p className="text-xs text-[#ef4444]">{editFieldErrors.phone}</p>
+                  {phoneFeedback.message ? (
+                    <p
+                      className="text-xs transition-colors duration-300"
+                      style={{ color: phoneFeedback.status === 'success' ? '#10b981' : '#ef4444' }}
+                    >
+                      {phoneFeedback.message}
+                    </p>
                   ) : (
                     <span />
                   )}
@@ -577,8 +605,8 @@ export default function ProfilePage() {
                     {showNewPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                {passwordFieldErrors.new_password ? (
-                  <p className="text-xs text-[#ef4444] mt-1">{passwordFieldErrors.new_password}</p>
+                {passwordData.new_password ? (
+                  <PasswordRequirementsChecklist isRTL={locale === 'fa'} value={passwordData.new_password} />
                 ) : (
                   <p className="text-xs text-white/30 mt-1">{t('password_hint')}</p>
                 )}
@@ -604,8 +632,13 @@ export default function ProfilePage() {
                     {showConfirmPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                {passwordFieldErrors.confirm_new_password && (
-                  <p className="text-xs text-[#ef4444] mt-1">{passwordFieldErrors.confirm_new_password}</p>
+                {confirmNewPasswordFeedback.message && (
+                  <p
+                    className="text-xs mt-1 transition-colors duration-300"
+                    style={{ color: confirmNewPasswordFeedback.status === 'success' ? '#10b981' : '#ef4444' }}
+                  >
+                    {confirmNewPasswordFeedback.message}
+                  </p>
                 )}
               </div>
 

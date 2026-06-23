@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, MessageSquare, AlertTriangle, Star, Pencil, Save, X } from 'lucide-react';
 import { commentsAPI, MyComment, Paginated } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
+import { useTransientError } from '@/hooks/useFieldFeedback';
 
 const STATUS_STYLE: Record<MyComment['status'], { color: string; bg: string; border: string }> = {
   pending: { color: '#fbbf24', bg: 'rgba(251,191,36,0.1)', border: 'rgba(251,191,36,0.3)' },
@@ -34,6 +35,7 @@ export default function MyCommentsPage() {
   const [editRating, setEditRating] = useState('1');
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const editTextFeedback = useTransientError(editTextError || undefined);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -193,11 +195,23 @@ export default function MyCommentsPage() {
                           rows={3}
                           maxLength={250}
                           className={inputClass}
-                          style={{ borderColor: editTextError ? '#ef4444' : 'rgba(255,255,255,0.1)' }}
+                          style={{
+                            borderColor:
+                              editTextFeedback.status === 'error'
+                                ? '#ef4444'
+                                : editTextFeedback.status === 'success'
+                                ? '#10b981'
+                                : 'rgba(255,255,255,0.1)',
+                          }}
                         />
                         <div className="flex items-start justify-between gap-2">
-                          {editTextError ? (
-                            <p className="text-xs" style={{ color: '#ef4444' }}>{editTextError}</p>
+                          {editTextFeedback.message ? (
+                            <p
+                              className="text-xs transition-colors duration-300"
+                              style={{ color: editTextFeedback.status === 'success' ? '#10b981' : '#ef4444' }}
+                            >
+                              {editTextFeedback.message}
+                            </p>
                           ) : <span />}
                           <p className="text-xs text-white/30 text-right whitespace-nowrap">{editText.length}/250</p>
                         </div>

@@ -9,6 +9,7 @@ import { postsAPI } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 import ImageLightbox from '@/components/common/ImageLightbox';
 import Turnstile from '@/components/common/Turnstile';
+import { useTransientError } from '@/hooks/useFieldFeedback';
 import type { PostDetail, Comment } from '@/lib/api';
 
 // ─── Star Rating Selector ─────────────────────────────────────────────────────
@@ -143,6 +144,8 @@ export default function PostDetailPage() {
   const [commentError, setCommentError] = useState('');
   const [commentNameError, setCommentNameError] = useState('');
   const [commentTextError, setCommentTextError] = useState('');
+  const commentNameFeedback = useTransientError(commentNameError || undefined);
+  const commentTextFeedback = useTransientError(commentTextError || undefined);
   const [captchaToken, setCaptchaToken] = useState('');
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
 
@@ -498,23 +501,40 @@ export default function PostDetailPage() {
                       background: isAuthenticated
                         ? 'rgba(255,255,255,0.03)'
                         : 'rgba(255,255,255,0.05)',
-                      border: `1px solid ${commentNameError ? '#ef4444' : 'rgba(255,255,255,0.1)'}`,
+                      border: `1px solid ${
+                        commentNameFeedback.status === 'error'
+                          ? '#ef4444'
+                          : commentNameFeedback.status === 'success'
+                          ? '#10b981'
+                          : 'rgba(255,255,255,0.1)'
+                      }`,
                       cursor: isAuthenticated ? 'default' : 'text',
                     }}
                     onFocus={(e) => {
-                      if (!isAuthenticated && !commentNameError) {
+                      if (!isAuthenticated && commentNameFeedback.status === 'idle') {
                         e.currentTarget.style.border = '1px solid #00ffff';
                         e.currentTarget.style.boxShadow = '0 0 10px rgba(0,255,255,0.15)';
                       }
                     }}
                     onBlur={(e) => {
-                      e.currentTarget.style.border = `1px solid ${commentNameError ? '#ef4444' : 'rgba(255,255,255,0.1)'}`;
+                      e.currentTarget.style.border = `1px solid ${
+                        commentNameFeedback.status === 'error'
+                          ? '#ef4444'
+                          : commentNameFeedback.status === 'success'
+                          ? '#10b981'
+                          : 'rgba(255,255,255,0.1)'
+                      }`;
                       e.currentTarget.style.boxShadow = 'none';
                     }}
                   />
                   <div className="flex items-start justify-between gap-2">
-                    {commentNameError ? (
-                      <p className="text-xs" style={{ color: '#ef4444' }}>{commentNameError}</p>
+                    {commentNameFeedback.message ? (
+                      <p
+                        className="text-xs transition-colors duration-300"
+                        style={{ color: commentNameFeedback.status === 'success' ? '#10b981' : '#ef4444' }}
+                      >
+                        {commentNameFeedback.message}
+                      </p>
                     ) : <span />}
                     <p className="text-xs text-white/30 text-right whitespace-nowrap">{commentName.length}/50</p>
                   </div>
@@ -539,23 +559,40 @@ export default function PostDetailPage() {
                     className="w-full rounded-xl px-4 py-3 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50 resize-y"
                     style={{
                       background: 'rgba(255,255,255,0.05)',
-                      border: `1px solid ${commentTextError ? '#ef4444' : 'rgba(255,255,255,0.1)'}`,
+                      border: `1px solid ${
+                        commentTextFeedback.status === 'error'
+                          ? '#ef4444'
+                          : commentTextFeedback.status === 'success'
+                          ? '#10b981'
+                          : 'rgba(255,255,255,0.1)'
+                      }`,
                       minHeight: '100px',
                     }}
                     onFocus={(e) => {
-                      if (!commentTextError) {
+                      if (commentTextFeedback.status === 'idle') {
                         e.currentTarget.style.border = '1px solid #00ffff';
                         e.currentTarget.style.boxShadow = '0 0 10px rgba(0,255,255,0.15)';
                       }
                     }}
                     onBlur={(e) => {
-                      e.currentTarget.style.border = `1px solid ${commentTextError ? '#ef4444' : 'rgba(255,255,255,0.1)'}`;
+                      e.currentTarget.style.border = `1px solid ${
+                        commentTextFeedback.status === 'error'
+                          ? '#ef4444'
+                          : commentTextFeedback.status === 'success'
+                          ? '#10b981'
+                          : 'rgba(255,255,255,0.1)'
+                      }`;
                       e.currentTarget.style.boxShadow = 'none';
                     }}
                   />
                   <div className="flex items-start justify-between gap-2">
-                    {commentTextError ? (
-                      <p className="text-xs" style={{ color: '#ef4444' }}>{commentTextError}</p>
+                    {commentTextFeedback.message ? (
+                      <p
+                        className="text-xs transition-colors duration-300"
+                        style={{ color: commentTextFeedback.status === 'success' ? '#10b981' : '#ef4444' }}
+                      >
+                        {commentTextFeedback.message}
+                      </p>
                     ) : <span />}
                     <p className="text-xs text-white/30 text-right whitespace-nowrap">{commentText.length}/250</p>
                   </div>

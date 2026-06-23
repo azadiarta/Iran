@@ -7,6 +7,7 @@ import { settingsAPI, contactAPI } from '@/lib/api';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
 import Turnstile from '@/components/common/Turnstile';
 import useAuthStore from '@/store/authStore';
+import { useTransientError } from '@/hooks/useFieldFeedback';
 import {
   SHORT_TEXT_PUBLIC_MAX_LENGTH,
   LONG_TEXT_PUBLIC_MAX_LENGTH,
@@ -36,6 +37,9 @@ export default function ContactPage() {
   const [mounted, setMounted] = useState(false);
   const [captchaToken, setCaptchaToken] = useState('');
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
+  const nameFeedback = useTransientError(fieldErrors.name);
+  const contactFeedback = useTransientError(fieldErrors.contact);
+  const messageFeedback = useTransientError(fieldErrors.message);
 
   function handleNameChange(value: string) {
     setFormData((d) => ({ ...d, name: value }));
@@ -255,12 +259,24 @@ export default function ContactPage() {
                   disabled={mounted && !!member}
                   maxLength={SHORT_TEXT_PUBLIC_MAX_LENGTH}
                   className={inputClass + (mounted && member ? ' opacity-60 cursor-not-allowed' : '')}
-                  style={{ borderColor: fieldErrors.name ? '#ef4444' : 'rgba(255,255,255,0.1)' }}
+                  style={{
+                    borderColor:
+                      nameFeedback.status === 'error'
+                        ? '#ef4444'
+                        : nameFeedback.status === 'success'
+                        ? '#10b981'
+                        : 'rgba(255,255,255,0.1)',
+                  }}
                 />
                 {!(mounted && member) && (
                   <div className="mt-1 flex items-start justify-between gap-2">
-                    {fieldErrors.name ? (
-                      <p className="text-xs" style={{ color: '#ef4444' }}>{fieldErrors.name}</p>
+                    {nameFeedback.message ? (
+                      <p
+                        className="text-xs transition-colors duration-300"
+                        style={{ color: nameFeedback.status === 'success' ? '#10b981' : '#ef4444' }}
+                      >
+                        {nameFeedback.message}
+                      </p>
                     ) : <span />}
                     <p className="text-xs text-white/30 text-right whitespace-nowrap">
                       {formData.name.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}
@@ -295,11 +311,23 @@ export default function ContactPage() {
                   placeholder={t('contact_placeholder')}
                   maxLength={SHORT_TEXT_PUBLIC_MAX_LENGTH}
                   className={inputClass}
-                  style={{ borderColor: fieldErrors.contact ? '#ef4444' : 'rgba(255,255,255,0.1)' }}
+                  style={{
+                    borderColor:
+                      contactFeedback.status === 'error'
+                        ? '#ef4444'
+                        : contactFeedback.status === 'success'
+                        ? '#10b981'
+                        : 'rgba(255,255,255,0.1)',
+                  }}
                 />
                 <div className="mt-1 flex items-start justify-between gap-2">
-                  {fieldErrors.contact ? (
-                    <p className="text-xs" style={{ color: '#ef4444' }}>{fieldErrors.contact}</p>
+                  {contactFeedback.message ? (
+                    <p
+                      className="text-xs transition-colors duration-300"
+                      style={{ color: contactFeedback.status === 'success' ? '#10b981' : '#ef4444' }}
+                    >
+                      {contactFeedback.message}
+                    </p>
                   ) : <span />}
                   <p className="text-xs text-white/30 text-right whitespace-nowrap">
                     {formData.contact.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}
@@ -320,11 +348,23 @@ export default function ContactPage() {
                   placeholder={t('message_placeholder')}
                   maxLength={LONG_TEXT_PUBLIC_MAX_LENGTH}
                   className={inputClass + ' resize-none'}
-                  style={{ borderColor: fieldErrors.message ? '#ef4444' : 'rgba(255,255,255,0.1)' }}
+                  style={{
+                    borderColor:
+                      messageFeedback.status === 'error'
+                        ? '#ef4444'
+                        : messageFeedback.status === 'success'
+                        ? '#10b981'
+                        : 'rgba(255,255,255,0.1)',
+                  }}
                 />
                 <div className="mt-1 flex items-start justify-between gap-2">
-                  {fieldErrors.message ? (
-                    <p className="text-xs" style={{ color: '#ef4444' }}>{fieldErrors.message}</p>
+                  {messageFeedback.message ? (
+                    <p
+                      className="text-xs transition-colors duration-300"
+                      style={{ color: messageFeedback.status === 'success' ? '#10b981' : '#ef4444' }}
+                    >
+                      {messageFeedback.message}
+                    </p>
                   ) : <span />}
                   <p className="text-xs text-white/30 text-right whitespace-nowrap">
                     {formData.message.length}/{LONG_TEXT_PUBLIC_MAX_LENGTH}

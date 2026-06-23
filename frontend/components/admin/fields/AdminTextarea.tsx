@@ -1,5 +1,6 @@
 'use client';
-import { forwardRef } from 'react';
+import { forwardRef, useState } from 'react';
+import { useTransientError } from '@/hooks/useFieldFeedback';
 
 interface AdminTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
@@ -8,6 +9,24 @@ interface AdminTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaEl
 
 const AdminTextarea = forwardRef<HTMLTextAreaElement, AdminTextareaProps>(
   ({ label, error, className = '', rows = 4, ...props }, ref) => {
+    const [focused, setFocused] = useState(false);
+    const feedback = useTransientError(error);
+
+    const borderColor =
+      feedback.status === 'error'
+        ? '#ef4444'
+        : feedback.status === 'success'
+        ? '#10b981'
+        : focused
+        ? '#00ffff'
+        : 'rgba(255,255,255,0.1)';
+    const boxShadow =
+      feedback.status === 'idle' && focused
+        ? '0 0 12px rgba(0,255,255,0.15)'
+        : feedback.status === 'success'
+        ? '0 0 12px rgba(16,185,129,0.15)'
+        : 'none';
+
     return (
       <div>
         {label && <label className="block text-xs text-white/50 mb-1.5">{label}</label>}
@@ -16,26 +35,25 @@ const AdminTextarea = forwardRef<HTMLTextAreaElement, AdminTextareaProps>(
           rows={rows}
           {...props}
           className={`w-full px-4 py-2.5 rounded-xl bg-white/5 border text-white placeholder-white/20 outline-none transition-all resize-none ${className}`}
-          style={{ borderColor: error ? '#ef4444' : 'rgba(255,255,255,0.1)' }}
+          style={{ borderColor, boxShadow }}
           onFocus={(e) => {
-            if (!error) {
-              e.currentTarget.style.borderColor = '#00ffff';
-              e.currentTarget.style.boxShadow = '0 0 12px rgba(0,255,255,0.15)';
-            }
+            setFocused(true);
             props.onFocus?.(e);
           }}
           onBlur={(e) => {
-            if (!error) {
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
-              e.currentTarget.style.boxShadow = 'none';
-            }
+            setFocused(false);
             props.onBlur?.(e);
           }}
         />
-        {(error || typeof props.maxLength === 'number') && (
+        {(feedback.message || typeof props.maxLength === 'number') && (
           <div className="mt-1 flex items-start justify-between gap-2">
-            {error ? (
-              <p className="text-xs" style={{ color: '#ef4444' }}>{error}</p>
+            {feedback.message ? (
+              <p
+                className="text-xs transition-colors duration-300"
+                style={{ color: feedback.status === 'success' ? '#10b981' : '#ef4444' }}
+              >
+                {feedback.message}
+              </p>
             ) : (
               <span />
             )}
