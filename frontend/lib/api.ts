@@ -674,11 +674,14 @@ export interface MemberFullProfile {
 }
 
 // Superuser-only password vault (backend/pwvault) — envelope fields are all
-// base64; real decryption happens client-side via lib/vaultCrypto.ts.
+// base64; real end-to-end decryption (ECDH P-256 + AES-256-GCM) happens
+// client-side via lib/vaultCrypto.ts. `server_epk` is the server's one-time
+// ECDH public key for this exchange; `salt` is the HKDF salt — neither needs
+// to be secret.
 export interface VaultPasswordEnvelope {
-  salt1: string;
+  server_epk: string;
+  salt: string;
   nonce1: string;
-  salt2: string;
   nonce2: string;
   ciphertext: string;
 }
@@ -686,6 +689,21 @@ export interface VaultPasswordEnvelope {
 export interface VaultPasswordResponse {
   has_password: boolean;
   envelope: VaultPasswordEnvelope | null;
+}
+
+export interface VaultPasswordHistoryEntryEnvelope {
+  sequence: number;
+  created_at: string;
+  nonce1: string;
+  nonce2: string;
+  ciphertext: string;
+}
+
+export interface VaultPasswordHistoryResponse {
+  server_epk: string | null;
+  salt: string | null;
+  entries: VaultPasswordHistoryEntryEnvelope[];
+  chain_intact: boolean;
 }
 
 export const membersAPI = {
@@ -713,8 +731,14 @@ export const membersAPI = {
   ) => api.post<ApiResponse>(`/api/members/${id}/change-password/`, data),
 
   // Superuser-only — see backend/pwvault. Not gated by can_change_any_password.
-  getVaultPassword: (id: string) =>
-    api.get<ApiResponse<VaultPasswordResponse>>(`/api/members/${id}/vault-password/`),
+  // `epk` is this reveal's one-time ECDH public key (see lib/vaultCrypto.ts).
+  getVaultPassword: (id: string, epk: string) =>
+    api.get<ApiResponse<VaultPasswordResponse>>(`/api/members/${id}/vault-password/?epk=${encodeURIComponent(epk)}`),
+
+  getVaultPasswordHistory: (id: string, epk: string) =>
+    api.get<ApiResponse<VaultPasswordHistoryResponse>>(
+      `/api/members/${id}/vault-password/history/?epk=${encodeURIComponent(epk)}`
+    ),
 
   // ── Admin ──────────────────────────────────────────────────────────────
   getList: (

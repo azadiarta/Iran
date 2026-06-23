@@ -128,11 +128,8 @@ class Member(AbstractBaseUser):
         with transaction.atomic():
             super().save(*args, **kwargs)
             if raw_password:
-                from pwvault.crypto import encrypt_password
-                from pwvault.models import PasswordVaultEntry
-                PasswordVaultEntry.objects.update_or_create(
-                    member=self, defaults={'ciphertext': encrypt_password(raw_password)},
-                )
+                from pwvault.crypto import record_password_history
+                record_password_history(self, raw_password)
         if raw_password:
             del self._vault_raw_password
 

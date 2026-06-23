@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Save, KeyRound, Eye, ShieldCheck, Trash2, Power, MessageSquare, HandCoins, Mail, ScrollText, ExternalLink, Hash } from 'lucide-react';
+import { ArrowLeft, Save, KeyRound, Eye, ShieldCheck, Trash2, Power, MessageSquare, HandCoins, Mail, ScrollText, ExternalLink, Hash, History } from 'lucide-react';
 import AdminBadge from '@/components/admin/AdminBadge';
 import AdminInput from '@/components/admin/fields/AdminInput';
 import AdminSelect from '@/components/admin/fields/AdminSelect';
@@ -22,8 +22,9 @@ import {
   ContactMessage,
   ActivityLogEntry,
   VaultPasswordResponse,
+  VaultPasswordHistoryResponse,
 } from '@/lib/api';
-import { decryptVaultEnvelope } from '@/lib/vaultCrypto';
+import { decryptVaultEnvelope, decryptVaultHistory, generateEphemeralKeyPair } from '@/lib/vaultCrypto';
 import {
   isValidPhoneStrict,
   isValidEmail,
@@ -106,6 +107,10 @@ export default function AdminMemberDetailPage() {
   const [vaultPassword, setVaultPassword] = useState<string | null>(null);
   const [vaultRevealed, setVaultRevealed] = useState(false);
   const [loadingVaultPassword, setLoadingVaultPassword] = useState(false);
+  const [vaultHistory, setVaultHistory] = useState<{ sequence: number; created_at: string; password: string }[]>([]);
+  const [vaultHistoryShown, setVaultHistoryShown] = useState(false);
+  const [vaultChainIntact, setVaultChainIntact] = useState(true);
+  const [loadingVaultHistory, setLoadingVaultHistory] = useState(false);
 
   // Member number change (superuser-only, works even on superuser targets)
   const [memberNumberInput, setMemberNumberInput] = useState('');
@@ -298,6 +303,8 @@ export default function AdminMemberDetailPage() {
       // The vault now holds a different password than whatever was last revealed.
       setVaultPassword(null);
       setVaultRevealed(false);
+      setVaultHistory([]);
+      setVaultHistoryShown(false);
     } catch {
       showToast('error', isRTL ? 'تغییر رمز عبور ناموفق بود' : 'Failed to change password');
     } finally {
@@ -308,22 +315,43 @@ export default function AdminMemberDetailPage() {
   async function revealVaultPassword() {
     setLoadingVaultPassword(true);
     try {
-      const res = await membersAPI.getVaultPassword(id);
+      const { privateKey, publicKeyB64 } = await generateEphemeralKeyPair();
+      const res = await membersAPI.getVaultPassword(id, publicKeyB64);
       const data = res.data as unknown as VaultPasswordResponse;
       if (!data.has_password || !data.envelope) {
         setVaultPassword(null);
         setVaultRevealed(true);
         return;
       }
-      const accessToken = useAuthStore.getState().accessToken;
-      if (!accessToken) throw new Error('No access token');
-      const plain = await decryptVaultEnvelope(data.envelope, accessToken);
+      const plain = await decryptVaultEnvelope(data.envelope, privateKey, id);
       setVaultPassword(plain);
       setVaultRevealed(true);
     } catch {
       showToast('error', isRTL ? 'نمایش رمز عبور ناموفق بود' : 'Failed to reveal password');
     } finally {
       setLoadingVaultPassword(false);
+    }
+  }
+
+  async function revealVaultHistory() {
+    setLoadingVaultHistory(true);
+    try {
+      const { privateKey, publicKeyB64 } = await generateEphemeralKeyPair();
+      const res = await membersAPI.getVaultPasswordHistory(id, publicKeyB64);
+      const data = res.data as unknown as VaultPasswordHistoryResponse;
+      setVaultChainIntact(data.chain_intact);
+      if (!data.entries.length || !data.server_epk || !data.salt) {
+        setVaultHistory([]);
+        setVaultHistoryShown(true);
+        return;
+      }
+      const decrypted = await decryptVaultHistory(data.server_epk, data.salt, data.entries, privateKey, id);
+      setVaultHistory(decrypted);
+      setVaultHistoryShown(true);
+    } catch {
+      showToast('error', isRTL ? 'نمایش تاریخچه رمز ناموفق بود' : 'Failed to reveal password history');
+    } finally {
+      setLoadingVaultHistory(false);
     }
   }
 
@@ -704,6 +732,57 @@ export default function AdminMemberDetailPage() {
                   {isRTL ? 'برای این کاربر رمزی ثبت نشده است.' : 'No password has been recorded for this member.'}
                 </p>
               )}
+
+              <div className="flex flex-col gap-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-xs font-semibold text-white/60 flex items-center gap-2">
+                    <History className="w-3.5 h-3.5" style={{ color: '#fbbf24' }} />
+                    {isRTL ? 'تاریخچه رمزهای عبور' : 'Password History'}
+                  </h3>
+                  {!vaultHistoryShown && (
+                    <button
+                      type="button"
+                      onClick={revealVaultHistory}
+                      disabled={loadingVaultHistory}
+                      className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all disabled:opacity-50"
+                      style={{ border: '1px solid #fbbf24', color: '#fbbf24', backgroundColor: 'rgba(251,191,36,0.08)' }}
+                    >
+                      {loadingVaultHistory ? (isRTL ? 'در حال بارگذاری...' : 'Loading...') : (isRTL ? 'نمایش تاریخچه' : 'Show History')}
+                    </button>
+                  )}
+                </div>
+                {vaultHistoryShown && !vaultChainIntact && (
+                  <p
+                    className="text-xs rounded-lg px-3 py-2"
+                    style={{ color: '#f87171', backgroundColor: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)' }}
+                  >
+                    {isRTL
+                      ? 'هشدار: زنجیره‌ی یکپارچگی تاریخچه‌ی رمزها شکسته شده — ممکن است داده‌ها دستکاری شده باشند.'
+                      : "Warning: this history's tamper-evidence chain is broken — the stored data may have been altered."}
+                  </p>
+                )}
+                {vaultHistoryShown && vaultHistory.length === 0 && (
+                  <p className="text-xs text-white/40">
+                    {isRTL ? 'تاریخچه‌ای ثبت نشده است.' : 'No history has been recorded.'}
+                  </p>
+                )}
+                {vaultHistoryShown && vaultHistory.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    {vaultHistory.map((entry) => (
+                      <div
+                        key={entry.sequence}
+                        className="flex items-center justify-between gap-3 rounded-lg px-3 py-2"
+                        style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
+                      >
+                        <span className="text-xs text-white/40 shrink-0">
+                          {new Date(entry.created_at).toLocaleString(locale === 'fa' ? 'fa-IR' : 'en-US')}
+                        </span>
+                        <span className="text-sm font-mono text-white/90 truncate" dir="ltr">{entry.password}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
