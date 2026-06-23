@@ -126,6 +126,49 @@ export function passwordStrengthError(isRTL: boolean, value: string): string | u
   return undefined;
 }
 
+// Checklist variant of the same 4 rules: unlike passwordStrengthError (which
+// stops at the first failing rule, for submit-blocking), this evaluates every
+// rule independently so a "show all unmet requirements at once" UI is
+// possible. Order matches passwordStrengthError/backend for consistency.
+export interface PasswordRuleCheck {
+  id: string;
+  message: string;
+  satisfied: boolean;
+}
+
+export function passwordRules(isRTL: boolean, value: string): PasswordRuleCheck[] {
+  return [
+    {
+      id: 'length',
+      message: isRTL
+        ? `رمز عبور باید حداقل ${PASSWORD_MIN_LENGTH} نویسه باشد. (${value.length}/${PASSWORD_MIN_LENGTH})`
+        : `Password must be at least ${PASSWORD_MIN_LENGTH} characters. (${value.length}/${PASSWORD_MIN_LENGTH})`,
+      satisfied: value.length >= PASSWORD_MIN_LENGTH,
+    },
+    {
+      id: 'letters_and_numbers',
+      message: isRTL
+        ? 'رمز عبور باید ترکیبی از حروف و اعداد باشد.'
+        : 'Password must contain a mix of letters and numbers.',
+      satisfied: /[A-Za-z]/.test(value) && /\d/.test(value),
+    },
+    {
+      id: 'uppercase',
+      message: isRTL
+        ? 'رمز عبور باید حداقل یک حرف بزرگ داشته باشد.'
+        : 'Password must contain at least one uppercase letter.',
+      satisfied: /[A-Z]/.test(value),
+    },
+    {
+      id: 'special_char',
+      message: isRTL
+        ? 'رمز عبور باید حداقل یک کاراکتر خاص داشته باشد.'
+        : 'Password must contain at least one special character.',
+      satisfied: /[^A-Za-z0-9]/.test(value),
+    },
+  ];
+}
+
 export function passwordMismatchError(isRTL: boolean): string {
   return isRTL ? 'رمزهای عبور مطابقت ندارند.' : 'Passwords do not match.';
 }

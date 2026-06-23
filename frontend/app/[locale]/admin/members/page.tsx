@@ -7,6 +7,7 @@ import AdminBadge from '@/components/admin/AdminBadge';
 import AdminModal from '@/components/admin/AdminModal';
 import AdminInput from '@/components/admin/fields/AdminInput';
 import AdminSelect from '@/components/admin/fields/AdminSelect';
+import PasswordRequirementsChecklist from '@/components/common/PasswordRequirementsChecklist';
 import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
 import { membersAPI, groupsAPI, MemberListItem, AccessGroup, Paginated } from '@/lib/api';
@@ -390,19 +391,26 @@ export default function AdminMembersPage() {
             options={groups.map((g) => ({ value: g.id, label: g.name }))}
             placeholder={isRTL ? 'پیش‌فرض' : 'Default'}
           />
-          <AdminInput
-            label={isRTL ? 'رمز عبور' : 'Password'}
-            type="password"
-            value={password}
-            onChange={(e) => handlePasswordChange(e.target.value)}
-            required
-            error={fieldErrors.password}
-            hint={
-              isRTL
-                ? 'حداقل ۸ نویسه، ترکیبی از حروف و اعداد، شامل حداقل یک حرف بزرگ و یک کاراکتر خاص.'
-                : 'At least 8 characters, with letters and numbers, including one uppercase letter and one special character.'
-            }
-          />
+          <div>
+            <AdminInput
+              label={isRTL ? 'رمز عبور' : 'Password'}
+              type="password"
+              value={password}
+              onChange={(e) => handlePasswordChange(e.target.value)}
+              required
+              error={fieldErrors.password}
+              hideMessage
+            />
+            {password ? (
+              <PasswordRequirementsChecklist isRTL={isRTL} value={password} />
+            ) : (
+              <p className="mt-1 text-xs text-white/30">
+                {isRTL
+                  ? 'حداقل ۸ نویسه، ترکیبی از حروف و اعداد، شامل حداقل یک حرف بزرگ و یک کاراکتر خاص.'
+                  : 'At least 8 characters, with letters and numbers, including one uppercase letter and one special character.'}
+              </p>
+            )}
+          </div>
           <AdminInput
             label={isRTL ? 'تکرار رمز عبور' : 'Confirm Password'}
             type="password"

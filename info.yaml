@@ -17,7 +17,7 @@ project_summary:
     total_frontend_routes: 33
     total_frontend_api_modules: 14
     total_zustand_stores: 4
-    total_reusable_ui_components: 28
+    total_reusable_ui_components: 29
     total_phone_fields: 1
 
 project_conventions:
@@ -227,6 +227,8 @@ security_rules:
       rule: "Every one of those same unauthenticated-write endpoints also carries a DRF throttle_scope resolved against core.throttles.SessionAwareScopedRateThrottle — never the plain rest_framework.throttling.ScopedRateThrottle. Anonymous requests are keyed on session+IP together, not IP alone, specifically because IP rotation alone must never be enough to reset a rate-limit counter on a site that organizes real-world political activity and is therefore a realistic targeted-abuse target. A new unauthenticated write endpoint must add a throttle_scope class attribute plus a matching DEFAULT_THROTTLE_RATES entry in settings.py — never rely on the global anon/user fallback rate alone for a sensitive write path."
     - id: sec_password_strength
       rule: "Every password a member can set — registration, profile password-change, and admin-created or admin-reset member passwords — is checked by core.validators.PasswordStrengthValidator server-side (also wired into AUTH_PASSWORD_VALIDATORS so it covers Django's own admin password-change form and the createsuperuser/changepassword CLI commands too, automatically) and mirrored by frontend/lib/validation.ts:passwordStrengthError client-side — both in the exact same order: length>=PASSWORD_MIN_LENGTH(8), a letter+digit mix, at least one uppercase letter, at least one special character."
+    - id: sec_passwords_never_recoverable
+      rule: "Member passwords are stored exclusively as a one-way Django PBKDF2 hash (Django's default password hasher — backend/groupfund/settings.py defines no PASSWORD_HASHERS override) and are NEVER retrievable in plaintext by anyone, including the superuser: no view, serializer, admin page, or management command in this codebase stores or exposes a reversible/plaintext copy of a member's password. This is a cryptographic floor, not a permission gate — restricting plaintext-password viewing to 'superuser only' is not implementable for already-hashed passwords regardless of who is asking, and building a reversible-storage mechanism to make it possible would itself be a severe security regression. The only password-related admin capability that exists or should ever exist is RESETTING a member's password to a new value the admin chooses (see ep_member_change_password/form_admin_member_change_password), never viewing the existing one."
     - id: sec_file_content_verification
       rule: "Every file upload (post images, expense receipts, payment/contribution receipts) is verified by its real file CONTENT — Pillow Image.open()+verify() against an explicit format allowlist, or a %PDF- magic-byte check for PDFs — via core.validators.validate_image_file/validate_receipt_file. Never trust a file's extension or a client-supplied Content-Type alone; this is what blocks SVG-stored-XSS and mislabeled-file attacks. A new upload entry point must reuse one of these two validators, not write a new extension/MIME check."
     - id: sec_jwt_bearer_only
@@ -828,7 +830,7 @@ api_calls:
 
 ui_components:
   scope: frontend
-  total_count: 28
+  total_count: 29
   description: Reusable UI components under frontend/components — admin primitives, admin form fields, layout shells, and shared/animation components.
   subcategories:
     admin_primitives:
@@ -876,7 +878,7 @@ ui_components:
           label: AdminInput — styled text/number/date input
           scope: frontend
           location: [frontend/components/admin/fields/AdminInput.tsx]
-          notes: "Most common field component across all admin forms, e.g. phone fields in admin/members forms."
+          notes: "Most common field component across all admin forms, e.g. phone fields in admin/members forms. Phase 43 — gained built-in real-time error green-flash-then-clear behavior (wraps its `error` prop in useTransientError, see validate_realtime_feedback_rule) and, for `type='password'`, a built-in show/hide toggle button (see validate_password_visibility_toggle_rule), plus a new `hideMessage?` prop that suppresses the built-in error/hint footer — still reacting to `error` via border/glow color only — for use alongside PasswordRequirementsChecklist."
         - id: ui_AdminPermissionCheckbox
           label: AdminPermissionCheckbox — single permission toggle row
           scope: frontend
@@ -896,7 +898,7 @@ ui_components:
           label: AdminTextarea — styled multi-line text field
           scope: frontend
           location: [frontend/components/admin/fields/AdminTextarea.tsx]
-          notes: "Used for description/notes/rejection_reason/message fields across admin forms."
+          notes: "Used for description/notes/rejection_reason/message fields across admin forms. Phase 43 — gained the same built-in real-time error green-flash-then-clear behavior as AdminInput (useTransientError on its `error` prop; see validate_realtime_feedback_rule)."
         - id: ui_AdminToggle
           label: AdminToggle — boolean switch
           scope: frontend
@@ -951,7 +953,7 @@ ui_components:
           location: [frontend/components/layout/LockdownSync.tsx, frontend/store/lockdownStore.ts]
           notes: "Mounted at root layout for every visitor including anonymous ones (unlike AuthSync, runs with no auth gate). Polls lockdownAPI.getStatus() every 20s into lockdownStore; GET /api/lockdown/ is AllowAny and exempt from SiteLockdownMiddleware so it always succeeds even while the site is locked down."
     common_and_animation_components:
-      count: 6
+      count: 7
       items:
         - id: ui_Turnstile
           label: "Turnstile — Cloudflare Turnstile CAPTCHA widget (Phase 31, NEW)"
@@ -983,6 +985,11 @@ ui_components:
           scope: frontend
           location: [frontend/components/lockdown/LockdownPage.tsx, "frontend/app/[locale]/ClientLayout.tsx"]
           notes: "position:fixed;inset:0;zIndex:9999 overlay, same dark #0a0a0f + amber #fbbf24 visual language as SplashScreen but with its own custom inline-SVG 'sleepy lock' mascot (closed crescent eyes, breathing scale/y animation, 3 floating animated Z letters) instead of the LionAndSun emblem. Rendered by ClientLayout.tsx whenever lockdownStore.kind blocks the current visitor (deny-by-default until auth hydration completes); shows the admin-entered message in a styled box."
+        - id: ui_PasswordRequirementsChecklist
+          label: "PasswordRequirementsChecklist — live password-rule checklist (Phase 43, NEW)"
+          scope: frontend
+          location: [frontend/components/common/PasswordRequirementsChecklist.tsx, frontend/hooks/useFieldFeedback.ts, frontend/lib/validation.ts]
+          notes: "Renders the 4 passwordRules() checks (min length 8, letter+digit mix, >=1 uppercase letter, >=1 special character) as an independent per-rule checklist via useChecklistFeedback, instead of the older single combined-message passwordStrengthError display — each rule shows red while failing, flips green for 1800ms the instant it is individually satisfied, then disappears (see validate_realtime_feedback_rule); renders null once empty or fully satisfied. Used at exactly the 4 sites where a member composes a brand-new password: register/page.tsx, profile/page.tsx (password-change), admin/members/page.tsx (create-member modal), admin/members/[id]/page.tsx (admin password reset)."
 
 state_management:
   scope: frontend
@@ -2045,7 +2052,7 @@ auth_permission_checks:
 
 validation_logic:
   scope: both
-  total_count: 14
+  total_count: 16
   description: >
     Client-side and server-side validation. Both stacks now have a shared, canonical
     validation/sanitization module (added during the input-validation-security hardening
@@ -2149,7 +2156,7 @@ validation_logic:
           location: [backend/core/validators.py, backend/accounts/member_views.py, frontend/lib/validation.ts, "frontend/app/[locale]/admin/members/[id]/page.tsx"]
           notes: "Bug fix: the admin-panel 'reassign member_number' box (form_admin_member_change_number) previously had NO frontend length limit at all, because it used `type=\"number\"` and HTML's maxLength attribute is silently ignored on number inputs. Backend: new MEMBER_NUMBER_LENGTH=5/MEMBER_NUMBER_MIN=10000/MEMBER_NUMBER_MAX=99999 constants in core/validators.py (previously inline magic numbers in MemberChangeNumberView only); the view now explicitly checks digit-count (`len(str(raw_number)) > MEMBER_NUMBER_LENGTH`) in addition to the pre-existing numeric MIN/MAX range check. Frontend: same 3 constants mirrored in validation.ts plus memberNumberFormatError(isRTL); the input switched to `type=\"text\" inputMode=\"numeric\" pattern=\"[0-9]*\" maxLength={MEMBER_NUMBER_LENGTH}` (restoring the standard AdminInput live counter, see validate_character_counter_rule) and gained a real-time handleMemberNumberChange handler that strips non-digits, caps the length, and shows an inline error the instant the value falls outside the valid shape/range — matching the project's standard real-time-validation convention instead of a submit-time-only check. Uniqueness (`Member.objects.filter(member_number=new_number).exclude(pk=member.pk).exists()` -> 'This member number is already in use.') was ALREADY enforced server-side before this fix; what changed is that the frontend now surfaces that exact backend error inline (via the same field-error state as the format checks) instead of only a generic toast, so a duplicate-code attempt reads as a real-time-style field error like every other validation failure on this box."
     frontend_manual_validation:
-      count: 2
+      count: 4
       items:
         - id: validate_frontend_pattern
           label: Per-component validation, built on the shared frontend/lib/validation.ts helpers
@@ -2161,6 +2168,16 @@ validation_logic:
           scope: frontend
           location: ["frontend/components/admin/AdminInput.tsx", "frontend/components/admin/AdminTextarea.tsx", "frontend/app/[locale]/register/page.tsx", "frontend/app/[locale]/login/page.tsx", "frontend/app/[locale]/posts/[id]/page.tsx", "frontend/app/[locale]/expenses/[id]/page.tsx", "frontend/app/[locale]/profile/comments/page.tsx"]
           notes: "Standing project rule (see project_conventions.consistency_principle.example_pattern): every text input or textarea anywhere on the site that carries a maxLength must show a live '{value.length}/{maxLength}' counter next to it, in a flex row with the field's error/hint message on the opposite side — zero exceptions, admin panel AND main site alike. Admin panel: AdminInput/AdminTextarea implement this generically via a `typeof props.maxLength === 'number'` check, so every admin page that uses these shared components gets the counter automatically with no per-page code. Main site: register/page.tsx's local Field component implements the same pattern and was the template copied everywhere else; raw (non-componentized) inputs on login/page.tsx (credential field), posts/[id]/page.tsx and expenses/[id]/page.tsx (guest-name + comment-text fields on the comment form), and profile/comments/page.tsx (inline comment-edit textarea) each had the counter added by hand in Phase 32, closing the last remaining gaps — at the time of writing there is no known maxLength input anywhere on the site without a counter."
+        - id: validate_password_visibility_toggle_rule
+          label: "Password show/hide toggle — every password input, both domains, no exceptions (Phase 43, NEW)"
+          scope: frontend
+          location: ["frontend/components/admin/fields/AdminInput.tsx", "frontend/app/[locale]/login/page.tsx", "frontend/app/[locale]/register/page.tsx", "frontend/app/[locale]/profile/page.tsx", "frontend/app/[locale]/admin/members/page.tsx", "frontend/app/[locale]/admin/members/[id]/page.tsx"]
+          notes: "Standing project rule: every password input anywhere on the site or in the admin panel must offer a button that toggles the field between masked and plaintext display (Eye/EyeOff icons from lucide-react, tabIndex={-1} so it never steals tab order). Admin panel: AdminInput.tsx (the panel's sole text-input primitive) implements this generically — internal `revealed` state plus a built-in toggle button rendered whenever `type='password'` — so every admin password field (form_admin_member_create's password/passwordConfirm, form_admin_member_change_password's newPassword/confirmPassword) gets the toggle automatically with no per-page code, the same way maxLength counters are inherited (see validate_character_counter_rule). Main site: login/page.tsx already had a hand-built toggle pre-dating this phase (confirmed, unchanged); register/page.tsx's password/confirm_password fields and profile/page.tsx's new-password field (password-change form) each gained one in Phase 43 via a local Eye/EyeOff button passed as a `rightElement` into register's new Field wrapper (or the equivalent inline pattern on profile). Audited exhaustively across the whole frontend at the end of Phase 43 — confirmed zero remaining `type=\"password\"` inputs anywhere without this toggle."
+        - id: validate_realtime_feedback_rule
+          label: "Real-time field feedback — stacked errors + green-flash-then-clear, every form, both domains, no exceptions (Phase 43, NEW)"
+          scope: frontend
+          location: ["frontend/hooks/useFieldFeedback.ts", "frontend/components/common/PasswordRequirementsChecklist.tsx", "frontend/components/admin/fields/AdminInput.tsx", "frontend/components/admin/fields/AdminTextarea.tsx", "frontend/app/[locale]/login/page.tsx", "frontend/app/[locale]/register/page.tsx", "frontend/app/[locale]/posts/[id]/page.tsx", "frontend/app/[locale]/expenses/[id]/page.tsx", "frontend/app/[locale]/contribute/page.tsx", "frontend/app/[locale]/profile/page.tsx", "frontend/app/[locale]/profile/comments/page.tsx", "frontend/app/[locale]/contact/page.tsx", "frontend/app/[locale]/admin/members/page.tsx", "frontend/app/[locale]/admin/members/[id]/page.tsx"]
+          notes: "Standing project rule, sitewide AND admin-panel-wide with no exceptions: when a real-time (per-keystroke) validation error is showing and the user fixes it, the message does not just vanish — it turns green for FIELD_FEEDBACK_FLASH_MS=1800ms (chosen as a duration long enough to register but short enough not to linger) and only then clears, both for single-error fields and for a checklist of several simultaneously-tracked rules (e.g. password-strength's 4 rules), each of which independently flashes green and disappears the instant IT individually becomes satisfied rather than waiting for all of them, and multiple distinct errors on the same field stack and clear independently rather than only ever showing one at a time. Implemented by two hooks in the new frontend/hooks/useFieldFeedback.ts: useTransientError(error, duration=1800) for a single message (used directly by AdminInput.tsx/AdminTextarea.tsx — making every admin form field that passes an `error` prop compliant automatically — and by 10 main-site page files' own per-field state), and useChecklistFeedback(rules, duration=1800) for multiple simultaneously-active rules, used exclusively inside the new frontend/components/common/PasswordRequirementsChecklist.tsx (built on the new passwordRules() checklist variant of passwordStrengthError in frontend/lib/validation.ts), which itself is wired into exactly the 4 forms where a member composes a brand-new password: form_register, form_profile_change_password, form_admin_member_create, form_admin_member_change_password. Audited exhaustively across the whole frontend at the end of Phase 43 to confirm no real-time-validated field anywhere was left on the old instant-disappear behavior."
 
 file_upload_handlers:
   scope: both

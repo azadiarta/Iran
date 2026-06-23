@@ -8,6 +8,7 @@ import { authAPI } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
 import Turnstile from '@/components/common/Turnstile';
+import { useTransientError } from '@/hooks/useFieldFeedback';
 import {
   isValidPhoneOrEmail,
   isValidPhoneLenient,
@@ -36,6 +37,8 @@ export default function LoginPage() {
   const [fieldErrors, setFieldErrors] = useState<{ credential?: string; password?: string }>({});
   const [captchaToken, setCaptchaToken] = useState('');
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
+  const credentialFeedback = useTransientError(fieldErrors.credential);
+  const passwordFeedback = useTransientError(fieldErrors.password);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -159,16 +162,21 @@ export default function LoginPage() {
               className="w-full rounded-xl px-4 py-3 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50"
               style={{
                 background: 'rgba(255,255,255,0.05)',
-                border: fieldErrors.credential ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.1)',
+                border:
+                  credentialFeedback.status === 'error'
+                    ? '1px solid #ef4444'
+                    : credentialFeedback.status === 'success'
+                    ? '1px solid #10b981'
+                    : '1px solid rgba(255,255,255,0.1)',
               }}
               onFocus={(e) => {
-                if (!fieldErrors.credential) {
+                if (credentialFeedback.status === 'idle') {
                   e.currentTarget.style.border = '1px solid #00ffff';
                   e.currentTarget.style.boxShadow = '0 0 12px rgba(0,255,255,0.2)';
                 }
               }}
               onBlur={(e) => {
-                if (!fieldErrors.credential) {
+                if (credentialFeedback.status === 'idle') {
                   e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
                   e.currentTarget.style.boxShadow = 'none';
                 }
@@ -176,9 +184,13 @@ export default function LoginPage() {
               placeholder="you@example.com"
             />
             <div className="flex items-start justify-between gap-2">
-              {fieldErrors.credential ? (
-                <p className="text-xs" style={{ color: '#ef4444' }} role="alert">
-                  {fieldErrors.credential}
+              {credentialFeedback.message ? (
+                <p
+                  className="text-xs transition-colors duration-300"
+                  style={{ color: credentialFeedback.status === 'success' ? '#10b981' : '#ef4444' }}
+                  role="alert"
+                >
+                  {credentialFeedback.message}
                 </p>
               ) : (
                 <span />
@@ -212,16 +224,21 @@ export default function LoginPage() {
                 className="w-full rounded-xl px-4 py-3 pr-12 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50"
                 style={{
                   background: 'rgba(255,255,255,0.05)',
-                  border: fieldErrors.password ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.1)',
+                  border:
+                    passwordFeedback.status === 'error'
+                      ? '1px solid #ef4444'
+                      : passwordFeedback.status === 'success'
+                      ? '1px solid #10b981'
+                      : '1px solid rgba(255,255,255,0.1)',
                 }}
                 onFocus={(e) => {
-                  if (!fieldErrors.password) {
+                  if (passwordFeedback.status === 'idle') {
                     e.currentTarget.style.border = '1px solid #00ffff';
                     e.currentTarget.style.boxShadow = '0 0 12px rgba(0,255,255,0.2)';
                   }
                 }}
                 onBlur={(e) => {
-                  if (!fieldErrors.password) {
+                  if (passwordFeedback.status === 'idle') {
                     e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
                     e.currentTarget.style.boxShadow = 'none';
                   }
@@ -238,9 +255,13 @@ export default function LoginPage() {
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
-            {fieldErrors.password && (
-              <p className="text-xs" style={{ color: '#ef4444' }} role="alert">
-                {fieldErrors.password}
+            {passwordFeedback.message && (
+              <p
+                className="text-xs transition-colors duration-300"
+                style={{ color: passwordFeedback.status === 'success' ? '#10b981' : '#ef4444' }}
+                role="alert"
+              >
+                {passwordFeedback.message}
               </p>
             )}
           </div>

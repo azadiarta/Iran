@@ -20,6 +20,7 @@ import AdminToggle from '@/components/admin/fields/AdminToggle';
 import Turnstile from '@/components/common/Turnstile';
 import useAuthStore from '@/store/authStore';
 import { SHORT_TEXT_PUBLIC_MAX_LENGTH, requiredFieldError } from '@/lib/validation';
+import { useTransientError } from '@/hooks/useFieldFeedback';
 
 const AMOUNT_REGEX = /^\d{0,9}(\.\d{0,2})?$/;
 
@@ -95,6 +96,9 @@ export default function ContributePage() {
   const [message, setMessage] = useState('');
   const [captchaToken, setCaptchaToken] = useState('');
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
+  const amountFeedback = useTransientError(amountError || undefined);
+  const guestNameFeedback = useTransientError(guestNameError || undefined);
+  const customDisplayNameFeedback = useTransientError(customDisplayNameError || undefined);
 
   useEffect(() => {
     const fetchMethods = async () => {
@@ -322,8 +326,13 @@ export default function ContributePage() {
             className="w-full pl-10 pr-4 py-4 text-xl font-bold rounded-2xl bg-white/5 border border-white/10 text-white placeholder-white/20 outline-none focus:border-[#00ffff] focus:ring-1 focus:ring-[#00ffff]/30 transition-all"
           />
         </div>
-        {amountError && (
-          <p className="mt-2 text-xs" style={{ color: '#ef4444' }}>{amountError}</p>
+        {amountFeedback.message && (
+          <p
+            className="mt-2 text-xs transition-colors duration-300"
+            style={{ color: amountFeedback.status === 'success' ? '#10b981' : '#ef4444' }}
+          >
+            {amountFeedback.message}
+          </p>
         )}
       </div>
 
@@ -341,11 +350,23 @@ export default function ContributePage() {
             placeholder={t('contribute.guest_name_placeholder')}
             maxLength={SHORT_TEXT_PUBLIC_MAX_LENGTH}
             className="w-full px-4 py-3 rounded-2xl bg-white/5 border text-white placeholder-white/20 outline-none focus:ring-1 focus:ring-[#00ffff]/30 transition-all"
-            style={{ borderColor: guestNameError ? '#ef4444' : 'rgba(255,255,255,0.1)' }}
+            style={{
+              borderColor:
+                guestNameFeedback.status === 'error'
+                  ? '#ef4444'
+                  : guestNameFeedback.status === 'success'
+                  ? '#10b981'
+                  : 'rgba(255,255,255,0.1)',
+            }}
           />
           <div className="mt-1 flex items-start justify-between gap-2">
-            {guestNameError ? (
-              <p className="text-xs" style={{ color: '#ef4444' }}>{guestNameError}</p>
+            {guestNameFeedback.message ? (
+              <p
+                className="text-xs transition-colors duration-300"
+                style={{ color: guestNameFeedback.status === 'success' ? '#10b981' : '#ef4444' }}
+              >
+                {guestNameFeedback.message}
+              </p>
             ) : <span />}
             <p className="text-xs text-white/30 text-right whitespace-nowrap">
               {guestName.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}
@@ -463,13 +484,25 @@ export default function ContributePage() {
                   maxLength={SHORT_TEXT_PUBLIC_MAX_LENGTH}
                   placeholder={t('contribute.custom_name_placeholder')}
                   className="mt-3 w-full px-4 py-3 rounded-2xl bg-white/5 border text-white placeholder-white/20 outline-none focus:ring-1 focus:ring-[#00ffff]/30 transition-all"
-                  style={{ borderColor: customDisplayNameError ? '#ef4444' : 'rgba(255,255,255,0.1)' }}
+                  style={{
+                    borderColor:
+                      customDisplayNameFeedback.status === 'error'
+                        ? '#ef4444'
+                        : customDisplayNameFeedback.status === 'success'
+                        ? '#10b981'
+                        : 'rgba(255,255,255,0.1)',
+                  }}
                 />
               )}
               {displayNameChoice === 'custom' && (
                 <div className="mt-1 flex items-start justify-between gap-2">
-                  {customDisplayNameError ? (
-                    <p className="text-xs" style={{ color: '#ef4444' }}>{customDisplayNameError}</p>
+                  {customDisplayNameFeedback.message ? (
+                    <p
+                      className="text-xs transition-colors duration-300"
+                      style={{ color: customDisplayNameFeedback.status === 'success' ? '#10b981' : '#ef4444' }}
+                    >
+                      {customDisplayNameFeedback.message}
+                    </p>
                   ) : <span />}
                   <p className="text-xs text-white/30 text-right whitespace-nowrap">
                     {customDisplayName.length}/{SHORT_TEXT_PUBLIC_MAX_LENGTH}

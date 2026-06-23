@@ -7,6 +7,7 @@ import AdminInput from '@/components/admin/fields/AdminInput';
 import AdminSelect from '@/components/admin/fields/AdminSelect';
 import AdminTextarea from '@/components/admin/fields/AdminTextarea';
 import AdminConfirmDialog from '@/components/admin/AdminConfirmDialog';
+import PasswordRequirementsChecklist from '@/components/common/PasswordRequirementsChecklist';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
 import useAuthStore from '@/store/authStore';
 import useToastStore from '@/store/toastStore';
@@ -599,18 +600,25 @@ export default function AdminMemberDetailPage() {
                 <KeyRound className="w-4 h-4" style={{ color: '#fbbf24' }} />
                 {isRTL ? 'تغییر رمز عبور' : 'Change Password'}
               </h2>
-              <AdminInput
-                label={isRTL ? 'رمز عبور جدید' : 'New Password'}
-                type="password"
-                value={newPassword}
-                onChange={(e) => handleNewPasswordChange(e.target.value)}
-                error={passwordFieldErrors.new_password}
-                hint={
-                  isRTL
-                    ? 'حداقل ۸ نویسه، ترکیبی از حروف و اعداد، شامل حداقل یک حرف بزرگ و یک کاراکتر خاص.'
-                    : 'At least 8 characters, with letters and numbers, including one uppercase letter and one special character.'
-                }
-              />
+              <div>
+                <AdminInput
+                  label={isRTL ? 'رمز عبور جدید' : 'New Password'}
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => handleNewPasswordChange(e.target.value)}
+                  error={passwordFieldErrors.new_password}
+                  hideMessage
+                />
+                {newPassword ? (
+                  <PasswordRequirementsChecklist isRTL={isRTL} value={newPassword} />
+                ) : (
+                  <p className="mt-1 text-xs text-white/30">
+                    {isRTL
+                      ? 'حداقل ۸ نویسه، ترکیبی از حروف و اعداد، شامل حداقل یک حرف بزرگ و یک کاراکتر خاص.'
+                      : 'At least 8 characters, with letters and numbers, including one uppercase letter and one special character.'}
+                  </p>
+                )}
+              </div>
               <AdminInput
                 label={isRTL ? 'تکرار رمز عبور' : 'Confirm Password'}
                 type="password"

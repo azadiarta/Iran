@@ -8,6 +8,8 @@ import { authAPI } from '@/lib/api';
 import useAuthStore from '@/store/authStore';
 import { LionAndSun } from '@/components/animations/IranianSymbols';
 import Turnstile from '@/components/common/Turnstile';
+import PasswordRequirementsChecklist from '@/components/common/PasswordRequirementsChecklist';
+import { useTransientError } from '@/hooks/useFieldFeedback';
 import {
   isValidPhoneStrict,
   isValidEmail,
@@ -71,6 +73,7 @@ function Field({
   rightElement?: React.ReactNode;
   maxLength?: number;
 }) {
+  const feedback = useTransientError(error);
   return (
     <div className="space-y-1.5">
       <label htmlFor={id} className="block text-sm font-medium" style={{ color: '#00ffff' }}>
@@ -89,17 +92,22 @@ function Field({
           className="w-full rounded-xl px-4 py-3 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50"
           style={{
             background: 'rgba(255,255,255,0.05)',
-            border: error ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.1)',
+            border:
+              feedback.status === 'error'
+                ? '1px solid #ef4444'
+                : feedback.status === 'success'
+                ? '1px solid #10b981'
+                : '1px solid rgba(255,255,255,0.1)',
             paddingRight: rightElement ? '3rem' : undefined,
           }}
           onFocus={(e) => {
-            if (!error) {
+            if (feedback.status === 'idle') {
               e.currentTarget.style.border = '1px solid #00ffff';
               e.currentTarget.style.boxShadow = '0 0 12px rgba(0,255,255,0.2)';
             }
           }}
           onBlur={(e) => {
-            if (!error) {
+            if (feedback.status === 'idle') {
               e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
               e.currentTarget.style.boxShadow = 'none';
             }
@@ -109,17 +117,21 @@ function Field({
           <div className="absolute right-3 top-1/2 -translate-y-1/2">{rightElement}</div>
         )}
       </div>
-      {(hint || error || typeof maxLength === 'number') && (
+      {(hint || feedback.message || typeof maxLength === 'number') && (
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-1">
-            {hint && !error && (
+            {hint && !feedback.message && (
               <p className="text-xs" style={{ color: 'rgba(251,191,36,0.6)' }}>
                 {hint}
               </p>
             )}
-            {error && (
-              <p className="text-xs" style={{ color: '#ef4444' }} role="alert">
-                {error}
+            {feedback.message && (
+              <p
+                className="text-xs transition-colors duration-300"
+                style={{ color: feedback.status === 'success' ? '#10b981' : '#ef4444' }}
+                role="alert"
+              >
+                {feedback.message}
               </p>
             )}
           </div>
@@ -160,6 +172,8 @@ export default function RegisterPage() {
   const [generalError, setGeneralError] = useState('');
   const [captchaToken, setCaptchaToken] = useState('');
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
+  const passwordFeedback = useTransientError(fieldErrors.password);
+  const confirmPasswordFeedback = useTransientError(fieldErrors.confirm_password);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -447,16 +461,21 @@ export default function RegisterPage() {
                 className="w-full rounded-xl px-4 py-3 pr-12 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50"
                 style={{
                   background: 'rgba(255,255,255,0.05)',
-                  border: fieldErrors.password ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.1)',
+                  border:
+                    passwordFeedback.status === 'error'
+                      ? '1px solid #ef4444'
+                      : passwordFeedback.status === 'success'
+                      ? '1px solid #10b981'
+                      : '1px solid rgba(255,255,255,0.1)',
                 }}
                 onFocus={(e) => {
-                  if (!fieldErrors.password) {
+                  if (passwordFeedback.status === 'idle') {
                     e.currentTarget.style.border = '1px solid #00ffff';
                     e.currentTarget.style.boxShadow = '0 0 12px rgba(0,255,255,0.2)';
                   }
                 }}
                 onBlur={(e) => {
-                  if (!fieldErrors.password) {
+                  if (passwordFeedback.status === 'idle') {
                     e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
                     e.currentTarget.style.boxShadow = 'none';
                   }
@@ -472,10 +491,8 @@ export default function RegisterPage() {
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
-            {fieldErrors.password ? (
-              <p className="text-xs" style={{ color: '#ef4444' }} role="alert">
-                {fieldErrors.password}
-              </p>
+            {form.password ? (
+              <PasswordRequirementsChecklist isRTL={isRTL} value={form.password} />
             ) : (
               <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
                 {t('password_hint')}
@@ -501,16 +518,21 @@ export default function RegisterPage() {
                 className="w-full rounded-xl px-4 py-3 pr-12 text-white placeholder-white/30 outline-none transition-all duration-200 disabled:opacity-50"
                 style={{
                   background: 'rgba(255,255,255,0.05)',
-                  border: fieldErrors.confirm_password ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.1)',
+                  border:
+                    confirmPasswordFeedback.status === 'error'
+                      ? '1px solid #ef4444'
+                      : confirmPasswordFeedback.status === 'success'
+                      ? '1px solid #10b981'
+                      : '1px solid rgba(255,255,255,0.1)',
                 }}
                 onFocus={(e) => {
-                  if (!fieldErrors.confirm_password) {
+                  if (confirmPasswordFeedback.status === 'idle') {
                     e.currentTarget.style.border = '1px solid #00ffff';
                     e.currentTarget.style.boxShadow = '0 0 12px rgba(0,255,255,0.2)';
                   }
                 }}
                 onBlur={(e) => {
-                  if (!fieldErrors.confirm_password) {
+                  if (confirmPasswordFeedback.status === 'idle') {
                     e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
                     e.currentTarget.style.boxShadow = 'none';
                   }
@@ -526,9 +548,13 @@ export default function RegisterPage() {
                 {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
-            {fieldErrors.confirm_password && (
-              <p className="text-xs" style={{ color: '#ef4444' }} role="alert">
-                {fieldErrors.confirm_password}
+            {confirmPasswordFeedback.message && (
+              <p
+                className="text-xs transition-colors duration-300"
+                style={{ color: confirmPasswordFeedback.status === 'success' ? '#10b981' : '#ef4444' }}
+                role="alert"
+              >
+                {confirmPasswordFeedback.message}
               </p>
             )}
           </div>
