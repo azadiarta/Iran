@@ -8,7 +8,8 @@ from django.db import models
 # Superuser sees all; group admins see scoped subset per access rules.
 # action values: created_post, deleted_comment, changed_permission, login, logout,
 #   failed_login, contributed, added_expense, approved_comment, edited_post,
-#   deleted_post, changed_group, created_member, deactivated_member
+#   deleted_post, changed_group, created_member, deactivated_member,
+#   password_vault_viewed
 
 class ActivityLog(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

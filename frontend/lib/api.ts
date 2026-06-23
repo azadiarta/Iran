@@ -673,6 +673,21 @@ export interface MemberFullProfile {
   activity_logs: ActivityLogEntry[];
 }
 
+// Superuser-only password vault (backend/pwvault) — envelope fields are all
+// base64; real decryption happens client-side via lib/vaultCrypto.ts.
+export interface VaultPasswordEnvelope {
+  salt1: string;
+  nonce1: string;
+  salt2: string;
+  nonce2: string;
+  ciphertext: string;
+}
+
+export interface VaultPasswordResponse {
+  has_password: boolean;
+  envelope: VaultPasswordEnvelope | null;
+}
+
 export const membersAPI = {
   getPublicCount: () => api.get<ApiResponse>('/api/members/count/'),
 
@@ -696,6 +711,10 @@ export const membersAPI = {
       confirm_new_password: string;
     }
   ) => api.post<ApiResponse>(`/api/members/${id}/change-password/`, data),
+
+  // Superuser-only — see backend/pwvault. Not gated by can_change_any_password.
+  getVaultPassword: (id: string) =>
+    api.get<ApiResponse<VaultPasswordResponse>>(`/api/members/${id}/vault-password/`),
 
   // ── Admin ──────────────────────────────────────────────────────────────
   getList: (

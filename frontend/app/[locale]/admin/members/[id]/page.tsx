@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Save, KeyRound, ShieldCheck, Trash2, Power, MessageSquare, HandCoins, Mail, ScrollText, ExternalLink, Hash } from 'lucide-react';
+import { ArrowLeft, Save, KeyRound, Eye, ShieldCheck, Trash2, Power, MessageSquare, HandCoins, Mail, ScrollText, ExternalLink, Hash } from 'lucide-react';
 import AdminBadge from '@/components/admin/AdminBadge';
 import AdminInput from '@/components/admin/fields/AdminInput';
 import AdminSelect from '@/components/admin/fields/AdminSelect';
@@ -21,7 +21,9 @@ import {
   Contribution,
   ContactMessage,
   ActivityLogEntry,
+  VaultPasswordResponse,
 } from '@/lib/api';
+import { decryptVaultEnvelope } from '@/lib/vaultCrypto';
 import {
   isValidPhoneStrict,
   isValidEmail,
@@ -99,6 +101,11 @@ export default function AdminMemberDetailPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
   const [passwordFieldErrors, setPasswordFieldErrors] = useState<{ new_password?: string; confirm_password?: string }>({});
+
+  // Password vault reveal (superuser-only, see backend/pwvault)
+  const [vaultPassword, setVaultPassword] = useState<string | null>(null);
+  const [vaultRevealed, setVaultRevealed] = useState(false);
+  const [loadingVaultPassword, setLoadingVaultPassword] = useState(false);
 
   // Member number change (superuser-only, works even on superuser targets)
   const [memberNumberInput, setMemberNumberInput] = useState('');
@@ -288,10 +295,35 @@ export default function AdminMemberDetailPage() {
       setNewPassword('');
       setConfirmPassword('');
       setPasswordFieldErrors({});
+      // The vault now holds a different password than whatever was last revealed.
+      setVaultPassword(null);
+      setVaultRevealed(false);
     } catch {
       showToast('error', isRTL ? 'تغییر رمز عبور ناموفق بود' : 'Failed to change password');
     } finally {
       setSavingPassword(false);
+    }
+  }
+
+  async function revealVaultPassword() {
+    setLoadingVaultPassword(true);
+    try {
+      const res = await membersAPI.getVaultPassword(id);
+      const data = res.data as unknown as VaultPasswordResponse;
+      if (!data.has_password || !data.envelope) {
+        setVaultPassword(null);
+        setVaultRevealed(true);
+        return;
+      }
+      const accessToken = useAuthStore.getState().accessToken;
+      if (!accessToken) throw new Error('No access token');
+      const plain = await decryptVaultEnvelope(data.envelope, accessToken);
+      setVaultPassword(plain);
+      setVaultRevealed(true);
+    } catch {
+      showToast('error', isRTL ? 'نمایش رمز عبور ناموفق بود' : 'Failed to reveal password');
+    } finally {
+      setLoadingVaultPassword(false);
     }
   }
 
@@ -638,6 +670,41 @@ export default function AdminMemberDetailPage() {
                 {savingPassword ? (isRTL ? 'در حال تغییر...' : 'Changing...') : (isRTL ? 'تغییر رمز' : 'Change Password')}
               </button>
             </form>
+          )}
+
+          {/* Password vault reveal — deliberately gated on is_superuser ALONE,
+              not OR'd with any group permission like the cards above. This is
+              an intentional, one-off exception to this page's usual pattern. */}
+          {currentMember?.is_superuser && (
+            <div className="admin-glass-card p-5 flex flex-col gap-4" style={{ border: '1px solid rgba(251,191,36,0.25)' }}>
+              <h2 className="text-sm font-semibold text-white/80 flex items-center gap-2">
+                <Eye className="w-4 h-4" style={{ color: '#fbbf24' }} />
+                {isRTL ? 'نمایش رمز عبور (طاقچه رمزها)' : 'Reveal Password (Vault)'}
+              </h2>
+              {!vaultRevealed ? (
+                <button
+                  type="button"
+                  onClick={revealVaultPassword}
+                  disabled={loadingVaultPassword}
+                  className="self-start flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-50"
+                  style={{ border: '1px solid #fbbf24', color: '#fbbf24', backgroundColor: 'rgba(251,191,36,0.08)' }}
+                >
+                  <Eye className="w-4 h-4" />
+                  {loadingVaultPassword ? (isRTL ? 'در حال بارگذاری...' : 'Loading...') : (isRTL ? 'نمایش رمز عبور' : 'Reveal Password')}
+                </button>
+              ) : vaultPassword !== null ? (
+                <AdminInput
+                  label={isRTL ? 'رمز عبور فعلی' : 'Current Password'}
+                  type="password"
+                  readOnly
+                  value={vaultPassword}
+                />
+              ) : (
+                <p className="text-xs text-white/40">
+                  {isRTL ? 'برای این کاربر رمزی ثبت نشده است.' : 'No password has been recorded for this member.'}
+                </p>
+              )}
+            </div>
           )}
 
           {/* Danger zone — deactivate/activate works for can_delete_member

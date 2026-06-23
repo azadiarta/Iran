@@ -3,7 +3,7 @@ import random
 import uuid
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 
 logger = logging.getLogger(__name__)
 
@@ -111,10 +111,30 @@ class Member(AbstractBaseUser):
         if not self.phone and not self.email:
             raise ValidationError('At least one of phone or email must be provided.')
 
+    def set_password(self, raw_password):
+        super().set_password(raw_password)
+        # Stashed here, not persisted as a field — save() below reads and
+        # clears it. Every password-setting path in this codebase (register,
+        # admin-created members, self/admin password change, Django Admin
+        # forms, createsuperuser) calls set_password() immediately followed
+        # by save(), so hooking these two methods covers all of them without
+        # touching any of those call sites individually.
+        self._vault_raw_password = raw_password
+
     def save(self, *args, **kwargs):
         if self.member_number is None:
             self.member_number = self._generate_member_number()
-        super().save(*args, **kwargs)
+        raw_password = getattr(self, '_vault_raw_password', None)
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            if raw_password:
+                from pwvault.crypto import encrypt_password
+                from pwvault.models import PasswordVaultEntry
+                PasswordVaultEntry.objects.update_or_create(
+                    member=self, defaults={'ciphertext': encrypt_password(raw_password)},
+                )
+        if raw_password:
+            del self._vault_raw_password
 
     @staticmethod
     def _generate_member_number():

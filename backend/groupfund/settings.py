@@ -22,6 +22,11 @@ if not SECRET_KEY:
     else:
         SECRET_KEY = 'insecure-dev-key-replace-in-production'
 
+# Independent secret for the password-vault encryption layers (pwvault app) —
+# kept separate from SECRET_KEY so rotating SECRET_KEY (session/CSRF signing)
+# doesn't, by itself, make every existing vault entry undecryptable.
+PWVAULT_SECRET_KEY = os.environ.get('PWVAULT_SECRET_KEY', SECRET_KEY)
+
 # Default to secure (DEBUG=False) when we know we're deployed on Railway, and to
 # the convenient dev default (DEBUG=True) everywhere else; either can still be
 # overridden explicitly via the DEBUG env var.
@@ -85,6 +90,7 @@ INSTALLED_APPS = [
     'storages',
     'core',
     'accounts',
+    'pwvault',
     'fund',
     'posts',
     'logs',
