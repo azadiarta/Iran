@@ -64,6 +64,15 @@ def _client_public_key_or_error(request):
         return None, api_error('Invalid "epk" query parameter.', status_code=400)
 
 
+def _token_bytes_from_request(request) -> bytes:
+    """Raw JWT access token that authenticated this very request -- the
+    shared secret behind pwvault/transport.py's inner token-bound encryption
+    layer. Never logged, never echoed back to the client."""
+    auth_header = request.headers.get('Authorization', '')
+    token_str = auth_header[7:] if auth_header.startswith('Bearer ') else auth_header
+    return token_str.encode('utf-8')
+
+
 class MemberVaultPasswordView(APIView):
     # Superuser-only — deliberately NOT extended with HasGroupPermission like
     # every other admin endpoint in this codebase (see accounts/permissions.py).
@@ -94,7 +103,9 @@ class MemberVaultPasswordView(APIView):
         if plaintext is None:
             return api_success(data={'has_password': False, 'envelope': None})
 
-        envelope = encrypt_for_transport_e2e(plaintext, client_public_key, member.id)
+        envelope = encrypt_for_transport_e2e(
+            plaintext, client_public_key, member.id, _token_bytes_from_request(request)
+        )
         return api_success(data={'has_password': True, 'envelope': envelope})
 
 
@@ -131,6 +142,7 @@ class MemberVaultPasswordHistoryView(APIView):
 
         bulk = encrypt_many_for_transport_e2e(
             [plaintext for _row, plaintext in decryptable], client_public_key, member.id,
+            _token_bytes_from_request(request),
         )
         entries = [
             {'sequence': row.sequence, 'created_at': row.created_at.isoformat(), **envelope}

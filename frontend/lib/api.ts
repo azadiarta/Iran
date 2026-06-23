@@ -674,13 +674,19 @@ export interface MemberFullProfile {
 }
 
 // Superuser-only password vault (backend/pwvault) — envelope fields are all
-// base64; real end-to-end decryption (ECDH P-256 + AES-256-GCM) happens
-// client-side via lib/vaultCrypto.ts. `server_epk` is the server's one-time
-// ECDH public key for this exchange; `salt` is the HKDF salt — neither needs
-// to be secret.
+// base64; real end-to-end decryption happens client-side via
+// lib/vaultCrypto.ts, peeling off two layers: an outer ECDH P-256 +
+// AES-256-GCM exchange (`server_epk`/`salt`, shared per response, plus each
+// entry's own `nonce1`/`nonce2`/`ciphertext`), then an inner access-token-
+// bound AES-256-GCM layer (`jwt_salt1`/`jwt_nonce1`/`jwt_salt2`/`jwt_nonce2`,
+// unique per entry). None of these values need to be secret on their own.
 export interface VaultPasswordEnvelope {
   server_epk: string;
   salt: string;
+  jwt_salt1: string;
+  jwt_nonce1: string;
+  jwt_salt2: string;
+  jwt_nonce2: string;
   nonce1: string;
   nonce2: string;
   ciphertext: string;
@@ -694,6 +700,10 @@ export interface VaultPasswordResponse {
 export interface VaultPasswordHistoryEntryEnvelope {
   sequence: number;
   created_at: string;
+  jwt_salt1: string;
+  jwt_nonce1: string;
+  jwt_salt2: string;
+  jwt_nonce2: string;
   nonce1: string;
   nonce2: string;
   ciphertext: string;

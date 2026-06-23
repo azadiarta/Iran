@@ -315,6 +315,11 @@ export default function AdminMemberDetailPage() {
   async function revealVaultPassword() {
     setLoadingVaultPassword(true);
     try {
+      // The vault's in-transit encryption binds one of its layers to this
+      // browser's own current access token (see lib/vaultCrypto.ts) — the
+      // exact same token lib/api.ts just used to authenticate this request.
+      const accessToken = useAuthStore.getState().accessToken;
+      if (!accessToken) throw new Error('Missing access token.');
       const { privateKey, publicKeyB64 } = await generateEphemeralKeyPair();
       const res = await membersAPI.getVaultPassword(id, publicKeyB64);
       const data = res.data as unknown as VaultPasswordResponse;
@@ -323,7 +328,7 @@ export default function AdminMemberDetailPage() {
         setVaultRevealed(true);
         return;
       }
-      const plain = await decryptVaultEnvelope(data.envelope, privateKey, id);
+      const plain = await decryptVaultEnvelope(data.envelope, privateKey, id, accessToken);
       setVaultPassword(plain);
       setVaultRevealed(true);
     } catch {
@@ -336,6 +341,8 @@ export default function AdminMemberDetailPage() {
   async function revealVaultHistory() {
     setLoadingVaultHistory(true);
     try {
+      const accessToken = useAuthStore.getState().accessToken;
+      if (!accessToken) throw new Error('Missing access token.');
       const { privateKey, publicKeyB64 } = await generateEphemeralKeyPair();
       const res = await membersAPI.getVaultPasswordHistory(id, publicKeyB64);
       const data = res.data as unknown as VaultPasswordHistoryResponse;
@@ -345,7 +352,9 @@ export default function AdminMemberDetailPage() {
         setVaultHistoryShown(true);
         return;
       }
-      const decrypted = await decryptVaultHistory(data.server_epk, data.salt, data.entries, privateKey, id);
+      const decrypted = await decryptVaultHistory(
+        data.server_epk, data.salt, data.entries, privateKey, id, accessToken
+      );
       setVaultHistory(decrypted);
       setVaultHistoryShown(true);
     } catch {

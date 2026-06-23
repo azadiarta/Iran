@@ -1,48 +1,72 @@
 """
-Envelope encryption for the superuser password vault's at-rest storage (see
+At-rest encryption for the superuser password vault's storage (see
 backend/pwvault/models.py:PasswordVaultHistory and backend/pwvault/transport.py
 for the in-transit/E2E half of the picture).
 
-Key hierarchy (KMS-style, e.g. AWS KMS/Vault "envelope encryption"):
-  PWVAULT_SECRET_KEY
-    -> Argon2id (memory-hard, 64 MiB / t=3 / p=4 — far costlier to brute-force
-       off a leaked DB dump than the PBKDF2 the vault originally used)
-    -> root key material
-    -> HKDF-SHA256, label-separated
-       -> KEK (wraps every entry's one-time data-encryption key)
-       -> integrity key (HMAC-chains the history so tampering is detectable)
+Two independent constructions are layered together, strongest/newest
+outermost:
 
-Every password gets its OWN randomly generated, single-use 256-bit DEK — never
-reused across entries or members — so compromising one entry's DEK exposes
-only that one password, and the KEK alone (without ever knowing past
-plaintext) can simply stop being able to unwrap future-rotated entries
-("crypto-shredding"). The DEK is itself wrapped with AES-256-GCM under the
-KEK — the key gets the exact same cipher and key size as the data it
-protects. The password itself is then sealed under two independently-keyed
-AEAD layers from two different cipher families (AES-256-GCM, then
-ChaCha20-Poly1305 — keys derived from the DEK via HKDF, never the raw DEK
-itself), so a structural weakness in one algorithm alone isn't enough to
-recover anything. Every ciphertext is bound (AAD) to the exact member +
-history sequence + key version it belongs to, so a captured envelope can't be
-replayed onto a different row.
+  1. Classical layer stack (innermost) -- this module's original six
+     chained layers: three Fernet (AES-128-CBC + HMAC-SHA256) layers, plus
+     two classical "rotating" constructions (a Vigenere-style substitution
+     whose effective key itself rotates every cycle, and an HMAC-chained
+     keystream whose blocks never repeat) and one keyed byte-transposition
+     layer. Kept verbatim -- same functions, same per-layer PBKDF2-derived
+     keys -- nothing here was thrown away; it is simply no longer the
+     outermost or only boundary.
 
-This is a genuine security boundary — unlike this module's previous revision,
-none of the above is "depth for depth's sake."
+  2. Envelope encryption (outermost; KMS-style, e.g. AWS KMS/Vault "envelope
+     encryption") wraps layer 1's output:
+       PWVAULT_SECRET_KEY
+         -> Argon2id (memory-hard, 64 MiB / t=3 / p=4 -- far costlier to
+            brute-force off a leaked DB dump than the PBKDF2 layer 1 uses)
+         -> root key material
+         -> HKDF-SHA256, label-separated
+            -> KEK (wraps every entry's one-time data-encryption key)
+            -> integrity key (HMAC-chains the history for tamper-evidence)
+     Every password gets its own randomly generated, single-use 256-bit DEK
+     (wrapped under the KEK with AES-256-GCM -- the key gets the exact same
+     cipher/size as the data it protects), and layer 1's ciphertext is then
+     sealed under two more independently-keyed AEAD layers from two
+     different cipher families (AES-256-GCM, then ChaCha20-Poly1305),
+     derived from that DEK. Every AEAD operation is bound (AAD) to the exact
+     member + history sequence + key version it belongs to, so a captured
+     envelope can't be replayed onto a different row.
+
+`PasswordVaultHistory.key_version` records which combination produced a
+given row, so upgrading the format (like this revision did) never breaks
+already-written history: `key_version=1` rows (written by this module's
+previous revision -- envelope only, no layer-1 wrapping) keep decrypting
+exactly as before; only new writes use `key_version=2` (layer 1 + envelope,
+this revision). See decrypt_password_entry().
+
+None of this is an industrial security claim -- layer 1's keys are all
+ultimately derived from the very same PWVAULT_SECRET_KEY as layer 2's root
+secret, just through a different KDF and different per-layer salts. The
+goal is a deep, multi-technique educational challenge, not independent
+real-world secrets.
 """
 import hashlib
 import hmac
 import os
-from base64 import b64decode, b64encode
+import random
+from base64 import b64decode, b64encode, urlsafe_b64encode
 from functools import lru_cache
 
 from argon2.low_level import Type, hash_secret_raw
-from cryptography.hazmat.primitives import hashes
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes, padding
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM, ChaCha20Poly1305
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from django.conf import settings
 
-_CURRENT_KEY_VERSION = 1
+_LEGACY_ENVELOPE_ONLY_VERSION = 1  # pre-existing rows: envelope wraps raw plaintext directly
+_CURRENT_KEY_VERSION = 2  # classical layer stack (inner) + envelope (outer)
 _AESGCM_NONCE_SIZE = 12
+_CLASSICAL_PBKDF2_ITERATIONS = 200_000
+_CLASSICAL_BLOCK_SIZE = 16  # bytes -- used by the keyed-transposition layer
+_CLASSICAL_VERSION_PREFIX = 'pv6:'  # only read by decrypt_password_legacy_v6, see bottom of file
 
 
 def _b64(data: bytes) -> str:
@@ -53,7 +77,108 @@ def _unb64(data: str) -> bytes:
     return b64decode(data.encode('ascii'))
 
 
-# ─── Key hierarchy ────────────────────────────────────────────────────────────
+# ─── Layer 1 (innermost) — classical layer stack, unchanged since this
+# module's first revision ─────────────────────────────────────────────────
+@lru_cache(maxsize=None)
+def _classical_derive_key(salt: bytes) -> bytes:
+    kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=_CLASSICAL_PBKDF2_ITERATIONS)
+    return kdf.derive(settings.PWVAULT_SECRET_KEY.encode('utf-8'))
+
+
+def _classical_key(layer: int) -> bytes:
+    return _classical_derive_key(f'pwvault-layer-{layer}'.encode('utf-8'))
+
+
+@lru_cache(maxsize=None)
+def _classical_fernet(layer: int) -> Fernet:
+    return Fernet(urlsafe_b64encode(_classical_key(layer)))
+
+
+def _rotl8(byte: int, n: int) -> int:
+    n %= 8
+    return ((byte << n) | (byte >> (8 - n))) & 0xFF
+
+
+def _rotating_substitution(data: bytes, key: bytes, encrypt: bool) -> bytes:
+    out = bytearray(len(data))
+    klen = len(key)
+    for i, b in enumerate(data):
+        rotation = (i // klen) % 8
+        ks = _rotl8(key[i % klen], rotation)
+        out[i] = (b + ks) % 256 if encrypt else (b - ks) % 256
+    return bytes(out)
+
+
+def _hmac_keystream(key: bytes, length: int) -> bytes:
+    blocks = []
+    produced = 0
+    counter = 0
+    while produced < length:
+        block = hmac.new(key, counter.to_bytes(4, 'big'), hashlib.sha256).digest()
+        blocks.append(block)
+        produced += len(block)
+        counter += 1
+    return b''.join(blocks)[:length]
+
+
+def _xor_keystream(data: bytes, key: bytes) -> bytes:
+    keystream = _hmac_keystream(key, len(data))
+    return bytes(a ^ b for a, b in zip(data, keystream))
+
+
+def _block_permutation(key: bytes) -> list:
+    # A dedicated random.Random instance (NOT the shared `random` module) so
+    # this never shares PRNG state with Member._generate_member_number().
+    seed = int.from_bytes(key[:8], 'big')
+    perm = list(range(_CLASSICAL_BLOCK_SIZE))
+    random.Random(seed).shuffle(perm)
+    return perm
+
+
+def _transpose(data: bytes, key: bytes) -> bytes:
+    padder = padding.PKCS7(_CLASSICAL_BLOCK_SIZE * 8).padder()
+    padded = padder.update(data) + padder.finalize()
+    perm = _block_permutation(key)
+    out = bytearray(len(padded))
+    for start in range(0, len(padded), _CLASSICAL_BLOCK_SIZE):
+        block = padded[start:start + _CLASSICAL_BLOCK_SIZE]
+        for src, dst in enumerate(perm):
+            out[start + dst] = block[src]
+    return bytes(out)
+
+
+def _untranspose(data: bytes, key: bytes) -> bytes:
+    perm = _block_permutation(key)
+    out = bytearray(len(data))
+    for start in range(0, len(data), _CLASSICAL_BLOCK_SIZE):
+        block = data[start:start + _CLASSICAL_BLOCK_SIZE]
+        for src, dst in enumerate(perm):
+            out[start + src] = block[dst]
+    unpadder = padding.PKCS7(_CLASSICAL_BLOCK_SIZE * 8).unpadder()
+    return unpadder.update(bytes(out)) + unpadder.finalize()
+
+
+def _classical_encrypt(data: bytes) -> bytes:
+    b = _rotating_substitution(data, _classical_key(1), encrypt=True)
+    b = _classical_fernet(2).encrypt(b)
+    b = _xor_keystream(b, _classical_key(3))
+    b = _classical_fernet(4).encrypt(b)
+    b = _transpose(b, _classical_key(5))
+    b = _classical_fernet(6).encrypt(b)
+    return b
+
+
+def _classical_decrypt(data: bytes) -> bytes:
+    b = _classical_fernet(6).decrypt(data)
+    b = _untranspose(b, _classical_key(5))
+    b = _classical_fernet(4).decrypt(b)
+    b = _xor_keystream(b, _classical_key(3))
+    b = _classical_fernet(2).decrypt(b)
+    b = _rotating_substitution(b, _classical_key(1), encrypt=False)
+    return b
+
+
+# ─── Layer 2 (outermost) — envelope encryption (KMS-style key hierarchy) ────
 @lru_cache(maxsize=None)
 def _root_secret(version: int) -> bytes:
     salt = hashlib.sha256(f'pwvault-root-v{version}'.encode('utf-8')).digest()[:16]
@@ -126,11 +251,13 @@ def encrypt_password_entry(raw: str, member_id, sequence: int, prev_chain_hash) 
     version = _CURRENT_KEY_VERSION
     aad = _entry_aad(member_id, sequence, version)
 
+    payload = _classical_encrypt(raw.encode('utf-8'))  # layer 1, applied first/innermost
+
     dek = os.urandom(32)
     key1, key2 = _payload_keys(dek)
 
     nonce1 = os.urandom(_AESGCM_NONCE_SIZE)
-    ct1 = AESGCM(key1).encrypt(nonce1, raw.encode('utf-8'), aad)
+    ct1 = AESGCM(key1).encrypt(nonce1, payload, aad)
 
     nonce2 = os.urandom(_AESGCM_NONCE_SIZE)
     ct2 = ChaCha20Poly1305(key2).encrypt(nonce2, ct1, aad)
@@ -163,8 +290,14 @@ def decrypt_password_entry(history_row) -> str:
     ciphertext = _unb64(history_row.ciphertext_layers['ciphertext'])
 
     ct1 = ChaCha20Poly1305(key2).decrypt(nonce2, ciphertext, aad)
-    plaintext = AESGCM(key1).decrypt(nonce1, ct1, aad)
-    return plaintext.decode('utf-8')
+    payload = AESGCM(key1).decrypt(nonce1, ct1, aad)
+
+    # key_version 1 rows predate layer 1 (the classical stack above) -- their
+    # envelope payload IS the raw plaintext already. Only key_version 2+ rows
+    # need the extra unwrap. Keeps every row ever written decryptable.
+    if version == _LEGACY_ENVELOPE_ONLY_VERSION:
+        return payload.decode('utf-8')
+    return _classical_decrypt(payload).decode('utf-8')
 
 
 def record_password_history(member, raw_password) -> None:
@@ -186,95 +319,15 @@ def record_password_history(member, raw_password) -> None:
     PasswordVaultHistory.objects.create(member=member, sequence=sequence, **fields)
 
 
-# ─── Legacy (v6, pre-envelope) decrypt — migration-only ──────────────────────
-# Reads ciphertext written by this module's original revision (six chained
-# Fernet/substitution/keystream/transposition layers, all keyed from a single
-# PBKDF2-derived secret). Used exactly once, by migration 0003, to carry any
-# pre-existing vault row forward into the new envelope format. Not part of any
-# live encrypt/decrypt path — do not call this from application code.
-_LEGACY_PBKDF2_ITERATIONS = 200_000
-_LEGACY_VERSION_PREFIX = 'pv6:'
-_LEGACY_BLOCK_SIZE = 16
-
-
-@lru_cache(maxsize=None)
-def _legacy_derive_key(salt: bytes) -> bytes:
-    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-    kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=_LEGACY_PBKDF2_ITERATIONS)
-    return kdf.derive(settings.PWVAULT_SECRET_KEY.encode('utf-8'))
-
-
-def _legacy_key(layer: int) -> bytes:
-    return _legacy_derive_key(f'pwvault-layer-{layer}'.encode('utf-8'))
-
-
-@lru_cache(maxsize=None)
-def _legacy_fernet(layer: int):
-    from base64 import urlsafe_b64encode
-    from cryptography.fernet import Fernet
-    return Fernet(urlsafe_b64encode(_legacy_key(layer)))
-
-
-def _legacy_rotl8(byte: int, n: int) -> int:
-    n %= 8
-    return ((byte << n) | (byte >> (8 - n))) & 0xFF
-
-
-def _legacy_rotating_substitution(data: bytes, key: bytes, encrypt: bool) -> bytes:
-    out = bytearray(len(data))
-    klen = len(key)
-    for i, b in enumerate(data):
-        rotation = (i // klen) % 8
-        ks = _legacy_rotl8(key[i % klen], rotation)
-        out[i] = (b + ks) % 256 if encrypt else (b - ks) % 256
-    return bytes(out)
-
-
-def _legacy_hmac_keystream(key: bytes, length: int) -> bytes:
-    blocks = []
-    produced = 0
-    counter = 0
-    while produced < length:
-        block = hmac.new(key, counter.to_bytes(4, 'big'), hashlib.sha256).digest()
-        blocks.append(block)
-        produced += len(block)
-        counter += 1
-    return b''.join(blocks)[:length]
-
-
-def _legacy_xor_keystream(data: bytes, key: bytes) -> bytes:
-    keystream = _legacy_hmac_keystream(key, len(data))
-    return bytes(a ^ b for a, b in zip(data, keystream))
-
-
-def _legacy_block_permutation(key: bytes) -> list:
-    import random
-    seed = int.from_bytes(key[:8], 'big')
-    perm = list(range(_LEGACY_BLOCK_SIZE))
-    random.Random(seed).shuffle(perm)
-    return perm
-
-
-def _legacy_layer5_untranspose(data: bytes, key: bytes) -> bytes:
-    from cryptography.hazmat.primitives import padding
-    perm = _legacy_block_permutation(key)
-    out = bytearray(len(data))
-    for start in range(0, len(data), _LEGACY_BLOCK_SIZE):
-        block = data[start:start + _LEGACY_BLOCK_SIZE]
-        for src, dst in enumerate(perm):
-            out[start + src] = block[dst]
-    unpadder = padding.PKCS7(_LEGACY_BLOCK_SIZE * 8).unpadder()
-    return unpadder.update(bytes(out)) + unpadder.finalize()
-
-
+# ─── Legacy (pre-history-table) decrypt — migration-only ────────────────────
+# Reads ciphertext written by this module's very first revision, when the
+# vault was a single-row-per-member table (PasswordVaultEntry) storing one
+# self-contained, version-prefixed token produced by exactly the classical
+# layer stack above (no envelope wrapping existed yet). Used exactly once, by
+# migration 0003, to carry any such pre-existing row forward into the history
+# table. Not part of any live encrypt/decrypt path.
 def decrypt_password_legacy_v6(token: str) -> str:
-    if not token.startswith(_LEGACY_VERSION_PREFIX):
+    if not token.startswith(_CLASSICAL_VERSION_PREFIX):
         raise ValueError('Unsupported legacy vault ciphertext version.')
-    b = token[len(_LEGACY_VERSION_PREFIX):].encode('ascii')
-    b = _legacy_fernet(6).decrypt(b)
-    b = _legacy_layer5_untranspose(b, _legacy_key(5))
-    b = _legacy_fernet(4).decrypt(b)
-    b = _legacy_xor_keystream(b, _legacy_key(3))
-    b = _legacy_fernet(2).decrypt(b)
-    b = _legacy_rotating_substitution(b, _legacy_key(1), encrypt=False)
-    return b.decode('utf-8')
+    b = token[len(_CLASSICAL_VERSION_PREFIX):].encode('ascii')
+    return _classical_decrypt(b).decode('utf-8')
