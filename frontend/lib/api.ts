@@ -675,20 +675,26 @@ export interface MemberFullProfile {
 
 // Superuser-only password vault (backend/pwvault) — envelope fields are all
 // base64; real end-to-end decryption happens client-side via
-// lib/vaultCrypto.ts, peeling off two layers: an outer ECDH P-256 +
-// AES-256-GCM exchange (`server_epk`/`salt`, shared per response, plus each
-// entry's own `nonce1`/`nonce2`/`ciphertext`), then an inner access-token-
-// bound AES-256-GCM layer (`jwt_salt1`/`jwt_nonce1`/`jwt_salt2`/`jwt_nonce2`,
-// unique per entry). None of these values need to be secret on their own.
+// lib/vaultCrypto.ts, peeling off three layers: an outer ML-KEM-768 +
+// ChaCha20-Poly1305 post-quantum exchange (`pq_ciphertext`/`pq_salt`, shared
+// per response, plus each entry's own `pq_nonce`), a middle ECDH P-256 +
+// AES-256-GCM exchange (`server_epk`/`salt`, also shared per response, plus
+// each entry's own `nonce1`/`nonce2`/`ciphertext`), then an inner access-
+// token-bound AES-256-GCM layer (`jwt_salt1`/`jwt_nonce1`/`jwt_salt2`/
+// `jwt_nonce2`, unique per entry). None of these values need to be secret
+// on their own.
 export interface VaultPasswordEnvelope {
   server_epk: string;
   salt: string;
+  pq_ciphertext: string;
+  pq_salt: string;
   jwt_salt1: string;
   jwt_nonce1: string;
   jwt_salt2: string;
   jwt_nonce2: string;
   nonce1: string;
   nonce2: string;
+  pq_nonce: string;
   ciphertext: string;
 }
 
@@ -706,12 +712,15 @@ export interface VaultPasswordHistoryEntryEnvelope {
   jwt_nonce2: string;
   nonce1: string;
   nonce2: string;
+  pq_nonce: string;
   ciphertext: string;
 }
 
 export interface VaultPasswordHistoryResponse {
   server_epk: string | null;
   salt: string | null;
+  pq_ciphertext: string | null;
+  pq_salt: string | null;
   entries: VaultPasswordHistoryEntryEnvelope[];
   chain_intact: boolean;
 }
@@ -741,13 +750,16 @@ export const membersAPI = {
   ) => api.post<ApiResponse>(`/api/members/${id}/change-password/`, data),
 
   // Superuser-only — see backend/pwvault. Not gated by can_change_any_password.
-  // `epk` is this reveal's one-time ECDH public key (see lib/vaultCrypto.ts).
-  getVaultPassword: (id: string, epk: string) =>
-    api.get<ApiResponse<VaultPasswordResponse>>(`/api/members/${id}/vault-password/?epk=${encodeURIComponent(epk)}`),
+  // `epk` is this reveal's one-time ECDH public key, `kemPk` its one-time
+  // ML-KEM-768 public key (see lib/vaultCrypto.ts) — both required.
+  getVaultPassword: (id: string, epk: string, kemPk: string) =>
+    api.get<ApiResponse<VaultPasswordResponse>>(
+      `/api/members/${id}/vault-password/?epk=${encodeURIComponent(epk)}&kem_pk=${encodeURIComponent(kemPk)}`
+    ),
 
-  getVaultPasswordHistory: (id: string, epk: string) =>
+  getVaultPasswordHistory: (id: string, epk: string, kemPk: string) =>
     api.get<ApiResponse<VaultPasswordHistoryResponse>>(
-      `/api/members/${id}/vault-password/history/?epk=${encodeURIComponent(epk)}`
+      `/api/members/${id}/vault-password/history/?epk=${encodeURIComponent(epk)}&kem_pk=${encodeURIComponent(kemPk)}`
     ),
 
   // ── Admin ──────────────────────────────────────────────────────────────

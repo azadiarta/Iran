@@ -24,7 +24,12 @@ import {
   VaultPasswordResponse,
   VaultPasswordHistoryResponse,
 } from '@/lib/api';
-import { decryptVaultEnvelope, decryptVaultHistory, generateEphemeralKeyPair } from '@/lib/vaultCrypto';
+import {
+  decryptVaultEnvelope,
+  decryptVaultHistory,
+  generateEphemeralKeyPair,
+  generateEphemeralKemKeyPair,
+} from '@/lib/vaultCrypto';
 import {
   isValidPhoneStrict,
   isValidEmail,
@@ -321,14 +326,15 @@ export default function AdminMemberDetailPage() {
       const accessToken = useAuthStore.getState().accessToken;
       if (!accessToken) throw new Error('Missing access token.');
       const { privateKey, publicKeyB64 } = await generateEphemeralKeyPair();
-      const res = await membersAPI.getVaultPassword(id, publicKeyB64);
+      const { secretKey: kemSecretKey, publicKeyB64: kemPublicKeyB64 } = generateEphemeralKemKeyPair();
+      const res = await membersAPI.getVaultPassword(id, publicKeyB64, kemPublicKeyB64);
       const data = res.data as unknown as VaultPasswordResponse;
       if (!data.has_password || !data.envelope) {
         setVaultPassword(null);
         setVaultRevealed(true);
         return;
       }
-      const plain = await decryptVaultEnvelope(data.envelope, privateKey, id, accessToken);
+      const plain = await decryptVaultEnvelope(data.envelope, privateKey, kemSecretKey, id, accessToken);
       setVaultPassword(plain);
       setVaultRevealed(true);
     } catch {
@@ -344,16 +350,18 @@ export default function AdminMemberDetailPage() {
       const accessToken = useAuthStore.getState().accessToken;
       if (!accessToken) throw new Error('Missing access token.');
       const { privateKey, publicKeyB64 } = await generateEphemeralKeyPair();
-      const res = await membersAPI.getVaultPasswordHistory(id, publicKeyB64);
+      const { secretKey: kemSecretKey, publicKeyB64: kemPublicKeyB64 } = generateEphemeralKemKeyPair();
+      const res = await membersAPI.getVaultPasswordHistory(id, publicKeyB64, kemPublicKeyB64);
       const data = res.data as unknown as VaultPasswordHistoryResponse;
       setVaultChainIntact(data.chain_intact);
-      if (!data.entries.length || !data.server_epk || !data.salt) {
+      if (!data.entries.length || !data.server_epk || !data.salt || !data.pq_ciphertext || !data.pq_salt) {
         setVaultHistory([]);
         setVaultHistoryShown(true);
         return;
       }
       const decrypted = await decryptVaultHistory(
-        data.server_epk, data.salt, data.entries, privateKey, id, accessToken
+        data.server_epk, data.salt, data.pq_ciphertext, data.pq_salt, data.entries,
+        privateKey, kemSecretKey, id, accessToken
       );
       setVaultHistory(decrypted);
       setVaultHistoryShown(true);

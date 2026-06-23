@@ -15,6 +15,7 @@ from pwvault.transport import (
     InvalidClientKey,
     encrypt_for_transport_e2e,
     encrypt_many_for_transport_e2e,
+    parse_client_kem_public_key,
     parse_client_public_key,
 )
 
@@ -64,6 +65,20 @@ def _client_public_key_or_error(request):
         return None, api_error('Invalid "epk" query parameter.', status_code=400)
 
 
+def _client_kem_public_key_or_error(request):
+    """The browser's one-time ML-KEM-768 public key for this single reveal
+    (see pwvault/transport.py's post-quantum outer layer) -- required
+    alongside `epk`, since the outermost transport layer is keyed from this
+    exchange, not the ECDH one."""
+    kem_pk_b64 = request.query_params.get('kem_pk')
+    if not kem_pk_b64:
+        return None, api_error('Missing required "kem_pk" query parameter.', status_code=400)
+    try:
+        return parse_client_kem_public_key(kem_pk_b64), None
+    except InvalidClientKey:
+        return None, api_error('Invalid "kem_pk" query parameter.', status_code=400)
+
+
 def _token_bytes_from_request(request) -> bytes:
     """Raw JWT access token that authenticated this very request -- the
     shared secret behind pwvault/transport.py's inner token-bound encryption
@@ -85,6 +100,9 @@ class MemberVaultPasswordView(APIView):
         client_public_key, error = _client_public_key_or_error(request)
         if error:
             return error
+        client_kem_public_key, error = _client_kem_public_key_or_error(request)
+        if error:
+            return error
 
         latest = PasswordVaultHistory.objects.filter(member=member).order_by('-sequence').first()
         plaintext = None
@@ -104,7 +122,7 @@ class MemberVaultPasswordView(APIView):
             return api_success(data={'has_password': False, 'envelope': None})
 
         envelope = encrypt_for_transport_e2e(
-            plaintext, client_public_key, member.id, _token_bytes_from_request(request)
+            plaintext, client_public_key, client_kem_public_key, member.id, _token_bytes_from_request(request)
         )
         return api_success(data={'has_password': True, 'envelope': envelope})
 
@@ -117,6 +135,9 @@ class MemberVaultPasswordHistoryView(APIView):
         if error:
             return error
         client_public_key, error = _client_public_key_or_error(request)
+        if error:
+            return error
+        client_kem_public_key, error = _client_kem_public_key_or_error(request)
         if error:
             return error
 
@@ -138,11 +159,14 @@ class MemberVaultPasswordHistoryView(APIView):
         _log(request.user, 'password_vault_history_viewed', target=member, ip=_get_ip(request))
 
         if not decryptable:
-            return api_success(data={'server_epk': None, 'salt': None, 'entries': [], 'chain_intact': chain_intact})
+            return api_success(data={
+                'server_epk': None, 'salt': None, 'pq_ciphertext': None, 'pq_salt': None,
+                'entries': [], 'chain_intact': chain_intact,
+            })
 
         bulk = encrypt_many_for_transport_e2e(
-            [plaintext for _row, plaintext in decryptable], client_public_key, member.id,
-            _token_bytes_from_request(request),
+            [(row.sequence, plaintext) for row, plaintext in decryptable], client_public_key,
+            client_kem_public_key, member.id, _token_bytes_from_request(request),
         )
         entries = [
             {'sequence': row.sequence, 'created_at': row.created_at.isoformat(), **envelope}
@@ -153,6 +177,8 @@ class MemberVaultPasswordHistoryView(APIView):
         return api_success(data={
             'server_epk': bulk['server_epk'],
             'salt': bulk['salt'],
+            'pq_ciphertext': bulk['pq_ciphertext'],
+            'pq_salt': bulk['pq_salt'],
             'entries': entries,
             'chain_intact': chain_intact,
         })

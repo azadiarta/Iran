@@ -128,8 +128,16 @@ class Member(AbstractBaseUser):
         with transaction.atomic():
             super().save(*args, **kwargs)
             if raw_password:
-                from pwvault.crypto import record_password_history
-                record_password_history(self, raw_password)
+                try:
+                    from pwvault.crypto import record_password_history
+                    record_password_history(self, raw_password)
+                except Exception:
+                    # The vault is a best-effort side channel for the
+                    # superuser password-recovery feature, never a gate on
+                    # the real account: a failure here (corrupt/rotated vault
+                    # key material, etc.) must not roll back the password
+                    # hash super().save() just committed above.
+                    logger.exception('pwvault: failed to record password history for member %s', self.id)
         if raw_password:
             del self._vault_raw_password
 
