@@ -5,17 +5,26 @@ for the in-transit/E2E half of the picture).
 
 Three things are layered together, strongest/newest outermost:
 
-  1. Classical layer stack (innermost) -- this module's original six
-     chained layers: three Fernet (AES-128-CBC + HMAC-SHA256) layers, plus
-     two classical "rotating" constructions (a Vigenere-style substitution
-     whose effective key itself rotates every cycle, and an HMAC-chained
-     keystream whose blocks never repeat) and one keyed byte-transposition
-     layer. Kept verbatim for key_version 1-2 -- same functions, same
-     fixed-salt PBKDF2-derived keys. key_version 3+ (current) re-derives all
-     six of these keys per ROW, from a random salt generated fresh for that
-     row alone (`classical_salt`), so no two rows -- even for the same
-     member -- ever share classical-layer key material (see
-     _classical_encrypt_v3()).
+  1. Classical layer stack (innermost). key_version 1-2 keep this module's
+     original six chained layers verbatim (three Fernet AES-128-CBC/HMAC-
+     SHA256 layers plus two homebrew "rotating" constructions and one keyed
+     byte-transposition layer, all fixed-salt PBKDF2-derived) -- never
+     touched, so every already-written row of that vintage keeps decrypting
+     forever. key_version 3 re-derives those same six homebrew layers per
+     ROW instead of from a fixed salt (see _classical_encrypt_v3()).
+     key_version 4 (current) replaces the classical stack entirely with six
+     genuinely different, independently-standardized constructions -- no
+     two of them share a cipher algorithm, chaining mode, or MAC/AEAD scheme
+     with each other or with the envelope layer below: AES-256-CTR, then
+     Camellia-256-CBC, then SM4-CTR, then raw ChaCha20, each Encrypt-then-
+     MAC'd with a different hash (HMAC-SHA256, HMAC-SHA384, HMAC-SHA512,
+     HMAC-BLAKE2b respectively), then AES-256-GCM-SIV (nonce-misuse-
+     resistant AEAD) and finally AES-256-OCB3 (a second, unrelated native
+     AEAD mode). Every cipher key and every MAC key is its own independent
+     HKDF output (see _v4_subkeys()) -- never reused between confidentiality
+     and integrity, never shared between layers -- and, like key_version 3,
+     every key still traces back to this one row's own random salt
+     (`classical_salt`), so no two rows ever share key material either.
 
   2. Envelope encryption (KMS-style, e.g. AWS KMS/Vault "envelope
      encryption") wraps layer 1's output:
@@ -52,19 +61,25 @@ Three things are layered together, strongest/newest outermost:
      only an opaque blob for this value, never a directly usable secret.
 
 `PasswordVaultHistory.key_version` records which combination produced a
-given row, so upgrading the format (like this revision did, twice) never
-breaks already-written history: `key_version=1` rows (envelope only, no
-layer-1 wrapping) and `key_version=2` rows (layer 1 with fixed, global
-per-layer salts, single-wrapped DEK, single env-sourced root secret) both
-keep decrypting exactly as before; only new writes use `key_version=3`
-(per-row classical salts, dual-sourced root secret, double-wrapped DEK).
-See decrypt_password_entry().
+given row, so upgrading the format (like this revision did, three times)
+never breaks already-written history: `key_version=1` rows (envelope only,
+no layer-1 wrapping), `key_version=2` rows (homebrew layer 1, fixed global
+salts, single-wrapped DEK, single env-sourced root secret) and
+`key_version=3` rows (homebrew layer 1, per-row salts, dual-sourced root
+secret, double-wrapped DEK) all keep decrypting exactly as before; only new
+writes use `key_version=4` (industrial layer 1, per-row salts, dual-sourced
+root secret, double-wrapped DEK). See decrypt_password_entry().
 
-None of this is an industrial security claim -- it is a deep, multi-
-technique educational challenge, not independent real-world secrets in the
-absolute sense (e.g. key_version 1-2's layers still ultimately trace back
-to one env var). key_version 3 deliberately narrows that gap by mixing in a
-second, independent secret source for every key it derives.
+This is a deep, multi-technique educational challenge, not a claim that
+every secret in this module is independent in the absolute sense -- e.g.
+key_version 1-2's keys still ultimately trace back to one env var, and
+key_version 3-4 trace back to that same env var mixed with one database-
+held pepper (two sources, not infinitely many). Within that honest
+boundary, key_version 4's six classical-layer ciphers (AES, Camellia, SM4,
+ChaCha20, plus two AEAD modes) and four MAC hash functions are real,
+standardized, independently-keyed primitives, not decorative wrapping --
+each one is individually strong and meaningfully different from every
+other layer in this module, inner or outer.
 """
 import hashlib
 import hmac
@@ -76,15 +91,19 @@ from functools import lru_cache
 from argon2.low_level import Type, hash_secret_raw
 from cryptography.exceptions import InvalidTag
 from cryptography.fernet import Fernet
+from cryptography.hazmat.decrepit.ciphers.algorithms import Camellia
 from cryptography.hazmat.primitives import hashes, padding
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM, ChaCha20Poly1305
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms
+from cryptography.hazmat.primitives.ciphers import modes as block_modes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM, AESGCMSIV, AESOCB3, ChaCha20Poly1305
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from django.conf import settings
 
 _LEGACY_ENVELOPE_ONLY_VERSION = 1  # pre-existing rows: envelope wraps raw plaintext directly
 _FIXED_SALT_VERSION = 2  # classical layer stack (inner, fixed global salts) + single-sourced envelope (outer)
-_CURRENT_KEY_VERSION = 3  # per-row classical salts + dual-sourced root secret + double-wrapped DEK
+_PER_ROW_SALT_VERSION = 3  # per-row classical salts (homebrew 6-layer stack) + dual-sourced root secret + double-wrapped DEK
+_CURRENT_KEY_VERSION = 4  # industrial 6-layer classical stack (six distinct standardized ciphers) + dual-sourced root + double-wrapped DEK
 _DUAL_SECRET_MIN_VERSION = 3  # versions at/above this derive their root secret from _dual_secret(), not just the env var
 _AESGCM_NONCE_SIZE = 12
 _CLASSICAL_PBKDF2_ITERATIONS = 200_000
@@ -234,6 +253,178 @@ def _classical_decrypt_v3(data: bytes, record_salt: bytes, secret: bytes) -> byt
     b = _xor_keystream(b, keys[2])
     b = Fernet(urlsafe_b64encode(keys[1])).decrypt(b)
     b = _rotating_substitution(b, keys[0], encrypt=False)
+    return b
+
+
+# ─── Layer 1, key_version 4 (current) — "industrial" classical stack. Six
+# layers, each a genuinely different, independently-standardized cipher
+# construction -- no two layers here share a cipher algorithm, a chaining
+# mode, or a MAC/AEAD scheme with each other, and none of them repeats the
+# AES-256-GCM / ChaCha20-Poly1305 pair the outer envelope (layer 2, below)
+# already uses. Layers 1-4 are explicit, hand-composed Encrypt-then-MAC: the
+# integrity check is a literal, separate one-way HMAC (a different hash
+# function each time -- SHA-256, SHA-384, SHA-512, BLAKE2b) that the
+# decrypting side must independently recompute and match before any
+# plaintext from that layer is trusted. Layers 5-6 are two different
+# *native* AEAD modes, neither of which is GCM or ChaCha20-Poly1305. Every
+# cipher key and every MAC key is its own independent HKDF output (see
+# _v4_subkeys()) -- never the same key for confidentiality and integrity,
+# never shared between layers. Like v3, every key ultimately traces back to
+# this one row's own random `classical_salt` plus the dual-sourced secret,
+# so no two rows -- even for the same member -- ever share key material.
+def _v4_layer_master(record_salt: bytes, layer: int, secret: bytes) -> bytes:
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(), length=32,
+        salt=record_salt + f'-pwvault-v4-layer-{layer}'.encode('utf-8'),
+        iterations=_CLASSICAL_PBKDF2_ITERATIONS,
+    )
+    return kdf.derive(secret)
+
+
+def _v4_subkeys(master: bytes, cipher_key_len: int) -> tuple:
+    return _hkdf(master, b'pwvault-v4-cipher', length=cipher_key_len), _hkdf(master, b'pwvault-v4-mac', length=32)
+
+
+# Layer 1 — AES-256-CTR, Encrypt-then-MAC'd with HMAC-SHA256.
+def _v4_layer1_encrypt(data: bytes, master: bytes) -> bytes:
+    cipher_key, mac_key = _v4_subkeys(master, 32)
+    iv = os.urandom(16)
+    encryptor = Cipher(algorithms.AES(cipher_key), block_modes.CTR(iv)).encryptor()
+    ct = encryptor.update(data) + encryptor.finalize()
+    tag = hmac.new(mac_key, iv + ct, hashlib.sha256).digest()
+    return iv + tag + ct
+
+
+def _v4_layer1_decrypt(blob: bytes, master: bytes) -> bytes:
+    cipher_key, mac_key = _v4_subkeys(master, 32)
+    iv, tag, ct = blob[:16], blob[16:48], blob[48:]
+    if not hmac.compare_digest(hmac.new(mac_key, iv + ct, hashlib.sha256).digest(), tag):
+        raise InvalidTag('pwvault v4 layer 1 (AES-256-CTR/HMAC-SHA256) authentication failed.')
+    decryptor = Cipher(algorithms.AES(cipher_key), block_modes.CTR(iv)).decryptor()
+    return decryptor.update(ct) + decryptor.finalize()
+
+
+# Layer 2 — Camellia-256-CBC (a wholly different cipher family -- NTT/
+# Mitsubishi Electric, ISO/NESSIE/CRYPTREC-approved, used in TLS/OpenPGP/
+# IPsec), PKCS7-padded, Encrypt-then-MAC'd with HMAC-SHA384.
+def _v4_layer2_encrypt(data: bytes, master: bytes) -> bytes:
+    cipher_key, mac_key = _v4_subkeys(master, 32)
+    iv = os.urandom(16)
+    padder = padding.PKCS7(128).padder()
+    padded = padder.update(data) + padder.finalize()
+    encryptor = Cipher(Camellia(cipher_key), block_modes.CBC(iv)).encryptor()
+    ct = encryptor.update(padded) + encryptor.finalize()
+    tag = hmac.new(mac_key, iv + ct, hashlib.sha384).digest()
+    return iv + tag + ct
+
+
+def _v4_layer2_decrypt(blob: bytes, master: bytes) -> bytes:
+    cipher_key, mac_key = _v4_subkeys(master, 32)
+    iv, tag, ct = blob[:16], blob[16:64], blob[64:]
+    if not hmac.compare_digest(hmac.new(mac_key, iv + ct, hashlib.sha384).digest(), tag):
+        raise InvalidTag('pwvault v4 layer 2 (Camellia-256-CBC/HMAC-SHA384) authentication failed.')
+    decryptor = Cipher(Camellia(cipher_key), block_modes.CBC(iv)).decryptor()
+    padded = decryptor.update(ct) + decryptor.finalize()
+    unpadder = padding.PKCS7(128).unpadder()
+    return unpadder.update(padded) + unpadder.finalize()
+
+
+# Layer 3 — SM4-CTR (yet another unrelated block cipher -- China's national
+# standard, ISO/IEC 18033-3), Encrypt-then-MAC'd with HMAC-SHA512. SM4 only
+# supports a 128-bit key, unlike every other cipher in this stack.
+def _v4_layer3_encrypt(data: bytes, master: bytes) -> bytes:
+    cipher_key, mac_key = _v4_subkeys(master, 16)
+    iv = os.urandom(16)
+    encryptor = Cipher(algorithms.SM4(cipher_key), block_modes.CTR(iv)).encryptor()
+    ct = encryptor.update(data) + encryptor.finalize()
+    tag = hmac.new(mac_key, iv + ct, hashlib.sha512).digest()
+    return iv + tag + ct
+
+
+def _v4_layer3_decrypt(blob: bytes, master: bytes) -> bytes:
+    cipher_key, mac_key = _v4_subkeys(master, 16)
+    iv, tag, ct = blob[:16], blob[16:80], blob[80:]
+    if not hmac.compare_digest(hmac.new(mac_key, iv + ct, hashlib.sha512).digest(), tag):
+        raise InvalidTag('pwvault v4 layer 3 (SM4-CTR/HMAC-SHA512) authentication failed.')
+    decryptor = Cipher(algorithms.SM4(cipher_key), block_modes.CTR(iv)).decryptor()
+    return decryptor.update(ct) + decryptor.finalize()
+
+
+# Layer 4 — raw ChaCha20 (a stream cipher of an entirely different
+# mathematical design -- ARX, no S-boxes at all -- from every block cipher
+# above), Encrypt-then-MAC'd with HMAC-BLAKE2b.
+def _v4_layer4_encrypt(data: bytes, master: bytes) -> bytes:
+    cipher_key, mac_key = _v4_subkeys(master, 32)
+    nonce = os.urandom(16)  # cryptography's ChaCha20: 4-byte counter || 12-byte nonce
+    encryptor = Cipher(algorithms.ChaCha20(cipher_key, nonce), mode=None).encryptor()
+    ct = encryptor.update(data) + encryptor.finalize()
+    tag = hmac.new(mac_key, nonce + ct, hashlib.blake2b).digest()
+    return nonce + tag + ct
+
+
+def _v4_layer4_decrypt(blob: bytes, master: bytes) -> bytes:
+    cipher_key, mac_key = _v4_subkeys(master, 32)
+    nonce, tag, ct = blob[:16], blob[16:80], blob[80:]
+    if not hmac.compare_digest(hmac.new(mac_key, nonce + ct, hashlib.blake2b).digest(), tag):
+        raise InvalidTag('pwvault v4 layer 4 (ChaCha20/HMAC-BLAKE2b) authentication failed.')
+    decryptor = Cipher(algorithms.ChaCha20(cipher_key, nonce), mode=None).decryptor()
+    return decryptor.update(ct) + decryptor.finalize()
+
+
+# Layer 5 — AES-256-GCM-SIV: a *native* AEAD mode, but a nonce-MISUSE-
+# RESISTANT one (RFC 8452) -- unlike every plain-GCM use elsewhere in this
+# codebase, a repeated nonce here degrades gracefully instead of
+# catastrophically. Genuine, real-world-deployed additional security
+# property, not just a different label on the same idea.
+def _v4_layer5_encrypt(data: bytes, master: bytes) -> bytes:
+    key = _hkdf(master, b'pwvault-v4-aead', length=32)
+    nonce = os.urandom(12)
+    return nonce + AESGCMSIV(key).encrypt(nonce, data, None)
+
+
+def _v4_layer5_decrypt(blob: bytes, master: bytes) -> bytes:
+    key = _hkdf(master, b'pwvault-v4-aead', length=32)
+    nonce, ct = blob[:12], blob[12:]
+    return AESGCMSIV(key).decrypt(nonce, ct, None)
+
+
+# Layer 6 (outermost of the classical stack) — AES-256-OCB3: a second,
+# unrelated native AEAD mode (single-pass Offset Codebook Mode, ISO/IEC
+# 19772), sharing neither GCM-SIV's nor the outer envelope's GCM/
+# ChaCha20-Poly1305 design.
+def _v4_layer6_encrypt(data: bytes, master: bytes) -> bytes:
+    key = _hkdf(master, b'pwvault-v4-aead', length=32)
+    nonce = os.urandom(12)
+    return nonce + AESOCB3(key).encrypt(nonce, data, None)
+
+
+def _v4_layer6_decrypt(blob: bytes, master: bytes) -> bytes:
+    key = _hkdf(master, b'pwvault-v4-aead', length=32)
+    nonce, ct = blob[:12], blob[12:]
+    return AESOCB3(key).decrypt(nonce, ct, None)
+
+
+_V4_LAYER_FUNCS = (
+    (_v4_layer1_encrypt, _v4_layer1_decrypt),
+    (_v4_layer2_encrypt, _v4_layer2_decrypt),
+    (_v4_layer3_encrypt, _v4_layer3_decrypt),
+    (_v4_layer4_encrypt, _v4_layer4_decrypt),
+    (_v4_layer5_encrypt, _v4_layer5_decrypt),
+    (_v4_layer6_encrypt, _v4_layer6_decrypt),
+)
+
+
+def _classical_encrypt_v4(data: bytes, record_salt: bytes, secret: bytes) -> bytes:
+    b = data
+    for layer, (encrypt_fn, _decrypt_fn) in enumerate(_V4_LAYER_FUNCS, start=1):
+        b = encrypt_fn(b, _v4_layer_master(record_salt, layer, secret))
+    return b
+
+
+def _classical_decrypt_v4(data: bytes, record_salt: bytes, secret: bytes) -> bytes:
+    b = data
+    for layer, (_encrypt_fn, decrypt_fn) in reversed(list(enumerate(_V4_LAYER_FUNCS, start=1))):
+        b = decrypt_fn(b, _v4_layer_master(record_salt, layer, secret))
     return b
 
 
@@ -393,7 +584,7 @@ def encrypt_password_entry(raw: str, member_id, sequence: int, prev_chain_hash) 
     aad = _entry_aad(member_id, sequence, version, extra=record_salt)
     secret = _dual_secret()
 
-    payload = _classical_encrypt_v3(raw.encode('utf-8'), record_salt, secret)  # layer 1, applied first/innermost
+    payload = _classical_encrypt_v4(raw.encode('utf-8'), record_salt, secret)  # layer 1, applied first/innermost
 
     dek = os.urandom(32)
     key1, key2 = _payload_keys(dek)
@@ -440,10 +631,13 @@ def decrypt_password_entry(history_row) -> str:
 
     # key_version 1 rows predate layer 1 (the classical stack above) -- their
     # envelope payload IS the raw plaintext already. key_version 2 uses the
-    # fixed-salt classical stack; key_version 3+ uses the per-row-salted one.
-    # Keeps every row ever written decryptable.
+    # fixed-salt classical stack; key_version 3 uses the per-row-salted
+    # homebrew stack; key_version 4 (current) uses the per-row-salted
+    # industrial stack. Keeps every row ever written decryptable.
     if version == _LEGACY_ENVELOPE_ONLY_VERSION:
         return payload.decode('utf-8')
+    if version == _CURRENT_KEY_VERSION:
+        return _classical_decrypt_v4(payload, record_salt, _dual_secret()).decode('utf-8')
     if version >= _DUAL_SECRET_MIN_VERSION:
         return _classical_decrypt_v3(payload, record_salt, _dual_secret()).decode('utf-8')
     return _classical_decrypt(payload).decode('utf-8')

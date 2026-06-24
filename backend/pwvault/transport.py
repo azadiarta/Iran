@@ -75,9 +75,27 @@ by accident.
 Every AEAD operation in every layer is additionally bound (AAD) to the exact
 member id it was encrypted for, so a captured envelope cannot be replayed as
 if it belonged to a different member's reveal.
+
+A fourth, final construction sits on top of all three AEAD layers above:
+a plain, *unencrypted* HMAC-SHA256 tag (`replay_tag`) over the entire
+envelope -- every salt, every public value, every entry's final ciphertext,
+and an `issued_at` timestamp -- keyed via HKDF from the same JWT-token
+secret as layer 1. This is deliberately one-way (a MAC, not another
+encryption pass): its only job is to let the browser recompute the exact
+same tag from the cleartext envelope fields it already received and refuse
+to even attempt decryption if they don't match bit-for-bit, which catches
+two things AEAD alone does not: a response whose *outer* fields (e.g.
+`server_epk`, or one entry's ciphertext spliced from a different, older
+response) were swapped wholesale rather than bit-flipped, and -- via
+`issued_at` -- a captured-and-replayed response served stale well after the
+original request. Forging a valid tag without the JWT token is exactly as
+hard as forging layer 1 itself.
 """
 import base64
+import hashlib
+import hmac
 import os
+import time
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, mlkem
@@ -124,6 +142,26 @@ def parse_client_kem_public_key(kem_pk_b64: str) -> mlkem.MLKEM768PublicKey:
 
 def _derive_key(secret: bytes, salt: bytes, info: bytes) -> bytes:
     return HKDF(algorithm=hashes.SHA256(), length=32, salt=salt, info=info).derive(secret)
+
+
+# ─── Outermost integrity tag — keyed HMAC over the whole envelope ───────────
+def _compute_replay_tag(token_bytes: bytes, issued_at: str, server_epk_b64: str, salt_b64: str,
+                         pq_ciphertext_b64: str, pq_salt_b64: str, ordered_ciphertexts: list) -> tuple:
+    """`ordered_ciphertexts` must already be sorted by each entry's own
+    stable id (never list position) -- the caller and the browser
+    (frontend/lib/vaultCrypto.ts) both sort by that same id before joining,
+    so the canonical string is identical on both ends regardless of any
+    display-only reordering applied elsewhere. Plain `'|'`/`','`-joined
+    string concatenation (not JSON) sidesteps any risk of Python's and
+    JavaScript's serializers ever disagreeing on field order or escaping."""
+    replay_salt = os.urandom(_HKDF_SALT_SIZE)
+    replay_key = _derive_key(token_bytes, replay_salt, b'pwvault-transport-replay-integrity')
+    canonical = '|'.join([
+        issued_at, server_epk_b64, salt_b64, pq_ciphertext_b64, pq_salt_b64,
+        ','.join(ordered_ciphertexts),
+    ])
+    tag = hmac.new(replay_key, canonical.encode('ascii'), hashlib.sha256).digest()
+    return _b64(replay_salt), _b64(tag)
 
 
 # ─── Layer 1 (innermost) — JWT-token-bound double AES-256-GCM ───────────────
@@ -174,6 +212,7 @@ def encrypt_many_for_transport_e2e(entries, client_public_key: ec.EllipticCurveP
     aad = str(member_id).encode('utf-8')
 
     envelopes = []
+    ciphertexts_by_id = []
     for entry_id, plaintext in entries:
         token_wrapped, jwt_fields = _token_wrap(plaintext.encode('utf-8'), token_bytes, aad)
         entry_tag = str(entry_id).encode('utf-8')
@@ -190,18 +229,28 @@ def encrypt_many_for_transport_e2e(entries, client_public_key: ec.EllipticCurveP
         pq_key = _derive_key(pq_secret, pq_salt, b'pwvault-pq-layer-3:' + entry_tag)
         pq_nonce = os.urandom(_AESGCM_NONCE_SIZE)
         ct3 = ChaCha20Poly1305(pq_key).encrypt(pq_nonce, ct2, aad)
+        ct3_b64 = _b64(ct3)
 
         envelopes.append({
             **jwt_fields,
             'nonce1': _b64(nonce1), 'nonce2': _b64(nonce2),
             'pq_nonce': _b64(pq_nonce),
-            'ciphertext': _b64(ct3),
+            'ciphertext': ct3_b64,
         })
+        ciphertexts_by_id.append((entry_id, ct3_b64))
 
     server_epk_raw = server_ephemeral.public_key().public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
+    server_epk_b64, ecdh_salt_b64 = _b64(server_epk_raw), _b64(ecdh_salt)
+    pq_ciphertext_b64, pq_salt_b64 = _b64(pq_ciphertext), _b64(pq_salt)
+    issued_at = str(int(time.time()))
+    ordered_ciphertexts = [ct for _entry_id, ct in sorted(ciphertexts_by_id, key=lambda pair: pair[0])]
+    replay_salt_b64, replay_tag_b64 = _compute_replay_tag(
+        token_bytes, issued_at, server_epk_b64, ecdh_salt_b64, pq_ciphertext_b64, pq_salt_b64, ordered_ciphertexts,
+    )
     return {
-        'server_epk': _b64(server_epk_raw), 'salt': _b64(ecdh_salt),
-        'pq_ciphertext': _b64(pq_ciphertext), 'pq_salt': _b64(pq_salt),
+        'server_epk': server_epk_b64, 'salt': ecdh_salt_b64,
+        'pq_ciphertext': pq_ciphertext_b64, 'pq_salt': pq_salt_b64,
+        'issued_at': issued_at, 'replay_salt': replay_salt_b64, 'replay_tag': replay_tag_b64,
         'envelopes': envelopes,
     }
 
@@ -216,5 +265,6 @@ def encrypt_for_transport_e2e(plaintext: str, client_public_key: ec.EllipticCurv
     return {
         'server_epk': result['server_epk'], 'salt': result['salt'],
         'pq_ciphertext': result['pq_ciphertext'], 'pq_salt': result['pq_salt'],
+        'issued_at': result['issued_at'], 'replay_salt': result['replay_salt'], 'replay_tag': result['replay_tag'],
         **envelope,
     }

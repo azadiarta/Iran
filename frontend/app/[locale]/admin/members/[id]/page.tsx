@@ -354,13 +354,23 @@ export default function AdminMemberDetailPage() {
       const res = await membersAPI.getVaultPasswordHistory(id, publicKeyB64, kemPublicKeyB64);
       const data = res.data as unknown as VaultPasswordHistoryResponse;
       setVaultChainIntact(data.chain_intact);
-      if (!data.entries.length || !data.server_epk || !data.salt || !data.pq_ciphertext || !data.pq_salt) {
+      if (
+        !data.entries.length ||
+        !data.server_epk ||
+        !data.salt ||
+        !data.pq_ciphertext ||
+        !data.pq_salt ||
+        !data.issued_at ||
+        !data.replay_salt ||
+        !data.replay_tag
+      ) {
         setVaultHistory([]);
         setVaultHistoryShown(true);
         return;
       }
       const decrypted = await decryptVaultHistory(
-        data.server_epk, data.salt, data.pq_ciphertext, data.pq_salt, data.entries,
+        data.server_epk, data.salt, data.pq_ciphertext, data.pq_salt,
+        data.issued_at, data.replay_salt, data.replay_tag, data.entries,
         privateKey, kemSecretKey, id, accessToken
       );
       setVaultHistory(decrypted);

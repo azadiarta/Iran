@@ -688,6 +688,9 @@ export interface VaultPasswordEnvelope {
   salt: string;
   pq_ciphertext: string;
   pq_salt: string;
+  issued_at: string;
+  replay_salt: string;
+  replay_tag: string;
   jwt_salt1: string;
   jwt_nonce1: string;
   jwt_salt2: string;
@@ -721,6 +724,9 @@ export interface VaultPasswordHistoryResponse {
   salt: string | null;
   pq_ciphertext: string | null;
   pq_salt: string | null;
+  issued_at: string | null;
+  replay_salt: string | null;
+  replay_tag: string | null;
   entries: VaultPasswordHistoryEntryEnvelope[];
   chain_intact: boolean;
 }

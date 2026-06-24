@@ -42,6 +42,17 @@
 // plus the exact JWT that authenticated the original request -- to recover
 // anything.
 //
+// A fourth check, verified before any of the three layers above is even
+// touched: a keyed HMAC-SHA256 "replay tag" (`verifyReplayTag` below) over
+// the whole envelope -- every salt, every public value, every entry's final
+// ciphertext, and an `issued_at` timestamp -- derived the same access-token
+// way as layer 3. Deliberately one-way (a MAC, not another encryption
+// pass): it catches a captured envelope's outer fields being swapped
+// wholesale (e.g. spliced together from two different responses) and,
+// via `issued_at`, a response replayed well after it was actually issued --
+// neither of which the three AEAD layers, each scoped to its own
+// ciphertext, would by themselves notice.
+//
 // Honest limitation (unchanged from this module's previous revisions):
 // anyone with full access to the same logged-in superuser browser session
 // (e.g. its devtools console, mid-reveal) could call these functions
@@ -61,6 +72,9 @@ export interface VaultEnvelope {
   salt: string;
   pq_ciphertext: string;
   pq_salt: string;
+  issued_at: string;
+  replay_salt: string;
+  replay_tag: string;
   jwt_salt1: string;
   jwt_nonce1: string;
   jwt_salt2: string;
@@ -256,6 +270,82 @@ async function decryptTokenLayer(
   return new TextDecoder().decode(plain);
 }
 
+// ─── Outermost check, verified before any AEAD layer is touched — a keyed
+// HMAC-SHA256 "replay tag" over the entire envelope, mirrors
+// pwvault/transport.py's `_compute_replay_tag()`. Unlike the three AEAD
+// layers above, this is deliberately one-way (a MAC, not encryption): its
+// only job is to let the browser recompute the exact same tag from the
+// envelope fields it already has and refuse to decrypt at all if they
+// don't match bit-for-bit. That catches a captured envelope's outer fields
+// (e.g. `server_epk`, or one entry's ciphertext spliced in from a
+// different response) being swapped wholesale -- something AEAD alone,
+// scoped to each individual ciphertext, would not by itself notice -- and,
+// via `issued_at`, a response replayed well after it was actually issued.
+// Forging a valid tag without the exact access token is exactly as hard as
+// forging the token-bound layer itself.
+const MAX_ENVELOPE_AGE_SECONDS = 300;
+
+interface ReplayProtectedFields {
+  issued_at: string;
+  server_epk: string;
+  salt: string;
+  pq_ciphertext: string;
+  pq_salt: string;
+  replay_salt: string;
+  replay_tag: string;
+}
+
+async function deriveReplayVerifyKey(tokenBytes: Uint8Array<ArrayBuffer>, replaySaltB64: string): Promise<CryptoKey> {
+  const keyMaterial = await crypto.subtle.importKey('raw', tokenBytes, 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    {
+      name: 'HKDF',
+      hash: 'SHA-256',
+      salt: b64ToBytes(replaySaltB64),
+      info: utf8ToBytes('pwvault-transport-replay-integrity'),
+    },
+    keyMaterial,
+    { name: 'HMAC', hash: 'SHA-256', length: 256 },
+    false,
+    ['verify']
+  );
+}
+
+// `orderedCiphertextsB64` must be sorted by each entry's own stable id
+// (e.g. `sequence`), never by list/display position -- the backend computes
+// the tag the same way (see transport.py's `_compute_replay_tag` docstring),
+// so this must match exactly or every tag will legitimately fail to verify.
+async function verifyReplayTag(
+  accessToken: string,
+  fields: ReplayProtectedFields,
+  orderedCiphertextsB64: string[]
+): Promise<void> {
+  const issuedAtSeconds = Number(fields.issued_at);
+  if (!Number.isFinite(issuedAtSeconds)) {
+    throw new Error('Vault envelope is missing a valid issued_at timestamp.');
+  }
+  const ageSeconds = Date.now() / 1000 - issuedAtSeconds;
+  if (Math.abs(ageSeconds) > MAX_ENVELOPE_AGE_SECONDS) {
+    throw new Error('Vault envelope is stale or has an implausible timestamp — refusing to decrypt a possible replay.');
+  }
+
+  const tokenBytes = utf8ToBytes(accessToken);
+  const key = await deriveReplayVerifyKey(tokenBytes, fields.replay_salt);
+  const canonical = [
+    fields.issued_at,
+    fields.server_epk,
+    fields.salt,
+    fields.pq_ciphertext,
+    fields.pq_salt,
+    orderedCiphertextsB64.join(','),
+  ].join('|');
+
+  const valid = await crypto.subtle.verify({ name: 'HMAC' }, key, b64ToBytes(fields.replay_tag), utf8ToBytes(canonical));
+  if (!valid) {
+    throw new Error('Vault envelope failed replay/integrity verification — refusing to decrypt.');
+  }
+}
+
 // Single password reveal. `entryId` for both the PQ and ECDH layers is a
 // fixed `0` here (and on the matching backend call in pwvault/views.py),
 // since this path only ever encrypts exactly one entry — no list, so no
@@ -267,6 +357,8 @@ export async function decryptVaultEnvelope(
   memberId: string,
   accessToken: string
 ): Promise<string> {
+  await verifyReplayTag(accessToken, envelope, [envelope.ciphertext]);
+
   const aad = utf8ToBytes(memberId);
 
   const pqSecret = await pqSharedSecret(kemSecretKey, envelope.pq_ciphertext);
@@ -294,12 +386,22 @@ export async function decryptVaultHistory(
   salt: string,
   pqCiphertext: string,
   pqSalt: string,
+  issuedAt: string,
+  replaySalt: string,
+  replayTag: string,
   entries: VaultHistoryEntryEnvelope[],
   privateKey: CryptoKey,
   kemSecretKey: Uint8Array,
   memberId: string,
   accessToken: string
 ): Promise<{ sequence: number; created_at: string; password: string }[]> {
+  const orderedCiphertexts = [...entries].sort((a, b) => a.sequence - b.sequence).map((entry) => entry.ciphertext);
+  await verifyReplayTag(
+    accessToken,
+    { issued_at: issuedAt, server_epk: serverEpk, salt, pq_ciphertext: pqCiphertext, pq_salt: pqSalt, replay_salt: replaySalt, replay_tag: replayTag },
+    orderedCiphertexts
+  );
+
   const aad = utf8ToBytes(memberId);
   const pqSecret = await pqSharedSecret(kemSecretKey, pqCiphertext);
   const sharedSecretMaterial = await ecdhSharedSecretMaterial(privateKey, serverEpk);

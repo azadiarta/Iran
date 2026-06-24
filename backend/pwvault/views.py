@@ -161,6 +161,7 @@ class MemberVaultPasswordHistoryView(APIView):
         if not decryptable:
             return api_success(data={
                 'server_epk': None, 'salt': None, 'pq_ciphertext': None, 'pq_salt': None,
+                'issued_at': None, 'replay_salt': None, 'replay_tag': None,
                 'entries': [], 'chain_intact': chain_intact,
             })
 
@@ -179,6 +180,9 @@ class MemberVaultPasswordHistoryView(APIView):
             'salt': bulk['salt'],
             'pq_ciphertext': bulk['pq_ciphertext'],
             'pq_salt': bulk['pq_salt'],
+            'issued_at': bulk['issued_at'],
+            'replay_salt': bulk['replay_salt'],
+            'replay_tag': bulk['replay_tag'],
             'entries': entries,
             'chain_intact': chain_intact,
         })
